@@ -27,6 +27,17 @@ fn break_wide_at(row: &mut Row, x: usize, blank: Cell) {
 }
 
 impl Grid {
+    /// Prepares `from..to` of row `y` to be overwritten: blanks the partner of a double-width
+    /// character that the range cuts in two.
+    pub(crate) fn clear_wide_edges(&mut self, y: usize, from: usize, to: usize, blank: Cell) {
+        if from >= to {
+            return;
+        }
+        let Some(row) = self.row_mut(y) else { return };
+        break_wide_at(row, from, blank);
+        break_wide_at(row, to - 1, blank);
+    }
+
     /// Erases cells `from..to` of row `y` with `blank` (clamped to the row).
     pub fn erase_cells(&mut self, y: usize, from: usize, to: usize, blank: Cell) {
         let Some(row) = self.row_mut(y) else { return };
@@ -39,6 +50,10 @@ impl Grid {
             break_wide_at(row, to, blank);
         }
         row.fill(from, to, blank);
+        if to >= row.len() {
+            // The end of the row is gone, so the row no longer continues on the next one.
+            row.set_flag(ferrum_scrollback::LineFlags::WRAPPED, false);
+        }
     }
 
     /// Inserts `n` blanks at `x`, pushing the rest of the row right; cells that fall off the

@@ -13,8 +13,13 @@ bitflags = { workspace = true }
 ferrum-scrollback = { workspace = true }
 rustc-hash = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 unicode-segmentation = { workspace = true }
 unicode-width = { workspace = true }
+vte = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
 
 [lints]
 workspace = true

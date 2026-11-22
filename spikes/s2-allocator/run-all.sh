@@ -6,7 +6,7 @@
 #   macOS   phys_footprint via `footprint <pid>`
 #   Windows Private Working Set via probe-windows.ps1 (PDH 'Working Set - Private')
 # Throughput (S1 parse+encode lines/s, no dhat) is printed by the process itself.
-# Output: one "RESULT ..." line per run. Usage (repo root): bash spikes/s2-allocator/run-all.sh [runs]
+# Output: one "RESULT ..." line per run (kind=base: 0-session baseline process). Usage (repo root): bash spikes/s2-allocator/run-all.sh [runs]
 set -euo pipefail
 cd "$(dirname "$0")"
 runs=${1:-3}
@@ -58,16 +58,22 @@ for cfg in "${configs[@]}"; do
   [ "$name" = system-arena1 ] && tdir=target/system # same binary, env var differs
   [ "$name" = mimalloc-nothp ] && tdir=target/mimalloc
   cargo build --release --target-dir "$tdir" ${features:+--features "$features"} >&2
-  for run in $(seq 1 "$runs"); do
-    tag=$name.$run
-    # shellcheck disable=SC2086
-    env $envs "$tdir/release/$exe" --idle-secs 10 --hold-secs 120 > "$res/$tag.out" &
-    for _ in $(seq 1 600); do grep -q STEADY "$res/$tag.out" 2> /dev/null && break; sleep 0.5; done
-    pid=$(grep -o 'pid=[0-9]*' "$res/$tag.out" | cut -d= -f2)
-    mem=$(sample "$pid" "$tag")
-    lps=$(awk '/^throughput.lines_per_s/ { print $2 }' "$res/$tag.out")
-    stop "$pid"
-    wait 2> /dev/null || true
-    echo "RESULT os=$os allocator=$name run=$run metric_bytes=$mem lines_per_s=$lps"
+  # kind=full: the S1 workload (10 sessions). kind=base: same binary, 0 sessions (empty-process
+  # baseline, so that "metric minus baseline" isolates what the workload costs per allocator).
+  for kind in full base; do
+    sessions=10
+    [ "$kind" = base ] && sessions=0
+    for run in $(seq 1 "$runs"); do
+      tag=$name.$kind.$run
+      # shellcheck disable=SC2086
+      env $envs "$tdir/release/$exe" --sessions "$sessions" --idle-secs 10 --hold-secs 120 > "$res/$tag.out" &
+      for _ in $(seq 1 600); do grep -q STEADY "$res/$tag.out" 2> /dev/null && break; sleep 0.5; done
+      pid=$(grep -o 'pid=[0-9]*' "$res/$tag.out" | cut -d= -f2)
+      mem=$(sample "$pid" "$tag")
+      lps=$(awk '/^throughput.lines_per_s/ { print $2 }' "$res/$tag.out")
+      stop "$pid"
+      wait 2> /dev/null || true
+      echo "RESULT os=$os allocator=$name kind=$kind run=$run metric_bytes=$mem lines_per_s=$lps"
+    done
   done
 done

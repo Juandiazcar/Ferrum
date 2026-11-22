@@ -27,9 +27,9 @@ jobs:
         shell: bash
         run: |
           uname -a
-          rustc -Vv | head -3
+          rustc -Vv | sed -n 1,3p
           case "$(uname -s)" in
-            Linux*) cat /sys/kernel/mm/transparent_hugepage/enabled; nproc; grep -m1 'model name' /proc/cpuinfo; ldd --version | head -1; free -m ;;
+            Linux*) cat /sys/kernel/mm/transparent_hugepage/enabled; nproc; grep -m1 'model name' /proc/cpuinfo; ldd --version | sed -n 1p; free -m ;;
             Darwin*) sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize || true; sw_vers ;;
           esac
           true

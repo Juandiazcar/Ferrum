@@ -27,3 +27,19 @@ does nothing (`erase_in_line`), RIS discards the scrollback (`grid_reset`), each
 DECSC memory across alternate-screen visits and the character sets are shared by both screens
 (`saved_cursor_alt`), and SGR 21 cancels bold instead of setting a double underline
 (`underline`; `4:2` is the double underline).
+
+## Unicode data files (`fixtures/unicode/`)
+
+- **Source:** the Unicode Consortium, Unicode 17.0.0 (the version of the `unicode-segmentation`
+  1.13.3 tables the crate uses):
+  `https://www.unicode.org/Public/17.0.0/ucd/auxiliary/GraphemeBreakTest.txt`,
+  `https://www.unicode.org/Public/17.0.0/emoji/emoji-sequences.txt` and
+  `https://www.unicode.org/Public/17.0.0/emoji/emoji-zwj-sequences.txt`.
+- **License:** Unicode License v3 (`fixtures/unicode/LICENSE-UNICODE.txt`, from
+  <https://www.unicode.org/license.txt>). Copyright (c) 1991-2026 Unicode, Inc.
+- **What was changed:** nothing; the files are byte for byte as downloaded.
+- **Runner:** `crates/ferrum-vt/tests/unicode_conformance.rs`: every line of
+  `GraphemeBreakTest.txt` must split as listed (segmentation functions, and a terminal for text
+  without controls), and every sequence of the two emoji files must be one cluster of two columns.
+  On a terminal, a cluster that starts with a zero-width scalar is not checked: such a scalar
+  never takes a cell and joins the cell before it (`docs/user/compat.md`, "Width of a cluster").

@@ -29,6 +29,34 @@ links: `docs/adr/0016-allocator-choice.md`.
 - `docs/03` §2 slack rows not replaced (slack not isolable from whole-process numbers); no
   allowance or gate changed; no open question raised.
 
+## Spike S3 Render pipeline (branch `spike/s3-render-pipeline`, ADR 0025)
+
+Throwaway harness in `spikes/s3-render-pipeline/` (standalone package, product lint tables,
+`unsafe_code = "forbid"`, clippy clean; `winit` 0.30.13, `softbuffer` 0.4.8, `swash` 0.2.10, `fontdb`
+0.24.0, `tiny-skia` 0.12.0, `rfd` 0.18.0, JetBrains Mono 2.304 variable). Method, per-OS tables,
+reproduction commands and CI run links: `docs/adr/0025-render-pipeline-measurements.md`. Windows 11
+(i5-9400, local, real display) and CI run 45028410900 (Xvfb, headless weston, macOS runner; the
+temporary workflow was deleted in the last commit). Three runs of everything.
+
+| Item | Result (MiB for memory; ranges are the three runs) |
+|---|---|
+| Full repaint 200×60, typical mix (NFR-PERF-03, target 2.5 ms) | Windows 0.98–1.15 ms; Linux CI 0.66 ms; macOS 0.39–0.57 ms (clamped window, 146×40 cells only) |
+| Full repaint 200×60, dense text (12 000 glyphs) | **Windows 2.64–2.88 ms (over 2.5 ms; Q-19: target kept, SIMD blitter required in WP-07)**; Linux CI 1.60–1.70 ms; macOS 0.79–0.83 ms (clamped) |
+| 4-row damage frame (repaint + `present_with_damage`) | Windows 61–76 + 35–37 µs (full-rect present 0.78–0.80 ms); X11 34–71 + 0.3 µs; Wayland 34.5 + 2.8–2.9 µs; macOS 29–30 + 0.9–1.0 µs |
+| `buffer_age` over the first four presents | Windows 0, 1, 1, 1; X11 0, 1, 1, 1; Wayland 0, 0, 2, 2 (double buffer); **macOS 0, 0, 0, 0 (contents undefined)** |
+| Idle total at 1440×900 (spike only, no UI toolkit) | Windows 7.23 PWS; X11 7.93–8.11 PSS; Wayland 8.49–11.00 PSS; macOS 24.42–24.52 `phys_footprint` (window clamped to 1024×642) |
+| Window surface | Windows 5.1 (one buffer); X11 2.6 PSS (4.94 mapped, shared with the X server); Wayland 5.0–7.5 PSS (two buffers, 9.9 mapped); 2880×1800 equivalent: Windows 19.8–19.9, X11 10.0 PSS, Wayland 29.7–29.8 PSS at idle |
+| Process base (window created) | Windows 1.8, X11 4.6–4.7, Wayland 2.6–2.7, **macOS 10.6–10.7 (allowance 4.5; Q-20: unchanged, real-Mac run decides)** |
+| Glyph cache, fonts | 10 032 B for 94 ASCII glyphs; font plus cache 0.26–0.88 resident (0.29 MiB file) |
+| `tiny-skia` | rounded rect 4.5–9 µs, stroke 6.6–13 µs, gradient 30–50 µs, shadow tile 0.29–0.50 ms; binary +272–282 KB (+8.5 % Linux, +17.5–19.0 % Windows and macOS); tiles 0.84 MiB (0.64–1.28 resident delta) |
+| `rfd` | binary +9 KB Windows, +109 KB Linux, +17 KB macOS; linked and unused: no measurable memory; Windows dialog open +6.2 to +6.4, still +5.0 to +5.1 six seconds after closing |
+
+- `docs/03` §2 UI rows (process base, window surface, glyph cache, fonts, chrome tiles) now hold measured values; allowances and gates untouched.
+- Decisions (ADR 0025): keep `tiny-skia` for chrome tiles only; native folder dialog through `rfd` run in a short-lived helper process, with the in-app path input as fallback (approved by the maintainer 2026-11-21, Q-06 extended); ADR 0006 validated as an architecture.
+- **Over target, decided by the maintainer 2026-11-21 (no S3 question stays open):** Q-19, the target stays 2.5 ms on dense text and WP-07 must meet it with the SIMD blitter (spike scalar blitter: Windows 2.97–3.00 ms); Q-20, the macOS process-base allowance is unchanged and a real-Mac run of the spike (MV-S3-1) before WP-08 decides.
+- ADR 0025 Consequences carry implementation requirements for WP-07/WP-08 (honor `buffer_age`, touch every pixel on the first frame, LRU for the glyph cache, X11 dev packages on the Linux build image).
+- Not measured: HiDPI hardware (scale 1.0 everywhere), unclamped macOS window, idle CPU, Linux and macOS folder dialogs, real glyph working set (CJK, emoji, weights), a non-scalar blitter. Steps are in `docs/manual-verification.md` (MV-S3-1 to MV-S3-4).
+
 ## Spike S4 Windows PTY (branch `spike/s4-windows-pty`, ADR 0026)
 
 Throwaway harness in `spikes/s4-windows-pty/` (standalone package, `unsafe_code = "forbid"`, only

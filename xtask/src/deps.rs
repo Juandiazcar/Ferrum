@@ -8,6 +8,8 @@ use anyhow::{Context, Result};
 use cargo_metadata::{DependencyKind, MetadataCommand};
 use serde::Deserialize;
 
+use crate::out;
+
 const RULES_PATH: &str = "xtask/deps-rules.toml";
 const TESTKIT: &str = "ferrum-testkit";
 
@@ -89,36 +91,37 @@ fn find_cycles(nodes: &[Node]) -> Vec<String> {
             (node.name.as_str(), targets)
         })
         .collect();
-    let mut done = BTreeSet::new();
-    let mut errors = Vec::new();
-    for start in graph.keys() {
-        let mut path = Vec::new();
-        visit(start, &graph, &mut path, &mut done, &mut errors);
+    let mut walk = Walk { graph, done: BTreeSet::new(), errors: Vec::new() };
+    for start in walk.graph.keys().copied().collect::<Vec<_>>() {
+        walk.visit(start, &mut Vec::new());
     }
-    errors
+    walk.errors
 }
 
-fn visit<'a>(
-    node: &'a str,
-    graph: &BTreeMap<&'a str, Vec<&'a str>>,
-    path: &mut Vec<&'a str>,
-    done: &mut BTreeSet<&'a str>,
-    errors: &mut Vec<String>,
-) {
-    if let Some(position) = path.iter().position(|seen| *seen == node) {
-        let mut cycle = path.get(position..).unwrap_or_default().to_vec();
-        cycle.push(node);
-        errors.push(format!("dependency cycle: {}", cycle.join(" -> ")));
-        return;
+/// Depth-first traversal state for cycle detection.
+struct Walk<'a> {
+    graph: BTreeMap<&'a str, Vec<&'a str>>,
+    done: BTreeSet<&'a str>,
+    errors: Vec<String>,
+}
+
+impl<'a> Walk<'a> {
+    fn visit(&mut self, node: &'a str, path: &mut Vec<&'a str>) {
+        if let Some(position) = path.iter().position(|seen| *seen == node) {
+            let mut cycle = path.get(position..).unwrap_or_default().to_vec();
+            cycle.push(node);
+            self.errors.push(format!("dependency cycle: {}", cycle.join(" -> ")));
+            return;
+        }
+        if !self.done.insert(node) {
+            return;
+        }
+        path.push(node);
+        for next in self.graph.get(node).cloned().unwrap_or_default() {
+            self.visit(next, path);
+        }
+        path.pop();
     }
-    if !done.insert(node) {
-        return;
-    }
-    path.push(node);
-    for next in graph.get(node).into_iter().flatten() {
-        visit(next, graph, path, done, errors);
-    }
-    path.pop();
 }
 
 fn load_nodes() -> Result<Vec<Node>> {
@@ -153,10 +156,13 @@ pub(crate) fn run() -> Result<bool> {
     let nodes = load_nodes()?;
     let errors = validate(&nodes, &rules);
     for error in &errors {
-        eprintln!("check-deps: {error}");
+        out::error(&format!("check-deps: {error}"));
     }
     if errors.is_empty() {
-        println!("check-deps: {} workspace crates, layering rules satisfied", nodes.len());
+        out::info(&format!(
+            "check-deps: {} workspace crates, layering rules satisfied",
+            nodes.len()
+        ));
     }
     Ok(errors.is_empty())
 }

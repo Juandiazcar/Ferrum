@@ -2,7 +2,17 @@
 
 use anyhow::Result;
 
+use crate::out;
 use crate::tools::{self, TOOLS};
+
+/// How much of CI to mirror.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Scope {
+    /// Everything CI runs.
+    Full,
+    /// The subset used by the pre-push hook.
+    Fast,
+}
 
 struct Step {
     name: &'static str,
@@ -67,26 +77,26 @@ const STEPS: &[Step] = &[
     },
 ];
 
-pub(crate) fn run(fast: bool) -> Result<bool> {
+pub(crate) fn run(scope: Scope) -> Result<bool> {
     let missing: Vec<_> = TOOLS.iter().filter(|tool| !tools::is_installed(tool)).collect();
     if !missing.is_empty() {
         for tool in &missing {
-            eprintln!("missing tool {}: {}", tool.name, tool.install);
+            out::error(&format!("missing tool {}: {}", tool.name, tool.install));
         }
-        eprintln!("Missing tools are an error, never a skip. See `cargo xtask setup`.");
+        out::error("Missing tools are an error, never a skip. See `cargo xtask setup`.");
         return Ok(false);
     }
     let mut failed = Vec::new();
-    for step in STEPS.iter().filter(|step| step.fast || !fast) {
-        println!("==> {}: {}", step.name, step.argv.join(" "));
+    for step in STEPS.iter().filter(|step| step.fast || scope == Scope::Full) {
+        out::info(&format!("==> {}: {}", step.name, step.argv.join(" ")));
         if !tools::run(step.argv, step.envs)? {
             failed.push(step.name);
         }
     }
     if failed.is_empty() {
-        println!("xtask check: all steps passed");
+        out::info("xtask check: all steps passed");
     } else {
-        eprintln!("xtask check: FAILED steps: {}", failed.join(", "));
+        out::error(&format!("xtask check: FAILED steps: {}", failed.join(", ")));
     }
     Ok(failed.is_empty())
 }

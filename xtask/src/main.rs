@@ -3,11 +3,9 @@
 //! Subcommands that need later work packages are stubs: they print what is missing and exit
 //! non-zero, never fake numbers.
 
-// xtask is the one place where printing to the terminal is the job (docs/05 §8).
-#![allow(clippy::print_stdout, clippy::print_stderr)]
-
 mod check;
 mod deps;
+mod out;
 mod setup;
 mod tools;
 
@@ -53,15 +51,17 @@ struct StubArgs {
 const EXIT_NOT_IMPLEMENTED: u8 = 2;
 
 fn not_implemented(command: &str, work_package: &str, reason: &str) -> ExitCode {
-    eprintln!("xtask {command}: not implemented until {work_package} ({reason}).");
-    eprintln!("No measurement was taken and none is reported.");
+    out::error(&format!("xtask {command}: not implemented until {work_package} ({reason})."));
+    out::error("No measurement was taken and none is reported.");
     ExitCode::from(EXIT_NOT_IMPLEMENTED)
 }
 
 fn main() -> ExitCode {
     let result = match Cli::parse().command {
         Command::Setup => setup::run(),
-        Command::Check { fast } => check::run(fast),
+        Command::Check { fast } => {
+            check::run(if fast { check::Scope::Fast } else { check::Scope::Full })
+        }
         Command::CheckDeps => deps::run(),
         Command::Bench(_) => {
             return not_implemented("bench", "WP-01/WP-02", "no benches exist before those crates");
@@ -77,7 +77,7 @@ fn main() -> ExitCode {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::FAILURE,
         Err(error) => {
-            eprintln!("xtask: {error:#}");
+            out::error(&format!("xtask: {error:#}"));
             ExitCode::FAILURE
         }
     }

@@ -1,0 +1,11 @@
+# typos-cli configuration (docs/04 §1). Keep exclusions minimal and justified.
+[files]
+extend-exclude = [
+  "LICENSE-APACHE",   # verbatim third-party legal text
+  "LICENSE-MIT",
+  "Cargo.lock",
+  "assets/",          # brand assets and, later, fonts and generated files
+]
+
+[default.extend-words]
+# Terminal vocabulary that looks like a typo (add entries only with a reason).

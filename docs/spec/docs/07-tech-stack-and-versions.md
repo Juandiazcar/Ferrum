@@ -36,7 +36,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | IPC sockets/pipes | `interprocess` | 2.4.9 | proto/daemon/app | UDS + Windows named pipes with a uniform API |
 | Serialization | `serde` | 1.0.229 | all | derive only where needed |
 | Wire format | `postcard` | 1.1.3 | proto | compact, no-std friendly, deterministic |
-| Config format | `toml` | 1.2.1 | config | serde-based; atomic writes by us |
+| Config format | `toml` | 1.2.2 (re-verified 2026-11-21) | config, xtask | serde-based; atomic writes by us |
 | Compression (scrollback) | `lz4_flex` | 0.14.2 | scrollback | pure Rust, `default-features = false`, `safe-encode`/`safe-decode` |
 | mmap | `memmap2` | 0.9.12 | scrollback, render | spill files and fonts |
 | Byte search | `memchr` | 2.8.3 | vt, scrollback | |
@@ -56,6 +56,8 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Archives (export) | `tar` | 0.4.46 | config | `.ferrum` = tar + zstd |
 | Zstd | `zstd` | 0.14.4 | config | export archives only |
 | CLI args | `lexopt` | 0.3.2 | app, daemon | tiny; `clap` is only used in `xtask` |
+| xtask CLI | `clap` | 4.6.9 (verified 2026-11-21) | xtask only | derive parser for `cargo xtask`; never in shipped binaries |
+| xtask graph check | `cargo_metadata` | 0.23.1 (verified 2026-11-21) | xtask only | typed `cargo metadata` for `check-deps`; brings `serde_json`, build tooling only |
 | Error types | `thiserror` | 2.0.21 | libs | |
 | Error context (bins) | `anyhow` | 1.0.104 | app, daemon, xtask | |
 | Logging | `tracing` | 0.1.44 | all | `max_level_*` features compile out debug/trace in release |
@@ -121,7 +123,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | `cargo-dist` | 0.34.0 | evaluate for release automation (name/state may have changed; fallback is a hand-written matrix workflow) |
 | `cargo-packager` | 0.11.8 | alternative packager to evaluate for .deb/.msi/.dmg |
 | `vttest` | system package | manual VT conformance runs |
-| GitHub Actions | **resolve at WP-00** | `actions/checkout`, `actions/upload-artifact`, `actions/download-artifact`, a Rust cache action, `taiki-e/install-action`, a release-upload action; pin by SHA |
+| GitHub Actions | resolved at WP-00 (2026-11-21), pinned by SHA in `.github/workflows/ci.yml` | `actions/checkout` v7.0.1, `Swatinem/rust-cache` v2.9.3, `taiki-e/install-action` v2.90.8, `dtolnay/rust-toolchain` (default-branch SHA, no releases); `actions/upload-artifact` v7.0.2 is resolved but unused until a job needs it; Dependabot keeps them current |
 
 ## 5. Fonts and assets
 

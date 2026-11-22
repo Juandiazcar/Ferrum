@@ -1,0 +1,19 @@
+[package]
+name = "ferrum-daemon"
+description = "session manager, event loop, client server and layout persistence (library behind the ferrumd binary)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "ferrum_daemon"
+
+[[bin]]
+name = "ferrumd"
+path = "src/main.rs"

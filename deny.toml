@@ -1,0 +1,44 @@
+# cargo-deny policy. Reconciled in WP-00 against `cargo deny init` of cargo-deny 0.22.0: every key below
+# exists in that schema and `cargo deny check` passes. The "license was not encountered" warnings are
+# expected while the dependency tree is nearly empty; the allow-list is the project policy (docs/10 §6).
+
+[graph]
+all-features = true
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+]
+
+[advisories]
+yanked = "deny"
+ignore = []                      # every ignore needs a comment + expiry date
+
+[licenses]
+confidence-threshold = 0.9
+allow = [
+  "MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib",
+  "Unicode-3.0", "CC0-1.0", "MPL-2.0", "BSL-1.0",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+deny = [
+  { crate = "openssl" },
+  { crate = "openssl-sys" },
+  { crate = "native-tls" },
+  # v1.0 has no async runtime; lifting these needs ADR (docs/13 §7)
+  { crate = "tokio" },
+  { crate = "async-std" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -73,7 +73,7 @@ The **only** allowed internal dependency edges (an edge not listed is forbidden)
 | `ferrum-platform` | — | clipboard, dirs, single-instance, memory metric; exposes traits for consumers that need injection |
 | `ferrum-vt` | `scrollback` | pure terminal state machine |
 | `ferrum-render` | — | no windowing; writes into `&mut [u32]`; takes plain values (colors, metrics), not config types |
-| `ferrum-daemon` | `vt`, `scrollback`, `proto`, `config`, `project`, `pty` | uses `pty`/`platform` through traits; real implementations are injected by the `ferrumd` binary's `main` |
+| `ferrum-daemon` | `vt`, `scrollback`, `proto`, `config`, `project`, `pty`, `platform` | the library uses `pty`/`platform` only through traits; real implementations are wired only in the `ferrumd` bin (`src/main.rs`) (ADR 0023) |
 | `ferrum-ui` | `render`, `proto`, `config`, `project` | **never** `daemon`, `pty`, `winit` |
 | `ferrum-app` | everything (+ `winit`, `softbuffer`) | composition root for the `ferrum` binary |
 | `ferrum-testkit` | any | only from `[dev-dependencies]` |

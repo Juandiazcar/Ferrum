@@ -1,0 +1,12 @@
+[package]
+name = "ferrum-ui"
+description = "minimal widget toolkit, layout engine, sidebar/splits/status bar, input mapping and theme application"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

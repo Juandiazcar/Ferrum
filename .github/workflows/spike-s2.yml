@@ -36,6 +36,9 @@ jobs:
       - name: Allocator comparison (3 runs per configuration)
         shell: bash
         run: bash spikes/s2-allocator/run-all.sh 3 2>&1 | grep -v '^ *\(Compiling\|Checking\|Locking\|Updating\|Downloaded\|Downloading\)' | tee results.txt
+      - name: Interleaved throughput (10 rounds)
+        shell: bash
+        run: bash spikes/s2-allocator/run-throughput.sh 10 2>&1 | grep THROUGHPUT | tee throughput.txt
       - name: Raw probe output
         if: always()
         shell: bash

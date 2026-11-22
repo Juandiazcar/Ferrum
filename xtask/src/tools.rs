@@ -64,3 +64,14 @@ pub(crate) fn run(argv: &[&str], envs: &[(&str, &str)]) -> Result<bool> {
         .with_context(|| format!("failed to start `{command}`"))?;
     Ok(status.success())
 }
+
+/// Runs `argv` and returns its stdout; an error when it cannot start or exits non-zero.
+pub(crate) fn capture(argv: &[&str]) -> Result<String> {
+    let (command, rest) = argv.split_first().context("empty command")?;
+    let output = Command::new(command)
+        .args(rest)
+        .output()
+        .with_context(|| format!("failed to start `{command}`"))?;
+    anyhow::ensure!(output.status.success(), "`{}` failed", argv.join(" "));
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}

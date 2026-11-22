@@ -62,7 +62,7 @@ line := flags:u8 | text_len:varint | utf8_text (trailing default-blank cells tri
 - `style_id` indexes a per-session **style table** (fg, bg, attrs interned; typical sessions use < 200 styles).
 - Wide characters and combining sequences are derived from the text at decode time (width table), not stored.
 - Lines are appended to a **hot chunk** (the newest ≤ 1 024 lines, uncompressed). When full it is **sealed**: LZ4-block compressed (`lz4_flex`) and kept as a `Box<[u8]>` with an index of line offsets (delta-encoded).
-- Beyond `spill_threshold` (default 50 000 lines per session) the oldest sealed chunks are written to an mmap-able spill file in the run directory and dropped from RAM; reading faults them back.
+- Beyond `spill_threshold` (default 50 000 lines per session) the oldest sealed chunks are written to a spill file in the run directory and dropped from RAM; reading copies one chunk back with a positional file read (no mmap, no `unsafe`: ADR 0027).
 - Reflow decodes only the affected chunks, re-wraps using the `wrapped` flag, and re-encodes. Large reflows run on a worker with a time budget and yield.
 
 ### 3.3 Why not `alacritty_terminal`

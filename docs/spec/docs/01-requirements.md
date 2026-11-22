@@ -18,7 +18,7 @@ Every requirement has an ID. Tests and PRs reference IDs (e.g. `Refs: FR-TERM-01
 | FR-TERM-008 | M | Kitty keyboard protocol (progressive enhancement) and legacy encodings; correct modifier handling incl. macOS Option-as-Alt setting |
 | FR-TERM-009 | M | OSC support: 0/1/2 (title), 4/10/11/12 (colors, query+set), 7 (cwd), 8 (hyperlinks), 52 (clipboard, permission-gated), 133 (prompt/command marks), 1337 `File=` inline images (subset), 9;4 progress |
 | FR-TERM-010 | M | Window resize with **reflow** of wrapped lines, including scrollback |
-| FR-TERM-011 | M | Scrollback: configurable (default 10 000 lines, min 0, max 1 000 000); beyond 50 000 lines cold history spills to disk (mmap) |
+| FR-TERM-011 | M | Scrollback: configurable (default 10 000 lines, min 0, max 1 000 000); beyond 50 000 lines cold history spills to disk (plain positional file reads and writes, no mmap: ADR 0027) |
 | FR-TERM-012 | S | Kitty graphics protocol (subset: PNG/RGBA transmit, place, delete) with bounded image cache |
 | FR-TERM-013 | S | Sixel (decode to the same bounded cache) |
 | FR-TERM-014 | M | Selection: click, double-click (word), triple-click (line), rectangular (Alt+drag), shift-extend, auto-scroll while dragging |

@@ -2,6 +2,40 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## WP-01 `ferrum-scrollback` (stack of PRs from `docs/adr-spill-without-mmap`)
+
+Done so far: ADR 0027 (spill without mmap), the crate (encoding, style table, chunks, spill ring,
+search, memory report, `decode_chunk`), property/spill/search/dhat tests, the `SpillStore` contract
+suite in `ferrum-testkit`, the product fixture generator in `fixtures/output/`.
+
+Per-session memory re-measured with the product fixture generator (Q-17; 12 000 logical lines fed,
+10 000 rows retained, `dhat` requested bytes reconcile with `memory_report()` to 84 bytes, seeds 1-3):
+
+| Content | Hot chunk | Sealed | Crate misc | Shared LZ4 scratch | Crate sum |
+|---|---|---|---|---|---|
+| Reference mix (`Mixed`) | 85 735-85 848 B | 338 264-342 854 B | 876 B | 106 594-106 698 B | 424 875-429 578 B |
+| Random ASCII (`Entropy`) | 85 687-85 784 B | 706 238-708 977 B | 876 B | 106 594-106 698 B | 792 801-795 626 B |
+
+- Reference mix: with the live grid 0.176 MB and read buffer 0.066 MB of ADR 0024 (the grid is
+  WP-02, the buffer WP-06; not re-measurable here) a session is 0.667-0.672 MB, inside the 1.0 MB
+  allowance; hot chunk within 0.10 MB (asserted by `tests/memory_budget.rs`). **No Q-21**: the
+  reference scenario is within budget. Random ASCII is the already-recorded Q-17 over-allowance
+  case (about 1.04 MB per session); the WP-08 gate decides.
+- Generator achieved mix (counted by `tests/fixture_mix.rs`): colored 33-37 %, mean columns 66-74,
+  non-ASCII 3.9-6.1 %, long lines 1.2-2.8 %, 4.0 runs per colored line, 12 160-12 260 rows.
+- `push_line` allocation (dhat, `tests/alloc_push_line.rs`): 0 blocks inside a chunk; exactly 1
+  block (the sealed blob) on the push that seals; the LZ4 hash table is reused (`CompressTable`).
+
+Deviations / notes:
+- Internal entries of `[workspace.dependencies]` now carry `version = "0.1.0"` (cargo-deny rejects
+  path-only entries); `cargo xtask release prepare` (WP-18) must bump them with the workspace version.
+  `cargo hack` runs `--locked` again, without `--no-dev-deps`.
+- Sealing and spill I/O run inline on the pushing thread; `docs/02` §5 puts compression on the
+  worker, which is a WP-06 wiring decision (`Scrollback` is `Send`).
+- Search matches per row (a match spanning a soft wrap is not found here); regex is a
+  `LineMatcher` implemented by the daemon (no regex dependency added).
+- Column widths of wide characters are derived by the consumer from the stored scalars.
+
 ## Spike S2 Allocator (branch `spike/s2-allocator`, ADR 0016)
 
 Throwaway harness in `spikes/s2-allocator/` (standalone package, `unsafe_code = "forbid"`, S1's

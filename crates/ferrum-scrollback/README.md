@@ -50,6 +50,7 @@ oldest                                                              newest
 | `Scrollback::new` / `with_spill` | create with a `ScrollbackConfig` (and a `Box<dyn SpillStore>`) |
 | `push_line(&LineRef)` | append one row (hot path) |
 | `read_line(index, &mut LineCursor)` | random access, 0 = oldest retained line |
+| `pop_front(&mut LineCursor)` | removes and returns the oldest line; lets `ferrum-vt` rewrite history for reflow by popping the front and pushing at the back, freeing chunks as it goes |
 | `search(matcher, Direction, start)` | iterator of `LineMatch` over decoded lines; `LineMatcher` is the regex hook, `LiteralMatcher` does substring with a case toggle (matching is per row) |
 | `memory_report()` | capacity-based bytes by category: hot chunk, sealed, misc, shared scratch, spill disk |
 | `take_event()`, `spill_state()`, `dropped_lines()` | spill and eviction status |

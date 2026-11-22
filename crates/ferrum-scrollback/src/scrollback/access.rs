@@ -61,6 +61,26 @@ impl Scrollback {
         Ok(Some(&cursor.line))
     }
 
+    /// Removes the oldest retained line and returns it, decoded into `cursor`. `Ok(None)` when
+    /// the store is empty. The removal counts in [`dropped_lines`](Self::dropped_lines), so a
+    /// caller that rewrites the history (reflow in `ferrum-vt`) by popping the front and pushing
+    /// at the back can tell by the absolute index `dropped_lines()` which lines are still the
+    /// old ones. Chunks are freed as they are consumed, so rewriting needs no second copy.
+    ///
+    /// # Errors
+    /// [`ScrollbackError`] when stored data fails validation or the spill store fails; the line
+    /// is then not removed.
+    pub fn pop_front<'c>(
+        &mut self,
+        cursor: &'c mut LineCursor,
+    ) -> Result<Option<&'c DecodedLine>, ScrollbackError> {
+        if self.read_line(0, cursor)?.is_none() {
+            return Ok(None);
+        }
+        self.drop_front_line();
+        Ok(Some(&cursor.line))
+    }
+
     fn locate(&self, index: usize) -> Option<Location> {
         if index >= self.retained {
             return None;

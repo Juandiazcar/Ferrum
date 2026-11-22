@@ -1,0 +1,39 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 140x32 history 0
+row |sh-5.2$ cat alacritty_terminal/tests/ref/hyperlinks/alacritty.recording|
+row |sh-5.1$ printf '\e]8;;https://example.com\e\\foo\e]8;;\e\\\n'|
+row |foo|
+  0-2 link=https://example.com
+row |sh-5.1$ printf '\e]8;;https://example.com\e\\foo\e]8;;\e\\\n'|
+row |foo|
+  0-2 link=https://example.com
+row |sh-5.1$ printf '\e]8;id=42;https://example.com\e\\bar\e]8;;\e\\\n'|
+row |bar|
+  0-2 link=https://example.com
+row |sh-5.1$ printf '\e]8;id=42;https://example.com\e\\bar\e]8;;\e\\\n'|
+row |bar|
+  0-2 link=https://example.com
+row |sh-5.1$|
+row |exit|
+row |sh-5.2$ printf '\e]8;id=hello;http://example.com/naoheu;ntahoeu\e\\This is a link\e]8;id=hello;\e\\\n'|
+row |This is a link|
+  0-13 link=http://example.com/naoheu;ntahoeu
+row |sh-5.2$ exit|
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

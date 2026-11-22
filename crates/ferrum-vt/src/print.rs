@@ -94,7 +94,7 @@ impl<S: EventSink> Core<S> {
 
     /// Prints a run of printable ASCII (0x20..=0x7E) in bulk.
     pub(crate) fn print_ascii(&mut self, bytes: &[u8]) {
-        if !self.screen().charsets.is_plain() || self.modes.contains(Mode::INSERT) {
+        if !self.charsets.is_plain() || self.modes.contains(Mode::INSERT) {
             for &byte in bytes {
                 self.print_char(char::from(byte));
             }
@@ -148,7 +148,7 @@ impl<S: EventSink> Core<S> {
             self.control(control);
             return;
         }
-        let c = self.screen_mut().charsets.map(c);
+        let c = self.charsets.map(c);
         self.last_char = Some(c);
         let width = char_width(c);
         if width == 0 {

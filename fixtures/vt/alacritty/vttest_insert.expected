@@ -1,0 +1,31 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 105x29 history 0
+row |A******************************************************************************BAAAAAAAAAAAAAAAAAAAAAAAAA|
+row ||
+row ||
+row |Test of 'Insert Mode'. The top line should be 'A*** ... ***B'. Push <RETURN>|
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

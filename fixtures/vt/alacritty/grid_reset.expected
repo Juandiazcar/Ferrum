@@ -1,0 +1,35 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 105x29 history 100
+row |%                                                                                                        |W
+  0-0 bold inverse
+row |                                                                                                         |W
+row | UL  ~/…/tests/ref/grid_reset  dynamic-alloc |
+  0-3 fg=i0 bg=i9
+  4-29 fg=i7 bg=i8
+  30-44 fg=i0 bg=i9
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

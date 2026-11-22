@@ -1,0 +1,37 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 105x29 history 0
+row |jwilm@jwilm-desk ➜  ~/code/alacritty  printf "f\e[10b"|
+  17-19 fg=i2 bold
+  20-36 fg=i6 bold
+  38-43 fg=i5
+  45-53 fg=i3
+row |jwilm@jwilm-desk ➜  ~/code/alacritty |
+  17-19 fg=i2 bold
+  20-36 fg=i6 bold
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

@@ -1,0 +1,43 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 114x37 history 0
+row |Here%                                                                                                             |W
+  4-4 bold inverse
+row | UL  ~/programming/alacritty/alacritty  origin_mode ↑ |
+  0-3 fg=i0 bg=i9
+  4-38 fg=i7 bg=i8
+  39-53 fg=i0 bg=i9
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

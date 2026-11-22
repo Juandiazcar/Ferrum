@@ -1,6 +1,6 @@
 # decaln / basic
 
-ESC # 8 fills the screen with E and homes the cursor.
+ESC # 8 fills the screen with E in the default style; the cursor and the margins stay.
 
 Reference: xterm ctlseqs: DECALN. Terminal size: 20x6.
 

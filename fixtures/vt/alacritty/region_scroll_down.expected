@@ -1,0 +1,56 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 116x31 history 10
+row |-rw-r--r--  1 undeadleech undeadleech 1.3K Jun 24 23:58 alacritty.recording|
+  56-74 fg=i2
+row | UL  ~/…/tests/ref/region_scroll_…  scroll_down  ls -lah|
+  0-3 fg=i0 bg=i9
+  4-34 fg=i7 bg=i8
+  35-47 fg=i0 bg=i9
+row |total 12K|
+row |drwxr-xr-x  2 undeadleech undeadleech 4.0K Jun 24 23:58 .|
+  56-56 fg=i4
+row |drwxr-xr-x 37 undeadleech undeadleech 4.0K Jun 24 23:57 ..|
+  56-57 fg=i4
+row |-rw-r--r--  1 undeadleech undeadleech 1.9K Jun 24 23:58 alacritty.recording|
+  56-74 fg=i2
+row | UL  ~/…/tests/ref/region_scroll_…  scroll_down  ls -lah ../../../..|
+  0-3 fg=i0 bg=i9
+  4-34 fg=i7 bg=i8
+  35-47 fg=i0 bg=i9
+row |total 300K|
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row |^C|
+row | UL  ~/…/tests/ref/region_scroll_…  scroll_down  exit|
+  0-3 fg=i0 bg=i9
+  4-34 fg=i7 bg=i8
+  35-47 fg=i0 bg=i9
+row ||

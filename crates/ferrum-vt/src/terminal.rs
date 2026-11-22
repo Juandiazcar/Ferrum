@@ -7,6 +7,7 @@ use crate::cursor::{Cursor, CursorStyle};
 use crate::damage::Damage;
 use crate::error::VtError;
 use crate::events::EventSink;
+use crate::extras::Extras;
 use crate::grid::Grid;
 use crate::input::Input;
 use crate::keyboard::KeyboardFlags;
@@ -107,6 +108,11 @@ impl<S: EventSink> Terminal<S> {
     /// The active kitty keyboard flags of the visible screen (0 when none were pushed).
     pub fn keyboard_flags(&self) -> KeyboardFlags {
         self.core.screen().keyboard.current()
+    }
+
+    /// The hyperlink and underline-color tables that cells and history styles refer to.
+    pub fn extras(&self) -> &Extras {
+        &self.core.extras
     }
 
     /// The color palette and default colors.

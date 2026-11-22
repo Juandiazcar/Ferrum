@@ -1,0 +1,46 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 139x35 history 0
+row | UL  ~/…/tests/ref/zerowidth  zerowidth-slice  echo "( <0361>° <035c>ʖ <0361>°)"|
+  0-3 fg=i0 bg=i9
+  4-28 fg=i7 bg=i8
+  29-45 fg=i0 bg=i9
+  55-60 inverse
+  63-68 inverse
+  71-76 inverse
+row |( ͡° ͜ʖ ͡°)|
+row | UL  ~/…/tests/ref/zerowidth  zerowidth-slice |
+  0-3 fg=i0 bg=i9
+  4-28 fg=i7 bg=i8
+  29-45 fg=i0 bg=i9
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

@@ -53,9 +53,9 @@ impl<S: EventSink> Core<S> {
         );
         self.modes.insert(Mode::AUTOWRAP | Mode::CURSOR_VISIBLE);
         self.cursor_style = None;
+        self.charsets = Charsets::default();
         let screen = self.screen_mut();
         screen.region = Region::full(screen.grid.lines());
-        screen.charsets = Charsets::default();
         screen.saved = None;
         screen.cursor = Cursor {
             x: screen.cursor.x,

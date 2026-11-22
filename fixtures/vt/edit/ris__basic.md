@@ -1,6 +1,6 @@
 # ris / basic
 
-ESC c resets the terminal to its power-on state (history is kept).
+ESC c resets the terminal to its power-on state (and discards the history).
 
 Reference: xterm ctlseqs: RIS. Terminal size: 20x6.
 

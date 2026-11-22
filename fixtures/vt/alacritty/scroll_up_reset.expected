@@ -1,0 +1,34 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 102x29 history 0
+row |drwxr-xr-x  5 kchibisov kchibisov 4.0K Nov 13 20:02 alacritty_terminal|
+row |-rw-r--r--  1 kchibisov kchibisov  17K Nov 13 20:02 alacritty.yml|
+row |-rw-r--r--  1 kchibisov kchibisov 128K Nov 13 20:02 Cargo.lock|
+row |-rw-r--r--  1 kchibisov kchibisov  245 Nov  3 09:50 Cargo.toml|
+row |-rw-r--r--  1 kchibisov kchibisov  22K Nov 16 04:47 CHANGELOG.md|
+row |drwxr-xr-x  4 kchibisov kchibisov 4.0K Nov 13 20:02 ci|
+row |-rw-r--r--  1 kchibisov kchibisov 5.5K Nov 13 20:02 CONTRIBUTING.md|
+row |drwxr-xr-x  2 kchibisov kchibisov 4.0K Nov  3 09:50 .copr|
+row |drwxr-xr-x  5 kchibisov kchibisov 4.0K Nov 13 20:02 copypasta|
+row |drwxr-xr-x  2 kchibisov kchibisov 4.0K Sep 26 16:22 docs|
+row |[kchibisov@NightLord alacritty]$ echo -e "\e[10M"|
+  0-48 fg=i1 bold strike underline=single
+row |drwxr-xr-x  2 kchibisov kchibisov 4.0K Nov  3 09:50 scripts|
+row |[kchibisov@NightLord alacritty]$  4.0K Nov  3 09:50 servo-freetype-proxy|
+  0-32 fg=i1 bold strike underline=single
+row |drwxr-xr-x  4 kchibisov kchibisov 4.0K Nov 12 16:22 target|
+row |-rw-r--r--  1 kchibisov kchibisov 1.7K Nov 13 20:02 .travis.yml|
+row |drwxr-xr-x  3 kchibisov kchibisov 4.0K Nov 13 20:02 winpty|
+row |[kchibisov@NightLord alacritty]$  printf "\e[31;1;4;9m"|
+row |[kchibisov@NightLord alacritty]$ echo -e "\e[10H"|
+  0-48 fg=i1 bold strike underline=single
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

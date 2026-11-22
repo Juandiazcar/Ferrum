@@ -1,6 +1,5 @@
 //! One screen (primary or alternate): its grid, cursor and per-screen state.
 
-use crate::charset::Charsets;
 use crate::cursor::{Cursor, SavedCursor};
 use crate::grid::Grid;
 use crate::keyboard::KeyboardStack;
@@ -39,7 +38,6 @@ pub struct Screen {
     pub(crate) cursor: Cursor,
     pub(crate) saved: Option<SavedCursor>,
     pub(crate) region: Region,
-    pub(crate) charsets: Charsets,
     pub(crate) keyboard: KeyboardStack,
 }
 
@@ -51,7 +49,6 @@ impl Screen {
             cursor: Cursor::default(),
             saved: None,
             region: Region::full(size.rows()),
-            charsets: Charsets::default(),
             keyboard: KeyboardStack::default(),
         }
     }

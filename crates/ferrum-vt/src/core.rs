@@ -32,7 +32,13 @@ pub(crate) struct Core<S> {
     pub(crate) sink: S,
     pub(crate) primary: Screen,
     pub(crate) alt: Option<Screen>,
+    /// The alternate screen's DECSC memory, kept while the screen itself is freed (xterm keeps
+    /// one saved cursor per screen; the Alacritty reference test `saved_cursor_alt` relies on it).
+    pub(crate) alt_saved: Option<crate::cursor::SavedCursor>,
     pub(crate) modes: Mode,
+    /// G0 to G3 and the shift state. They belong to the terminal, not to a screen (xterm keeps
+    /// one set for both buffers), and DECSC saves and restores them.
+    pub(crate) charsets: crate::charset::Charsets,
     pub(crate) tabs: TabStops,
     pub(crate) scrollback: Scrollback,
     pub(crate) extras: Extras,
@@ -58,7 +64,9 @@ impl<S: EventSink> Core<S> {
             sink,
             primary: Screen::new(size),
             alt: None,
+            alt_saved: None,
             modes: Mode::default(),
+            charsets: crate::charset::Charsets::default(),
             tabs: TabStops::new(size.cols()),
             scrollback,
             extras: Extras::new(),

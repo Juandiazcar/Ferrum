@@ -53,7 +53,6 @@ impl<S: EventSink> Core<S> {
         let mut alt = Screen::new(size);
         alt.grid.copy_clipped_from(&old.grid);
         alt.cursor = old.cursor;
-        alt.charsets = old.charsets;
         alt.keyboard = old.keyboard;
         alt.saved = old.saved;
         self.alt = Some(alt);

@@ -1,0 +1,71 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 116x63 history 0
+row | UL  ~/…/tests/ref/tab_rendering  copy-tabs  echo '\tb\na\tb\naa\tb\naaa\tb\naaaa\tb\naaaaa\tb\naaaaaa\tb\naaaaaaa\t|W
+  0-3 fg=i0 bg=i9
+  4-32 fg=i7 bg=i8
+  33-43 fg=i0 bg=i9
+row |b\naaaaaaaa\tb\naaaaaaaaa\tb\naaaaaaaaaa\tb'|
+row |        b|
+row |a       b|
+row |aa      b|
+row |aaa     b|
+row |aaaa    b|
+row |aaaaa   b|
+row |aaaaaa  b|
+row |aaaaaaa b|
+row |aaaaaaaa        b|
+row |aaaaaaaaa       b|
+row |aaaaaaaaaa      b|
+row | UL  ~/…/tests/ref/tab_rendering  copy-tabs |
+  0-3 fg=i0 bg=i9
+  4-32 fg=i7 bg=i8
+  33-43 fg=i0 bg=i9
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

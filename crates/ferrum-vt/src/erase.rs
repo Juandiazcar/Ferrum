@@ -63,7 +63,6 @@ impl<S: EventSink> Core<S> {
             3 => self.clear_scrollback(),
             _ => {}
         }
-        self.screen_mut().cursor.wrap_pending = false;
     }
 
     /// EL and DECSEL.
@@ -71,12 +70,14 @@ impl<S: EventSink> Core<S> {
         let screen = self.screen();
         let (x, y, cols) = (screen.cursor.x, screen.cursor.y, screen.grid.cols());
         match mode {
+            // Erasing to the right with a wrap pending changes nothing: the cursor is "after"
+            // the last cell (the Alacritty reference test erase_in_line).
+            0 if self.screen().cursor.wrap_pending => {}
             0 => self.erase_span(y, x, cols, protection),
             1 => self.erase_span(y, 0, x + 1, protection),
             2 => self.erase_span(y, 0, cols, protection),
             _ => {}
         }
-        self.screen_mut().cursor.wrap_pending = false;
     }
 
     /// ECH: blanks `n` cells from the cursor without moving anything.
@@ -84,7 +85,6 @@ impl<S: EventSink> Core<S> {
         let n = args.count(0, 1);
         let (x, y) = (self.screen().cursor.x, self.screen().cursor.y);
         self.erase_span(y, x, x.saturating_add(n), Protection::Ignore);
-        self.screen_mut().cursor.wrap_pending = false;
     }
 
     /// ICH.
@@ -92,7 +92,6 @@ impl<S: EventSink> Core<S> {
         let screen = self.screen_mut();
         let (x, y, blank) = (screen.cursor.x, screen.cursor.y, screen.cursor.pen.blank());
         screen.grid.insert_blank(y, x, n, blank);
-        screen.cursor.wrap_pending = false;
     }
 
     /// DCH.
@@ -100,11 +99,10 @@ impl<S: EventSink> Core<S> {
         let screen = self.screen_mut();
         let (x, y, blank) = (screen.cursor.x, screen.cursor.y, screen.cursor.pen.blank());
         screen.grid.delete_cells(y, x, n, blank);
-        screen.cursor.wrap_pending = false;
     }
 
     /// `CSI 3 J`: drops the saved lines.
-    fn clear_scrollback(&mut self) {
+    pub(crate) fn clear_scrollback(&mut self) {
         let mut cursor = ferrum_scrollback::LineCursor::new();
         while matches!(self.scrollback.pop_front(&mut cursor), Ok(Some(_))) {}
     }

@@ -6,10 +6,12 @@
 mod bench;
 mod check;
 mod deps;
+mod import_refs;
 mod out;
 mod setup;
 mod tools;
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
@@ -46,6 +48,16 @@ enum Command {
         #[arg(long, value_name = "REV", conflicts_with = "save_baseline")]
         against: Option<String>,
     },
+    /// Convert the reference tests of `alacritty_terminal` (`tests/ref`, Apache-2.0) into the
+    /// compact fixtures of `fixtures/vt/alacritty/` (docs/08 section 4).
+    ImportAlacrittyRefs {
+        /// The `tests/ref` directory of an `alacritty_terminal` source tree.
+        #[arg(long, value_name = "DIR")]
+        from: PathBuf,
+        /// Where the fixtures are written.
+        #[arg(long, value_name = "DIR", default_value = "fixtures/vt/alacritty")]
+        to: PathBuf,
+    },
     /// Reference-scenario memory measurement (not implemented yet).
     Memcheck(StubArgs),
     /// Long-running leak check (not implemented yet).
@@ -75,6 +87,7 @@ fn main() -> ExitCode {
             check::run(if fast { check::Scope::Fast } else { check::Scope::Full })
         }
         Command::CheckDeps => deps::run(),
+        Command::ImportAlacrittyRefs { from, to } => import_refs::run(&from, &to),
         Command::Bench { quick, save_baseline, against } => bench::run(
             if quick { bench::Effort::Quick } else { bench::Effort::Full },
             &match (save_baseline, against) {

@@ -5,7 +5,7 @@ use crate::core::Core;
 use crate::cursor::{Cursor, SavedCursor};
 use crate::events::EventSink;
 use crate::modes::Mode;
-use crate::screen::{Region, Screen};
+use crate::screen::Screen;
 
 impl<S: EventSink> Core<S> {
     /// Routes `ESC <intermediates> <final>`.
@@ -20,10 +20,10 @@ impl<S: EventSink> Core<S> {
             ([], b'c') => self.reset(),
             ([], b'=') => self.modes.insert(Mode::APP_KEYPAD),
             ([], b'>') => self.modes.remove(Mode::APP_KEYPAD),
-            ([], b'n') => self.screen_mut().charsets.shift(2),
-            ([], b'o') => self.screen_mut().charsets.shift(3),
-            ([], b'N') => self.screen_mut().charsets.single_shift(2),
-            ([], b'O') => self.screen_mut().charsets.single_shift(3),
+            ([], b'n') => self.charsets.shift(2),
+            ([], b'o') => self.charsets.shift(3),
+            ([], b'N') => self.charsets.single_shift(2),
+            ([], b'O') => self.charsets.single_shift(3),
             ([b'#'], b'8') => self.screen_alignment_test(),
             ([slot @ (b'(' | b')' | b'*' | b'+')], final_byte) => {
                 self.designate(*slot, final_byte);
@@ -41,15 +41,15 @@ impl<S: EventSink> Core<S> {
             b'*' => 2,
             _ => 3,
         };
-        self.screen_mut().charsets.designate(index, charset);
+        self.charsets.designate(index, charset);
     }
 
     /// DECSC.
     pub(crate) fn save_cursor(&mut self) {
         let origin = self.modes.contains(Mode::ORIGIN);
+        let charsets = self.charsets;
         let screen = self.screen_mut();
-        screen.saved =
-            Some(SavedCursor { cursor: screen.cursor, origin, charsets: screen.charsets });
+        screen.saved = Some(SavedCursor { cursor: screen.cursor, origin, charsets });
     }
 
     /// DECRC. Without a saved state the cursor goes home with default attributes.
@@ -61,17 +61,15 @@ impl<S: EventSink> Core<S> {
         let last_y = screen.grid.lines().saturating_sub(1);
         screen.cursor =
             Cursor { x: saved.cursor.x.min(last_x), y: saved.cursor.y.min(last_y), ..saved.cursor };
-        screen.charsets = saved.charsets;
+        self.charsets = saved.charsets;
     }
 
-    /// DECALN: fills the screen with `E`.
+    /// DECALN: fills the screen with `E` in the default style. The cursor and the margins stay
+    /// where they are (the Alacritty reference test `decaln_reset`).
     fn screen_alignment_test(&mut self) {
         let screen = self.screen_mut();
-        screen.region = Region::full(screen.grid.lines());
-        screen.cursor.x = 0;
-        screen.cursor.y = 0;
-        screen.cursor.wrap_pending = false;
-        let fill = screen.cursor.pen.cell('E');
+        let mut fill = crate::cell::Cell::default();
+        fill.set_scalar('E');
         for y in 0..screen.grid.lines() {
             if let Some(row) = screen.grid.row_mut(y) {
                 row.fill(0, usize::MAX, fill);
@@ -80,10 +78,14 @@ impl<S: EventSink> Core<S> {
         }
     }
 
-    /// RIS: back to the power-on state. The history is kept.
+    /// RIS: back to the power-on state; the history is discarded too (the Alacritty reference
+    /// test `grid_reset`).
     pub(crate) fn reset(&mut self) {
+        self.clear_scrollback();
         let size = self.primary.grid.size();
         self.alt = None;
+        self.alt_saved = None;
+        self.charsets = crate::charset::Charsets::default();
         self.modes = Mode::default();
         self.tabs.reset();
         self.primary = Screen::new(size);

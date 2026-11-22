@@ -1,0 +1,59 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 157x40 history 0
+row |fork on  colored-underlines-v3 via 🦀 v1.59.0 ➜ echo -e '\e[58;2;255;0;255m\e[4:1mUNDERLINE\e[4:2mDOUBLE\e[58:5:196m\e[4:3mUh̷̗ERCURL\e[4:4mDOTTED\e[4:5mDASHE|W
+  0-3 fg=i4 bold
+  8-30 fg=i5 bold
+  36-45 fg=i1 bold
+  46-46 fg=i7 bold
+  48-51 fg=i10 bold
+  56-155 fg=i10
+row |D\e[59mNOT_COLORED_DASH\e[0m'|
+  0-28 fg=i10
+row |UNDERLINEDOUBLEUh̷̗ERCURLDOTTEDDASHEDNOT_COLORED_DASH|
+  0-8 underline=single ul=#ff00ff
+  9-14 underline=double ul=#ff00ff
+  15-22 underline=curly ul=i196
+  23-28 underline=dotted ul=i196
+  29-34 underline=dashed ul=i196
+  35-50 underline=dashed
+row |fork on  colored-underlines-v3 via 🦀 v1.59.0 ➜|
+  0-3 fg=i4 bold
+  8-30 fg=i5 bold
+  36-45 fg=i1 bold
+  46-46 fg=i7 bold
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

@@ -32,8 +32,8 @@ impl<S: EventSink> Core<S> {
             control::HT => self.tab_forward(1),
             control::LF | control::VT | control::FF => self.line_feed(),
             control::CR => self.carriage_return(),
-            control::SO => self.screen_mut().charsets.shift(1),
-            control::SI => self.screen_mut().charsets.shift(0),
+            control::SO => self.charsets.shift(1),
+            control::SI => self.charsets.shift(0),
             control::IND => self.index(),
             control::NEL => self.next_line(),
             control::HTS => {

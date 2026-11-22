@@ -13,5 +13,9 @@ lz4_flex = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+[dev-dependencies]
+dhat = { workspace = true }
+proptest = { workspace = true }
+
 [lints]
 workspace = true

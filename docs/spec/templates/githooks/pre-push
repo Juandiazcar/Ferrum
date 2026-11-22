@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs the same checks as CI (fast subset). Skip only for documented WIP pushes: git push --no-verify
+exec cargo xtask check --fast

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ferrum">
+  <title>Ferrum (monochrome mark)</title>
+  <g fill="currentColor">
+    <rect x="148" y="116" width="72" height="280"/>
+    <rect x="148" y="116" width="216" height="72"/>
+    <rect x="148" y="224" width="156" height="64"/>
+    <rect x="256" y="324" width="52" height="72" opacity="0.55"/>
+  </g>
+</svg>

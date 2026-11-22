@@ -74,13 +74,14 @@ impl Pen {
         self.attrs & attr.bits() != 0
     }
 
-    /// Sets or clears one attribute flag.
-    pub fn set_attr(&mut self, attr: Attrs, on: bool) {
-        if on {
-            self.attrs |= attr.bits();
-        } else {
-            self.attrs &= !attr.bits();
-        }
+    /// Sets one attribute flag.
+    pub fn insert_attr(&mut self, attr: Attrs) {
+        self.attrs |= attr.bits();
+    }
+
+    /// Clears one attribute flag.
+    pub fn remove_attr(&mut self, attr: Attrs) {
+        self.attrs &= !attr.bits();
     }
 
     /// The underline style.

@@ -3,6 +3,7 @@
 use ferrum_scrollback::{Scrollback, StyledRun};
 
 use crate::cursor::CursorStyle;
+use crate::dcs::Dcs;
 use crate::events::EventSink;
 use crate::extras::Extras;
 use crate::modes::Mode;
@@ -47,6 +48,8 @@ pub(crate) struct Core<S> {
     pub(crate) stop: bool,
     /// DECSCUSR; `None` until a program sets it (the UI default applies).
     pub(crate) cursor_style: Option<CursorStyle>,
+    /// The DCS string in progress.
+    pub(crate) dcs: Dcs,
 }
 
 impl<S: EventSink> Core<S> {
@@ -66,6 +69,7 @@ impl<S: EventSink> Core<S> {
             last_char: None,
             stop: false,
             cursor_style: None,
+            dcs: Dcs::Ignore,
         }
     }
 

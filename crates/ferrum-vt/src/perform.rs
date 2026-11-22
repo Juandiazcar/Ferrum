@@ -69,6 +69,22 @@ impl<S: EventSink> Perform for Core<S> {
         }
     }
 
+    fn hook(&mut self, params: &Params, intermediates: &[u8], ignore: bool, action: char) {
+        if ignore {
+            self.dcs = crate::dcs::Dcs::Ignore;
+        } else {
+            self.dcs_hook(params, intermediates, action);
+        }
+    }
+
+    fn put(&mut self, byte: u8) {
+        self.dcs_put(byte);
+    }
+
+    fn unhook(&mut self) {
+        self.dcs_unhook();
+    }
+
     fn terminated(&self) -> bool {
         self.stop
     }

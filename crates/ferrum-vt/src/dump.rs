@@ -114,7 +114,7 @@ fn style_runs(grid: &Grid, y: usize, extras: &Extras) -> Vec<String> {
 
 fn pen_text(pen: &Pen, extras: &Extras) -> String {
     let mut cell = pen.cell(' ');
-    cell.set_flags(CellFlags::all(), false);
+    cell.remove_flags(CellFlags::all());
     style_text(&cell, extras)
 }
 

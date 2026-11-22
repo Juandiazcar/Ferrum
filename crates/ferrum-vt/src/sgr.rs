@@ -101,7 +101,11 @@ fn apply_attribute(pen: &mut Pen, code: u16) -> bool {
         _ => None,
     };
     let Some((attr, on)) = flag else { return false };
-    pen.set_attr(attr, on);
+    if on {
+        pen.insert_attr(attr);
+    } else {
+        pen.remove_attr(attr);
+    }
     true
 }
 
@@ -136,8 +140,8 @@ fn apply(pen: &mut Pen, param: &[u16], rest: &mut ParamsIter<'_>) {
         }
         21 => pen.set_underline(Underline::Double),
         22 => {
-            pen.set_attr(Attrs::BOLD, false);
-            pen.set_attr(Attrs::DIM, false);
+            pen.remove_attr(Attrs::BOLD);
+            pen.remove_attr(Attrs::DIM);
         }
         24 => pen.set_underline(Underline::None),
         38 => pen.fg = extended_color(param, rest).unwrap_or(pen.fg),

@@ -52,7 +52,7 @@ impl Grid {
         row.fill(from, to, blank);
         if to >= row.len() {
             // The end of the row is gone, so the row no longer continues on the next one.
-            row.set_flag(ferrum_scrollback::LineFlags::WRAPPED, false);
+            row.remove_flag(ferrum_scrollback::LineFlags::WRAPPED);
         }
     }
 
@@ -113,10 +113,10 @@ mod tests {
     fn make_wide(grid: &mut Grid, x: usize) {
         if let Some(row) = grid.row_mut(0) {
             if let Some(head) = row.get_mut(x) {
-                head.set_flags(CellFlags::WIDE, true);
+                head.insert_flags(CellFlags::WIDE);
             }
             if let Some(tail) = row.get_mut(x + 1) {
-                tail.set_flags(CellFlags::SPACER, true);
+                tail.insert_flags(CellFlags::SPACER);
             }
         }
     }

@@ -31,7 +31,7 @@ impl<S: EventSink> Core<S> {
         };
         let y = self.screen().cursor.y;
         if let Some(row) = self.screen_mut().grid.row_mut(y) {
-            row.set_flag(flag, true);
+            row.insert_flag(flag);
         }
         self.sink.event(Event::ShellMark(mark));
     }

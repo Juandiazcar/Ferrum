@@ -35,8 +35,8 @@ impl<S: EventSink> Core<S> {
     pub(crate) fn set_pen_protection(&mut self, code: u16) {
         let mut pen = self.screen().cursor.pen;
         match code {
-            1 => pen.set_attr(Attrs::PROTECTED, true),
-            0 | 2 => pen.set_attr(Attrs::PROTECTED, false),
+            1 => pen.insert_attr(Attrs::PROTECTED),
+            0 | 2 => pen.remove_attr(Attrs::PROTECTED),
             _ => return,
         }
         self.set_pen(pen);

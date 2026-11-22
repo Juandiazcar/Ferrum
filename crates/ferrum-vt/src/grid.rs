@@ -255,7 +255,7 @@ mod tests {
         }
         if let (Some(index), Some(cell)) = (keep, grid.row_mut(0).and_then(|row| row.get_mut(0))) {
             cell.set_raw_char(index);
-            cell.set_flags(CellFlags::GRAPHEME, true);
+            cell.insert_flags(CellFlags::GRAPHEME);
         }
         let fresh = grid.intern_cluster("fresh\u{0301}");
         assert!(fresh.is_some());

@@ -6,7 +6,7 @@ use crate::core::Core;
 use crate::events::{Event, EventSink};
 
 /// Longest reply the terminal builds.
-const REPLY_CAPACITY: usize = 64;
+const REPLY_CAPACITY: usize = 128;
 
 /// A short reply under construction.
 pub(crate) struct Reply {

@@ -4,6 +4,8 @@ use crate::args::Args;
 use crate::core::Core;
 use crate::erase::Protection;
 use crate::events::EventSink;
+use crate::modes::{Scope, Switch};
+use crate::reports::AttributeLevel;
 
 impl<S: EventSink> Core<S> {
     /// Routes a CSI sequence. Unknown sequences are ignored (and never reported back).
@@ -14,8 +16,13 @@ impl<S: EventSink> Core<S> {
             ([b' '], 'q') => self.set_cursor_style(args.mode(0)),
             ([b'"'], 'q') => self.set_pen_protection(args.mode(0)),
             ([b'!'], 'p') => self.soft_reset(),
-            ([b'$'], 'p') => self.report_mode(args, false),
-            ([b'?', b'$'], 'p') => self.report_mode(args, true),
+            ([b'$'], 'p') => self.report_mode(args, Scope::Ansi),
+            ([b'?', b'$'], 'p') => self.report_mode(args, Scope::Private),
+            ([b'>'], 'c') => self.report_attributes(AttributeLevel::Secondary),
+            ([b'>'], 'q') => self.report_version(),
+            ([b'>'], 'u') => self.keyboard_push(args),
+            ([b'<'], 'u') => self.keyboard_pop(args),
+            ([b'='], 'u') => self.keyboard_set(args),
             _ => {}
         }
     }
@@ -26,10 +33,13 @@ impl<S: EventSink> Core<S> {
         }
         match action {
             'm' => self.sgr(args),
-            'h' => self.set_modes(args, false, true),
-            'l' => self.set_modes(args, false, false),
+            'h' => self.set_modes(args, Scope::Ansi, Switch::Set),
+            'l' => self.set_modes(args, Scope::Ansi, Switch::Reset),
             'g' => self.clear_tab_stops(args.mode(0)),
             'r' => self.set_scroll_region(args),
+            'c' => self.report_attributes(AttributeLevel::Primary),
+            'n' => self.report_status(args.mode(0), Scope::Ansi),
+            't' => self.window_operation(args),
             's' => self.save_cursor(),
             'u' => self.restore_cursor(),
             _ => {}
@@ -85,8 +95,10 @@ impl<S: EventSink> Core<S> {
         match action {
             'J' => self.erase_display(args.mode(0), Protection::Respect),
             'K' => self.erase_line(args.mode(0), Protection::Respect),
-            'h' => self.set_modes(args, true, true),
-            'l' => self.set_modes(args, true, false),
+            'n' => self.report_status(args.mode(0), Scope::Private),
+            'u' => self.keyboard_query(),
+            'h' => self.set_modes(args, Scope::Private, Switch::Set),
+            'l' => self.set_modes(args, Scope::Private, Switch::Reset),
             _ => {}
         }
     }

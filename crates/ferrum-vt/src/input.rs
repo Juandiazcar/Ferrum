@@ -53,6 +53,15 @@ enum VteState {
     Unknown,
 }
 
+/// Whether the ESC that opens an OSC was already fed to `vte` (it ended the previous chunk).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EscSeen {
+    /// `vte` consumed it: it is in the escape state.
+    Consumed,
+    /// It is in the bytes being parsed and `vte` has not seen it.
+    InBytes,
+}
+
 /// Whether an OSC string is being captured.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum OscState {
@@ -92,7 +101,7 @@ impl Input {
         }
         let mut pos = 0;
         if self.esc_pending && bytes.first() == Some(&b']') {
-            self.begin_osc(core, true);
+            self.begin_osc(core, EscSeen::Consumed);
             pos = 1;
         }
         self.esc_pending = false;
@@ -106,7 +115,7 @@ impl Input {
             }
             let limit = osc_at.unwrap_or(bytes.len());
             if pos >= limit {
-                self.begin_osc(core, false);
+                self.begin_osc(core, EscSeen::InBytes);
                 pos += 2;
                 osc_at = self.next_osc(bytes, pos);
                 continue;
@@ -190,11 +199,13 @@ impl Input {
     }
 
     /// Switches to OSC capture; `vte` is first brought back to its ground state.
-    fn begin_osc<S: EventSink>(&mut self, core: &mut Core<S>, esc_consumed: bool) {
-        if esc_consumed {
-            self.parser.advance(core, b"\\");
-        } else if self.vte_state != VteState::Ground {
-            self.parser.advance(core, &[ESC, b'\\']);
+    fn begin_osc<S: EventSink>(&mut self, core: &mut Core<S>, esc: EscSeen) {
+        match esc {
+            EscSeen::Consumed => self.parser.advance(core, b"\\"),
+            EscSeen::InBytes if self.vte_state != VteState::Ground => {
+                self.parser.advance(core, &[ESC, b'\\']);
+            }
+            EscSeen::InBytes => {}
         }
         self.vte_state = VteState::Ground;
         self.osc = OscState::Collecting;

@@ -88,7 +88,9 @@ mod tests {
                 cell.set_scalar(c);
             }
         }
-        row.set_flag(ferrum_scrollback::LineFlags::WRAPPED, wrapped);
+        if wrapped {
+            row.insert_flag(ferrum_scrollback::LineFlags::WRAPPED);
+        }
         row
     }
 
@@ -116,14 +118,14 @@ mod tests {
         let mut row = Row::new(4, Cell::default());
         if let Some(cell) = row.get_mut(0) {
             cell.set_scalar('漢');
-            cell.set_flags(CellFlags::WIDE, true);
+            cell.insert_flags(CellFlags::WIDE);
         }
         if let Some(cell) = row.get_mut(1) {
-            cell.set_flags(CellFlags::SPACER, true);
+            cell.insert_flags(CellFlags::SPACER);
         }
         if let Some(cell) = row.get_mut(2) {
             cell.set_raw_char(index);
-            cell.set_flags(CellFlags::GRAPHEME, true);
+            cell.insert_flags(CellFlags::GRAPHEME);
         }
         let (mut text, mut runs) = (String::new(), Vec::new());
         encode_row(&row, &graphemes, &mut text, &mut runs);

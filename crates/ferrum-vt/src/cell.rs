@@ -149,13 +149,14 @@ impl Cell {
         CellFlags::from_bits_retain(self.flags)
     }
 
-    /// Sets or clears structural flags.
-    pub fn set_flags(&mut self, flags: CellFlags, on: bool) {
-        if on {
-            self.flags |= flags.bits();
-        } else {
-            self.flags &= !flags.bits();
-        }
+    /// Sets structural flags.
+    pub fn insert_flags(&mut self, flags: CellFlags) {
+        self.flags |= flags.bits();
+    }
+
+    /// Clears structural flags.
+    pub fn remove_flags(&mut self, flags: CellFlags) {
+        self.flags &= !flags.bits();
     }
 
     /// Foreground color.
@@ -270,16 +271,16 @@ mod tests {
     #[test]
     fn wide_and_spacer_cells_count_columns() {
         let mut wide = Cell::default();
-        wide.set_flags(CellFlags::WIDE, true);
+        wide.insert_flags(CellFlags::WIDE);
         let mut spacer = Cell::default();
-        spacer.set_flags(CellFlags::SPACER, true);
+        spacer.insert_flags(CellFlags::SPACER);
         assert_eq!((Cell::default().columns(), wide.columns(), spacer.columns()), (1, 2, 0));
     }
 
     #[test]
     fn setting_a_scalar_clears_grapheme_state() {
         let mut cell = Cell::default();
-        cell.set_flags(CellFlags::GRAPHEME, true);
+        cell.insert_flags(CellFlags::GRAPHEME);
         cell.set_scalar('x');
         assert_eq!((cell.scalar(), cell.flags()), ('x', CellFlags::empty()));
     }

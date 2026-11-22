@@ -57,11 +57,15 @@ impl Row {
         self.flags = flags;
     }
 
-    /// Sets or clears one flag.
-    pub fn set_flag(&mut self, flag: LineFlags, on: bool) {
-        let bits =
-            if on { self.flags.bits() | flag.bits() } else { self.flags.bits() & !flag.bits() };
-        // INVARIANT: both operands only hold defined bits, so the result does too.
+    /// Sets one flag.
+    pub fn insert_flag(&mut self, flag: LineFlags) {
+        self.flags = self.flags.union(flag);
+    }
+
+    /// Clears one flag.
+    pub fn remove_flag(&mut self, flag: LineFlags) {
+        let bits = self.flags.bits() & !flag.bits();
+        // INVARIANT: clearing bits of a valid flag set leaves a valid flag set.
         self.flags = LineFlags::from_bits(bits).unwrap_or(self.flags);
     }
 
@@ -106,7 +110,7 @@ mod tests {
         x.set_scalar('x');
         row.fill(2, 99, x);
         assert_eq!(row.used_len(), 4);
-        row.set_flag(LineFlags::WRAPPED, true);
+        row.insert_flag(LineFlags::WRAPPED);
         assert!(row.is_wrapped());
         row.clear(Cell::default());
         assert_eq!((row.used_len(), row.is_wrapped()), (0, false));
@@ -115,9 +119,9 @@ mod tests {
     #[test]
     fn flags_are_set_and_cleared_independently() {
         let mut row = Row::new(1, Cell::default());
-        row.set_flag(LineFlags::WRAPPED, true);
-        row.set_flag(LineFlags::PROMPT_MARK, true);
-        row.set_flag(LineFlags::WRAPPED, false);
+        row.insert_flag(LineFlags::WRAPPED);
+        row.insert_flag(LineFlags::PROMPT_MARK);
+        row.remove_flag(LineFlags::WRAPPED);
         assert_eq!(row.flags(), LineFlags::PROMPT_MARK);
     }
 }

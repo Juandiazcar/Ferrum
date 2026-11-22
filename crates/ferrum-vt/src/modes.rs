@@ -58,6 +58,30 @@ impl Default for Mode {
     }
 }
 
+/// Whether a mode number is an ANSI mode (`CSI Pm h`) or a DEC private one (`CSI ? Pm h`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Scope {
+    /// ANSI modes (4, 20).
+    Ansi,
+    /// DEC private modes.
+    Private,
+}
+
+/// SM versus RM.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Switch {
+    /// Set the mode.
+    Set,
+    /// Reset the mode.
+    Reset,
+}
+
+impl Switch {
+    pub(crate) fn is_set(self) -> bool {
+        self == Self::Set
+    }
+}
+
 /// Which mouse events the program wants (the highest tracking mode that is set).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]

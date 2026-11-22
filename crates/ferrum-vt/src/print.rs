@@ -12,6 +12,30 @@ use crate::width::{char_width, cluster_width, joins_cluster};
 /// DEL is never displayed (xterm ignores it).
 const DEL: char = '\u{7f}';
 
+/// What happens at the right margin (DECAWM).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Wrap {
+    /// The next character wraps to the next row.
+    Auto,
+    /// The cursor stays on the last column.
+    Stay,
+}
+
+impl Wrap {
+    fn of(modes: Mode) -> Self {
+        if modes.contains(Mode::AUTOWRAP) { Self::Auto } else { Self::Stay }
+    }
+}
+
+/// Whether a scalar always belongs to the previous cluster or only when UAX #29 says so.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum JoinRule {
+    /// Zero-width scalars: they never take a cell of their own.
+    Always,
+    /// Wider scalars: only when they continue the cluster.
+    IfContinues,
+}
+
 /// What a glyph cell shows.
 #[derive(Clone, Copy)]
 enum Glyph {
@@ -62,7 +86,7 @@ impl<S: EventSink> Core<S> {
     fn wrap_line(&mut self) {
         let y = self.screen().cursor.y;
         if let Some(row) = self.screen_mut().grid.row_mut(y) {
-            row.set_flag(ferrum_scrollback::LineFlags::WRAPPED, true);
+            row.insert_flag(ferrum_scrollback::LineFlags::WRAPPED);
         }
         self.carriage_return();
         self.index();
@@ -79,7 +103,7 @@ impl<S: EventSink> Core<S> {
         let mut rest = bytes;
         while !rest.is_empty() {
             self.settle_wrap();
-            let autowrap = self.modes.contains(Mode::AUTOWRAP);
+            let wrap = Wrap::of(self.modes);
             let screen = self.screen_mut();
             let (x, y, cols) = (screen.cursor.x, screen.cursor.y, screen.grid.cols());
             let count = rest.len().min(cols.saturating_sub(x));
@@ -93,7 +117,7 @@ impl<S: EventSink> Core<S> {
                     *cell = Cell::styled(char::from(byte), fg, bg, attrs);
                 }
             }
-            Self::advance_cursor(screen, count, autowrap);
+            Self::advance_cursor(screen, count, wrap);
             rest = tail;
         }
         self.last_char = bytes.last().map(|&byte| char::from(byte));
@@ -101,12 +125,12 @@ impl<S: EventSink> Core<S> {
 
     /// Moves the cursor right by `columns` after printing; at the margin it stays on the last
     /// column and a wrap becomes pending.
-    fn advance_cursor(screen: &mut Screen, columns: usize, autowrap: bool) {
+    fn advance_cursor(screen: &mut Screen, columns: usize, wrap: Wrap) {
         let cols = screen.grid.cols();
         let next = screen.cursor.x + columns;
         if next >= cols {
             screen.cursor.x = cols.saturating_sub(1);
-            screen.cursor.wrap_pending = autowrap;
+            screen.cursor.wrap_pending = wrap == Wrap::Auto;
         } else {
             screen.cursor.x = next;
         }
@@ -128,10 +152,10 @@ impl<S: EventSink> Core<S> {
         self.last_char = Some(c);
         let width = char_width(c);
         if width == 0 {
-            self.join_previous(c, true);
+            self.join_previous(c, JoinRule::Always);
             return;
         }
-        if !c.is_ascii() && self.join_previous(c, false) {
+        if !c.is_ascii() && self.join_previous(c, JoinRule::IfContinues) {
             return;
         }
         self.put_glyph(Glyph::Scalar(c), width);
@@ -139,8 +163,8 @@ impl<S: EventSink> Core<S> {
 
     /// Appends `c` to the glyph before the cursor when it belongs to that cluster (or always,
     /// with `force`, for zero-width scalars). True when `c` was consumed.
-    fn join_previous(&mut self, c: char, force: bool) -> bool {
-        match self.plan_join(c, force) {
+    fn join_previous(&mut self, c: char, rule: JoinRule) -> bool {
+        match self.plan_join(c, rule) {
             Joined::No => false,
             Joined::Swallowed => true,
             Joined::Merged(merge) => {
@@ -150,7 +174,8 @@ impl<S: EventSink> Core<S> {
         }
     }
 
-    fn plan_join(&mut self, c: char, force: bool) -> Joined {
+    fn plan_join(&mut self, c: char, rule: JoinRule) -> Joined {
+        let force = rule == JoinRule::Always;
         let alt = self.alt_active();
         let screen =
             if alt { self.alt.as_mut().unwrap_or(&mut self.primary) } else { &mut self.primary };
@@ -189,7 +214,7 @@ impl<S: EventSink> Core<S> {
             let cell = self.screen_mut().grid.row_mut(y).and_then(|row| row.get_mut(x));
             if let Some(cell) = cell {
                 cell.set_raw_char(index);
-                cell.set_flags(CellFlags::GRAPHEME, true);
+                cell.insert_flags(CellFlags::GRAPHEME);
             }
             return;
         }
@@ -207,13 +232,13 @@ impl<S: EventSink> Core<S> {
     /// Writes a glyph of `width` 1 or 2 at the cursor and advances.
     fn put_glyph(&mut self, glyph: Glyph, width: usize) {
         self.settle_wrap();
-        let autowrap = self.modes.contains(Mode::AUTOWRAP);
+        let wrap = Wrap::of(self.modes);
         let cols = self.screen().grid.cols();
         if width == 2 && cols < 2 {
             return;
         }
         if width == 2 && self.screen().cursor.x + 1 >= cols {
-            if autowrap {
+            if wrap == Wrap::Auto {
                 self.wrap_with_leading_spacer();
             } else {
                 self.screen_mut().cursor.x = cols - 2;
@@ -231,13 +256,13 @@ impl<S: EventSink> Core<S> {
             Glyph::Scalar(c) => head.set_scalar(c),
             Glyph::Cluster(index) => {
                 head.set_raw_char(index);
-                head.set_flags(CellFlags::GRAPHEME, true);
+                head.insert_flags(CellFlags::GRAPHEME);
             }
         }
         let mut tail = Cell::styled(' ', pen.fg_word(), pen.bg_word(), pen.attrs);
         if width == 2 {
-            head.set_flags(CellFlags::WIDE, true);
-            tail.set_flags(CellFlags::SPACER, true);
+            head.insert_flags(CellFlags::WIDE);
+            tail.insert_flags(CellFlags::SPACER);
         }
         if let Some(row) = screen.grid.row_mut(y) {
             if let Some(cell) = row.get_mut(x) {
@@ -247,7 +272,7 @@ impl<S: EventSink> Core<S> {
                 *cell = tail;
             }
         }
-        Self::advance_cursor(screen, width, autowrap);
+        Self::advance_cursor(screen, width, wrap);
     }
 
     /// A wide character does not fit in the last column: leave a spacer there and wrap.
@@ -256,7 +281,7 @@ impl<S: EventSink> Core<S> {
         let (x, y, blank) = (screen.cursor.x, screen.cursor.y, screen.cursor.pen.blank());
         if let Some(cell) = screen.grid.row_mut(y).and_then(|row| row.get_mut(x)) {
             *cell = blank;
-            cell.set_flags(CellFlags::LEADING_SPACER, true);
+            cell.insert_flags(CellFlags::LEADING_SPACER);
         }
         self.wrap_line();
     }

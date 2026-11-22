@@ -5,7 +5,7 @@ use crate::args::Args;
 use crate::core::Core;
 use crate::erase::Protection;
 use crate::events::EventSink;
-use crate::modes::Mode;
+use crate::modes::{Mode, Scope, Switch};
 use crate::reply::Reply;
 use crate::screen::{Region, Screen};
 
@@ -53,37 +53,37 @@ fn private_flag(code: u16) -> Option<Mode> {
 
 impl<S: EventSink> Core<S> {
     /// `CSI Pm h` and `CSI Pm l` (ANSI modes) and their `?` forms (DEC private modes).
-    pub(crate) fn set_modes(&mut self, args: Args<'_>, private: bool, on: bool) {
+    pub(crate) fn set_modes(&mut self, args: Args<'_>, scope: Scope, switch: Switch) {
         for param in args.iter() {
             let code = param.first().copied().unwrap_or(0);
-            if private {
-                self.set_private_mode(code, on);
-            } else if let Some(flag) = ansi_flag(code) {
-                self.modes.set(flag, on);
+            match scope {
+                Scope::Private => self.set_private_mode(code, switch),
+                Scope::Ansi => {
+                    if let Some(flag) = ansi_flag(code) {
+                        self.modes.set(flag, switch.is_set());
+                    }
+                }
             }
         }
     }
 
-    fn set_private_mode(&mut self, code: u16, on: bool) {
+    fn set_private_mode(&mut self, code: u16, switch: Switch) {
         match code {
-            3 => self.column_mode(on),
+            3 => self.column_mode(switch),
             6 => {
-                self.modes.set(Mode::ORIGIN, on);
+                self.modes.set(Mode::ORIGIN, switch.is_set());
                 self.goto(Some(0), Some(0));
             }
-            9 | 1000 | 1002 | 1003 => self.set_mouse_tracking(code, on),
-            47 | 1047 => self.set_alt_screen(on, CursorHandling::Keep),
-            1048 => {
-                if on {
-                    self.save_cursor();
-                } else {
-                    self.restore_cursor();
-                }
-            }
-            1049 => self.set_alt_screen(on, CursorHandling::SaveAndRestore),
+            9 | 1000 | 1002 | 1003 => self.set_mouse_tracking(code, switch),
+            47 | 1047 => self.set_alt_screen(switch, CursorHandling::Keep),
+            1048 => match switch {
+                Switch::Set => self.save_cursor(),
+                Switch::Reset => self.restore_cursor(),
+            },
+            1049 => self.set_alt_screen(switch, CursorHandling::SaveAndRestore),
             _ => {
                 if let Some(flag) = private_flag(code) {
-                    self.modes.set(flag, on);
+                    self.modes.set(flag, switch.is_set());
                     self.screen_mut().grid.damage_mut().mark_all();
                 }
             }
@@ -91,29 +91,29 @@ impl<S: EventSink> Core<S> {
     }
 
     /// Only one mouse tracking level is active at a time: the last one enabled.
-    fn set_mouse_tracking(&mut self, code: u16, on: bool) {
+    fn set_mouse_tracking(&mut self, code: u16, switch: Switch) {
         let Some(flag) = private_flag(code) else { return };
-        if on {
+        if switch.is_set() {
             self.modes.remove(Mode::MOUSE_TRACKING);
         }
-        self.modes.set(flag, on);
+        self.modes.set(flag, switch.is_set());
     }
 
     /// DECCOLM: clears the screen and homes the cursor. The terminal never resizes itself: the
     /// UI owns the size, so only the mode flag and the clear are applied (as Alacritty does).
-    fn column_mode(&mut self, on: bool) {
-        self.modes.set(Mode::COLUMN_132, on);
+    fn column_mode(&mut self, switch: Switch) {
+        self.modes.set(Mode::COLUMN_132, switch.is_set());
         let screen = self.screen_mut();
         screen.region = Region::full(screen.grid.lines());
         self.erase_display(2, Protection::Ignore);
         self.goto(Some(0), Some(0));
     }
 
-    fn set_alt_screen(&mut self, on: bool, cursor: CursorHandling) {
-        if on == self.alt_active() {
+    fn set_alt_screen(&mut self, switch: Switch, cursor: CursorHandling) {
+        if switch.is_set() == self.alt_active() {
             return;
         }
-        if on {
+        if switch.is_set() {
             if cursor == CursorHandling::SaveAndRestore {
                 self.save_cursor();
             }
@@ -132,16 +132,22 @@ impl<S: EventSink> Core<S> {
     }
 
     /// DECRQM: reports whether a mode is set.
-    pub(crate) fn report_mode(&mut self, args: Args<'_>, private: bool) {
+    pub(crate) fn report_mode(&mut self, args: Args<'_>, scope: Scope) {
         let code = args.mode(0);
-        let flag = if private { private_flag(code) } else { ansi_flag(code) };
+        let flag = match scope {
+            Scope::Private => private_flag(code),
+            Scope::Ansi => ansi_flag(code),
+        };
         let state = match flag {
             Some(flag) if self.modes.contains(flag) => ModeState::Set,
             Some(_) => ModeState::Reset,
             None => ModeState::NotRecognized,
         };
         let reply = Reply::new()
-            .text(if private { b"\x1b[?" } else { b"\x1b[" })
+            .text(match scope {
+                Scope::Private => b"\x1b[?".as_slice(),
+                Scope::Ansi => b"\x1b[".as_slice(),
+            })
             .number(usize::from(code))
             .text(b";")
             .number(state as usize)

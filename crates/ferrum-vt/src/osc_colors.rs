@@ -24,11 +24,9 @@ fn push_color(reply: Reply, color: Rgb) -> Reply {
 }
 
 impl<S: EventSink> Core<S> {
-    fn report_palette_changed(&mut self, changed: bool) {
-        if changed {
-            self.screen_mut().grid.damage_mut().mark_all();
-            self.sink.event(Event::PaletteChanged);
-        }
+    fn palette_changed(&mut self) {
+        self.screen_mut().grid.damage_mut().mark_all();
+        self.sink.event(Event::PaletteChanged);
     }
 
     /// OSC 4: `index;spec` pairs; a spec of `?` asks for the current color.
@@ -45,7 +43,9 @@ impl<S: EventSink> Core<S> {
                 changed |= self.palette.set_entry(index, color);
             }
         }
-        self.report_palette_changed(changed);
+        if changed {
+            self.palette_changed();
+        }
     }
 
     /// OSC 104: resets the listed entries, or all of them when none is listed.
@@ -57,7 +57,9 @@ impl<S: EventSink> Core<S> {
         for index in rest.split(|&b| b == b';').filter_map(parse_index) {
             changed |= self.palette.reset_entry(index);
         }
-        self.report_palette_changed(changed);
+        if changed {
+            self.palette_changed();
+        }
     }
 
     /// OSC 10, 11, 12: sets or queries the foreground, background and cursor colors. Extra
@@ -73,7 +75,9 @@ impl<S: EventSink> Core<S> {
                 changed |= self.palette.set_dynamic(*which, color);
             }
         }
-        self.report_palette_changed(changed);
+        if changed {
+            self.palette_changed();
+        }
     }
 
     fn report_dynamic(&mut self, which: DynamicColor, command: usize) {
@@ -90,7 +94,9 @@ impl<S: EventSink> Core<S> {
             _ => DynamicColor::Cursor,
         };
         let changed = self.palette.reset_dynamic(which);
-        self.report_palette_changed(changed);
+        if changed {
+            self.palette_changed();
+        }
     }
 }
 

@@ -1,0 +1,88 @@
+# TEMPORARY: spike S3 measurements (docs/12, ADR 0025). Exists only on the spike branch and is
+# deleted in the final commit before the PR is ready, so nothing spike-specific stays in CI (ADR 0022).
+name: spike-s3
+
+on:
+  push:
+    branches: ["spike/s3-*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: "0"
+  FONT_URL: https://download.jetbrains.com/fonts/JetBrainsMono-2.304.zip
+  FONT_SHA256: 662a196d58f1183bf2d77428b6d5283fe3f45161ab021bea4036bc98e5cac016
+
+jobs:
+  linux-x11:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rust
+      - run: sudo apt-get update && sudo apt-get install -y xvfb pkg-config libx11-dev libxcursor-dev libxrandr-dev libxi-dev libxkbcommon-dev libxkbcommon-x11-dev libx11-xcb-dev libxcb1-dev
+      - name: Fetch JetBrains Mono (OFL)
+        run: |
+          mkdir -p "$RUNNER_TEMP/font" && cd "$RUNNER_TEMP/font"
+          curl -fsSL -o jb.zip "$FONT_URL"
+          unzip -q jb.zip 'fonts/variable/JetBrainsMono[[]wght].ttf'
+          mv 'fonts/variable/JetBrainsMono[wght].ttf' JBM-var.ttf
+          echo "$FONT_SHA256  JBM-var.ttf" | sha256sum -c -
+      - name: rfd dependency tree (async runtimes banned by deny.toml?)
+        working-directory: spikes/s3-render-pipeline
+        run: |
+          cargo tree --locked --features dialog -e normal --target x86_64-unknown-linux-gnu | wc -l; cargo tree --locked --features dialog -e normal --target x86_64-unknown-linux-gnu --depth 2 -i rfd
+          for c in tokio async-std; do echo "--- cargo tree -i $c"; cargo tree --locked --features dialog --target x86_64-unknown-linux-gnu -i $c || true; done
+      - name: Measure under Xvfb (X11)
+        working-directory: spikes/s3-render-pipeline
+        run: |
+          set -o pipefail
+          echo "RESULT host $(uname -srm) cpus=$(nproc)"
+          xvfb-run -a -s "-screen 0 3000x2000x24" bash run.sh "$RUNNER_TEMP/font/JBM-var.ttf" 3
+
+  linux-wayland:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rust
+      - run: sudo apt-get update && sudo apt-get install -y weston pkg-config libx11-dev libxcursor-dev libxrandr-dev libxi-dev libxkbcommon-dev libxkbcommon-x11-dev libx11-xcb-dev libxcb1-dev libwayland-dev
+      - name: Fetch JetBrains Mono (OFL)
+        run: |
+          mkdir -p "$RUNNER_TEMP/font" && cd "$RUNNER_TEMP/font"
+          curl -fsSL -o jb.zip "$FONT_URL"
+          unzip -q jb.zip 'fonts/variable/JetBrainsMono[[]wght].ttf'
+          mv 'fonts/variable/JetBrainsMono[wght].ttf' JBM-var.ttf
+          echo "$FONT_SHA256  JBM-var.ttf" | sha256sum -c -
+      - name: Measure under weston (headless Wayland)
+        working-directory: spikes/s3-render-pipeline
+        run: |
+          set -o pipefail
+          export XDG_RUNTIME_DIR="$RUNNER_TEMP/xdg"; mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"
+          weston --backend=headless --socket=wl-s3 --width=3000 --height=2000 --idle-time=0 >"$RUNNER_TEMP/weston.log" 2>&1 &
+          for _ in $(seq 1 50); do [ -S "$XDG_RUNTIME_DIR/wl-s3" ] && break; sleep 0.2; done
+          export WAYLAND_DISPLAY=wl-s3
+          unset DISPLAY
+          echo "RESULT host $(uname -srm) cpus=$(nproc) weston=$(weston --version)"
+          bash run.sh "$RUNNER_TEMP/font/JBM-var.ttf" 3 || { echo "run failed"; cat "$RUNNER_TEMP/weston.log"; exit 1; }
+
+  macos:
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rust
+      - name: Fetch JetBrains Mono (OFL)
+        run: |
+          mkdir -p "$RUNNER_TEMP/font" && cd "$RUNNER_TEMP/font"
+          curl -fsSL -o jb.zip "$FONT_URL"
+          unzip -q jb.zip 'fonts/variable/JetBrainsMono[[]wght].ttf'
+          mv 'fonts/variable/JetBrainsMono[wght].ttf' JBM-var.ttf
+          echo "$FONT_SHA256  JBM-var.ttf" | shasum -a 256 -c -
+      - name: Measure (macOS runner session)
+        working-directory: spikes/s3-render-pipeline
+        run: |
+          set -o pipefail
+          echo "RESULT host $(uname -srm) $(sysctl -n machdep.cpu.brand_string) cpus=$(sysctl -n hw.ncpu)"
+          bash run.sh "$RUNNER_TEMP/font/JBM-var.ttf" 3

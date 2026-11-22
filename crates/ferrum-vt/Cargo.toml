@@ -8,5 +8,13 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[dependencies]
+bitflags = { workspace = true }
+ferrum-scrollback = { workspace = true }
+rustc-hash = { workspace = true }
+thiserror = { workspace = true }
+unicode-segmentation = { workspace = true }
+unicode-width = { workspace = true }
+
 [lints]
 workspace = true

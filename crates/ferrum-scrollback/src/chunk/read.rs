@@ -59,6 +59,15 @@ impl ChunkBuf {
 pub fn decode_chunk(blob: &[u8], buf: &mut ChunkBuf) -> Result<(), DecodeError> {
     buf.id = None;
     buf.ends.clear();
+    let outcome = decode_into(blob, buf);
+    if outcome.is_err() {
+        // A failed decode leaves no lines behind, whatever stage failed.
+        buf.ends.clear();
+    }
+    outcome
+}
+
+fn decode_into(blob: &[u8], buf: &mut ChunkBuf) -> Result<(), DecodeError> {
     let mut pos = 0;
     let lines = get_len(blob, &mut pos, HOT_CHUNK_LINES)?;
     let raw_len = get_len(blob, &mut pos, MAX_CHUNK_RAW_BYTES)?;

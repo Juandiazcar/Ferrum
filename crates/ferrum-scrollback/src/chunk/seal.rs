@@ -113,8 +113,10 @@ mod tests {
             for flip in [0x01u8, 0x80, 0xFF] {
                 let mut damaged = blob.to_vec();
                 damaged[position] ^= flip;
-                // Either outcome is fine; reaching the next iteration proves totality.
-                decode_chunk(&damaged, &mut buf).ok();
+                // Either outcome is fine, but a failure must leave no lines behind.
+                if decode_chunk(&damaged, &mut buf).is_err() {
+                    assert_eq!(buf.line_count(), 0, "byte {position} ^ {flip:#x}");
+                }
             }
         }
         for cut in 0..blob.len() {

@@ -1,6 +1,6 @@
 # 03 — Memory and Performance Budget
 
-This file defines the numbers that decide whether a change may merge. The figures marked **(to validate)** are design estimates; spikes S1–S3 in `docs/12` replace them with measurements in the first work packages, and this file is then updated with the measured values. The per-session scrollback lines of §2 carry the S1 measurements (`docs/adr/0024-scrollback-memory-model-measurements.md`); every other figure is still to validate.
+This file defines the numbers that decide whether a change may merge. The figures marked **(to validate)** are design estimates; spikes S1–S3 in `docs/12` replace them with measurements in the first work packages, and this file is then updated with the measured values. The per-session scrollback lines of §2 carry the S1 measurements (`docs/adr/0024-scrollback-memory-model-measurements.md`); the UI rows for process base, window surface, glyph cache, fonts and chrome tiles carry the S3 measurements (`docs/adr/0025-render-pipeline-measurements.md`); every other figure is still to validate.
 
 ## 1. The reference scenario (`AC-MEM-01`)
 
@@ -30,12 +30,12 @@ A second gate, `AC-MEM-04`, handles HiDPI honestly: the window surface (framebuf
 | – 10 sessions subtotal (10 × 1.0) | 10.0 | **6.8 measured** (10 × 0.684, reference mix); 8.5 prose; 10.3 random (over the allowance) | `dhat`-measured per-session bytes, ADR 0024 |
 | – allocator slack / fragmentation | 3.0 | 2–3 | S2 (ADR 0016) measured whole-process memory per allocator, not the slack alone: requested bytes are not comparable with resident bytes, so the slack stays an estimate; allocator choice per OS is in ADR 0016 |
 | **UI** | **≤ 26 MB** | ≈ 19–24 MB | 24 MB of components + 2 MB reserve |
-| – process base (binary, libwayland/X11, xkb; no fontconfig) | 4.5 | 4.0 | |
-| – window surface at 1440×900@1x (up to 2 buffers) | 10.5 | 5.2–10.4 | OS-owned; see §5 |
-| – glyph cache | 3.0 | 1.5–2.5 | bounded LRU |
-| – fonts (mmap'd, only touched pages count) | 1.5 | 1.0 | |
+| – process base (binary, libwayland/X11, xkb; no fontconfig) | 4.5 | **measured lower bound** (S3 spike, no UI toolkit, window created, MiB): Linux X11 4.6–4.7 PSS, Linux Wayland 2.6–2.7 PSS, Windows 1.8 Private WS, **macOS 10.6–10.7 phys_footprint (over the allowance; unchanged by Q-20, a real-Mac run decides)** (ADR 0025) | the product UI adds its toolkit and chrome on top |
+| – window surface at 1440×900@1x (up to 2 buffers) | 10.5 | **measured** (S3, ADR 0025, MiB, one 5.18 MB buffer = 4.94 MiB): Windows 5.1 (single buffer); Linux X11 2.6 PSS (half of the 4.94 mapped, the rest is charged to the X server); Linux Wayland 5.0–7.5 PSS after 4 presents (two `wl_shm` buffers, 9.9 MiB mapped); macOS 2.5 MiB buffer at a clamped 1024×642 window, not comparable | OS-owned; see §5; at 2880×1800: Windows 19.8–19.9, X11 10.0 PSS (19.8 mapped), Wayland 29.7–29.8 PSS at idle and 39.7–39.8 right after the presents (39.6 mapped) |
+| – glyph cache | 3.0 | **0.0096 measured** (10 032 B for 94 ASCII glyphs, one size and weight); working set with CJK, emoji and weights not yet measured (ADR 0025) | bounded LRU; the spike cache is unbounded |
+| – fonts (mmap'd, only touched pages count) | 1.5 | **0.3–0.9 measured** (S3: JetBrains Mono variable, 0.29 MiB file; resident delta for font plus glyph cache, MiB: Windows 0.33–0.34, macOS 0.26–0.28, Linux X11 0.74–0.84, Wayland 0.80–0.88) (ADR 0025) | |
 | – viewport caches (≤ 4 visible sessions) | 1.5 | 0.6 | encoded rows only |
-| – UI chrome tiles + widget state | 1.5 | 1.0 | |
+| – UI chrome tiles + widget state | 1.5 | **0.84 MiB measured for tiles only** (24 button tiles 240×32 plus 4 shadow tiles 96×96 as `tiny-skia` pixmaps; resident delta 0.64–1.28 MiB on Windows, X11 and macOS); widget state not yet built (ADR 0025) | |
 | – allocator slack | 1.5 | 1.2 | |
 | **Image cache (elastic, off in the reference scenario)** | **+3 MB cap** | 0 | hard cap, LRU eviction; only grows when images are displayed |
 | **Total allowance** | **≤ 44 MB** (≤ 47 MB with images in use) | ≈ 30–38 MB | 3–6 MB of headroom against the 50 MB gate |

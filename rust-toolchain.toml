@@ -1,0 +1,8 @@
+# Pinned toolchain for CI and releases. Bump monthly via a dedicated `chore(deps)` PR.
+# If a restricted environment cannot download it, use an installed toolchain >= MSRV locally
+# (see docs/07 §6) — never edit this file to match a sandbox.
+[toolchain]
+channel = "1.100.0"
+components = ["rustfmt", "clippy", "llvm-tools-preview"]
+profile = "minimal"
+targets = []

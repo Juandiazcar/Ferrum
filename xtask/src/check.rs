@@ -63,15 +63,7 @@ const STEPS: &[Step] = &[
     },
     Step {
         name: "features",
-        argv: &[
-            "cargo",
-            "hack",
-            "check",
-            "--workspace",
-            "--each-feature",
-            "--no-dev-deps",
-            "--locked",
-        ],
+        argv: &["cargo", "hack", "check", "--workspace", "--each-feature", "--locked"],
         envs: &[],
         fast: false,
     },

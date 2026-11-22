@@ -1,0 +1,12 @@
+[package]
+name = "ferrum-project"
+description = "project model, .git/HEAD reader, cwd tracking logic and startup recipes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

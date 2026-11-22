@@ -1,0 +1,12 @@
+[package]
+name = "ferrum-testkit"
+description = "dev-only helpers: fixtures, golden harness, PTY test driver, fake clock"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true

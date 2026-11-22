@@ -1,0 +1,29 @@
+# Machine-readable form of the internal dependency table in docs/spec/docs/04-repository-structure.md §2.
+# An internal edge that is not listed is forbidden. Changing this file requires an ADR.
+#
+# [allowed]    crate = internal crates it may depend on through [dependencies]/[build-dependencies]
+# Dev-dependencies (tests, benches) may use ferrum-testkit plus anything in the crate's own list.
+# [forbidden_external] third-party crates a crate must never depend on directly
+# Every workspace crate must appear in [allowed]; every crate listed here must exist.
+
+[allowed]
+ferrum-scrollback = []
+ferrum-proto      = []
+ferrum-config     = []
+ferrum-project    = ["ferrum-config"]
+ferrum-pty        = []
+ferrum-platform   = []
+ferrum-vt         = ["ferrum-scrollback"]
+ferrum-render     = []
+ferrum-daemon     = ["ferrum-vt", "ferrum-scrollback", "ferrum-proto", "ferrum-config", "ferrum-project", "ferrum-pty"]
+ferrum-ui         = ["ferrum-render", "ferrum-proto", "ferrum-config", "ferrum-project"]
+ferrum-app        = [
+  "ferrum-vt", "ferrum-scrollback", "ferrum-proto", "ferrum-pty", "ferrum-daemon", "ferrum-render",
+  "ferrum-ui", "ferrum-config", "ferrum-project", "ferrum-platform",
+]
+ferrum-testkit    = ["ferrum-vt", "ferrum-scrollback", "ferrum-proto", "ferrum-pty", "ferrum-daemon", "ferrum-render", "ferrum-ui", "ferrum-config", "ferrum-project", "ferrum-platform"]
+xtask             = []
+
+[forbidden_external]
+ferrum-ui     = ["winit", "softbuffer"]
+ferrum-render = ["winit", "softbuffer"]

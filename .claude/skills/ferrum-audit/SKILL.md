@@ -7,6 +7,8 @@ description: Audit a Ferrum work-package branch/PR against the spec before mergi
 
 Goal: decide merge / request changes. Evidence over trust: re-run checks yourself, read the diff, never accept a reported number you did not see produced.
 
+**Zero-exception rule (maintainer, 2026-11-21):** the audit is mandatory, strict and literal. Any non-compliance with the spec, however small, blocks the merge. Never grant an exception, never merge with a known deviation, never reclassify a spec violation as a follow-up. If the spec cannot be met as written, stop and escalate to the maintainer; only the maintainer changes the spec (ADR).
+
 ## Steps
 1. `git fetch && git diff main...<branch> --stat`, then read the full diff (not only summaries).
 2. Re-read the WP in `docs/spec/docs/12-build-order.md`; check every exit criterion is met with evidence.
@@ -26,6 +28,6 @@ Goal: decide merge / request changes. Evidence over trust: re-run checks yoursel
 | Git (`docs/06`, `ferrum-git`) | Conventional Commit, DCO sign-off, **no Co-Authored-By / "Generated with" lines**, atomic commits, PR template filled |
 | Honesty | `PROGRESS.md` matches reality; gates not loosened; failing tests not disabled; PROVISIONAL items marked |
 
-5. Classify findings: **blocker** (spec violation, failing gate, fake evidence), **fix-before-merge** (rule violation), **follow-up** (issue/PROGRESS note).
-6. Blockers or fix-before-merge → send back to the implementing subagent with exact file:line and the spec clause. Re-audit after fixes.
-7. Clean + CI green on all OS → `gh pr merge <n> --squash --delete-branch`. Record audit result (findings, numbers) in the PR as a comment.
+5. Every finding that deviates from the spec, a rule, or a WP exit criterion is a **blocker**. The only non-blocking notes are items the spec itself explicitly defers to a later WP.
+6. Any blocker → send back to the implementing subagent with exact file:line and the spec clause. Re-audit the whole change after fixes (not only the fixed lines).
+7. Merge only when there are zero blockers and CI is green on all OS → `gh pr merge <n> --squash --delete-branch`. Record the audit result (checks run, numbers, "0 blockers") in the PR as a comment.

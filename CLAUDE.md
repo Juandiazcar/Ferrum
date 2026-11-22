@@ -15,6 +15,10 @@ The specification lives in `docs/spec/` (this package's `docs/`). Read in this o
 7. **No telemetry, no network** beyond the opt-out update check. No secrets in the repo, logs, or argv.
 8. **Do not expand scope.** Anything not in `docs/01` needs a requirement ID or an ADR first. Phase 2 code does not start until v1.0 is released.
 
+## Spec audit (maintainer rule, 2026-11-21)
+
+Every change is audited against the spec before merge (`ferrum-audit` skill). The audit is **mandatory, strict and literal**. If anything fails to comply, even minimally, the change does not merge. **No exceptions are ever created**: no "merge now, fix later", no downgrading a spec violation to a follow-up, no waivers by the agent. If the spec itself cannot be met, stop and bring it to the maintainer; only the maintainer can change the spec (via ADR).
+
 ## Project skills (`.claude/skills/`)
 
 - `ferrum-wp` — implement one work package end to end (implementer agents).

@@ -29,9 +29,10 @@ jobs:
           uname -a
           rustc -Vv | head -3
           case "$(uname -s)" in
-            Linux*) nproc; grep -m1 'model name' /proc/cpuinfo; ldd --version | head -1; free -m ;;
-            Darwin*) sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize; sw_vers ;;
+            Linux*) cat /sys/kernel/mm/transparent_hugepage/enabled; nproc; grep -m1 'model name' /proc/cpuinfo; ldd --version | head -1; free -m ;;
+            Darwin*) sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize || true; sw_vers ;;
           esac
+          true
       - name: Allocator comparison (3 runs per configuration)
         shell: bash
         run: bash spikes/s2-allocator/run-all.sh 3 2>&1 | grep -v '^ *\(Compiling\|Checking\|Locking\|Updating\|Downloaded\|Downloading\)' | tee results.txt

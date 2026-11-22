@@ -3,7 +3,7 @@
 # (default 3), one process per run. Each process fills 10 sessions, idles 10 s, prints
 # "STEADY pid=<pid>"; this script then samples the OS memory metric EXTERNALLY (docs/03 §1):
 #   Linux   PSS from /proc/<pid>/smaps_rollup
-#   macOS   phys_footprint via `footprint <pid>`
+#   macOS   phys_footprint via `footprint -f bytes <pid>`
 #   Windows Private Working Set via probe-windows.ps1 (PDH 'Working Set - Private')
 # Throughput (S1 parse+encode lines/s, no dhat) is printed by the process itself.
 # Output: one "RESULT ..." line per run (kind=base: 0-session baseline process). Usage (repo root): bash spikes/s2-allocator/run-all.sh [runs]
@@ -37,11 +37,9 @@ sample() {
       cp "/proc/$pid/smaps_rollup" "$res/$tag.smaps_rollup"
       awk '/^Pss:/ { print $2 * 1024 }' "/proc/$pid/smaps_rollup" ;;
     macos)
-      footprint "$pid" > "$res/$tag.footprint.txt" 2>&1
-      # "phys_footprint" total line, e.g. "Footprint: 12 MB"; value and unit converted to bytes.
-      awk '/Footprint:/ && !d { v = $(NF-4); u = $(NF-3);
-             m = (u == "KB") ? 1024 : (u == "MB") ? 1048576 : (u == "GB") ? 1073741824 : 1;
-             printf "%d\n", v * m; d = 1 }' "$res/$tag.footprint.txt" ;;
+      footprint -f bytes "$pid" > "$res/$tag.footprint.txt" 2>&1
+      # "Auxiliary data: phys_footprint: <n> B" (exact bytes; the Activity Monitor metric, not the peak)
+      awk '$1 == "phys_footprint:" { print $2; exit }' "$res/$tag.footprint.txt" ;;
     windows)
       powershell.exe -NoProfile -ExecutionPolicy Bypass -File probe-windows.ps1 -ProcId "$pid" \
         | tee "$res/$tag.probe.txt" | awk '{ print $1 }' ;;

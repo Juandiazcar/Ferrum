@@ -1,0 +1,18 @@
+---
+source: crates/ferrum-vt/tests/fixtures.rs
+---
+size 20x6 primary
+cursor row=0 col=0 wrap_pending=false
+modes AUTOWRAP|CURSOR_VISIBLE
+00 |                    |E
+01 |                    |
+02 |                    |
+03 |                    |
+04 |                    |
+05 |                    |
+history 0
+events
+  ShellMark(CommandFinished { exit_code: Some(130) })
+  ShellMark(CommandFinished { exit_code: Some(-1) })
+  ShellMark(CommandFinished { exit_code: None })
+  ShellMark(CommandFinished { exit_code: None })

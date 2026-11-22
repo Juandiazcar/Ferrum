@@ -3,7 +3,7 @@
 
 use crate::core::Core;
 use crate::events::{Event, EventSink};
-use crate::limits::MAX_TITLE_BYTES;
+use crate::limits::{MAX_CWD_BYTES, MAX_TITLE_BYTES};
 
 /// Splits `payload` at its first `;` into the numeric command and the rest.
 pub(crate) fn split_command(payload: &[u8]) -> Option<(u16, &[u8])> {
@@ -23,6 +23,15 @@ impl<S: EventSink> Core<S> {
         match command {
             0 | 2 => self.set_title(rest, TitleKind::Window),
             1 => self.set_title(rest, TitleKind::Icon),
+            4 => self.osc_palette(rest),
+            7 => self.set_cwd(rest),
+            8 => self.osc_hyperlink(rest),
+            10..=12 => self.osc_dynamic_colors(command, rest),
+            52 => self.osc_clipboard(rest),
+            104 => self.reset_palette(rest),
+            110..=112 => self.reset_dynamic_color(command),
+            133 => self.osc_shell_mark(rest),
+            9 => self.osc_progress(rest),
             _ => {}
         }
     }
@@ -42,9 +51,28 @@ impl<S: EventSink> Core<S> {
             text.push(c);
         }
         match kind {
-            TitleKind::Window => self.sink.event(Event::Title(&self.scratch.short)),
+            TitleKind::Window => {
+                self.title.clear();
+                self.title.push_str(&self.scratch.short);
+                self.sink.event(Event::Title(&self.scratch.short));
+            }
             TitleKind::Icon => self.sink.event(Event::IconName(&self.scratch.short)),
         }
+    }
+
+    /// OSC 7: the shell's working directory as a `file://` URI. Anything else, a URI with control
+    /// characters or an over-long one is ignored.
+    fn set_cwd(&mut self, raw: &[u8]) {
+        let Ok(uri) = std::str::from_utf8(raw) else { return };
+        if !uri.starts_with("file://")
+            || uri.len() > MAX_CWD_BYTES
+            || uri.chars().any(char::is_control)
+        {
+            return;
+        }
+        self.cwd.clear();
+        self.cwd.push_str(uri);
+        self.sink.event(Event::Cwd(uri));
     }
 }
 

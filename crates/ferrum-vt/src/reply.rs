@@ -50,6 +50,17 @@ impl Reply {
         self.text(text)
     }
 
+    /// Appends a 16-bit value as four lowercase hex digits.
+    pub(crate) fn hex4(self, value: u16) -> Self {
+        const DIGITS: &[u8; 16] = b"0123456789abcdef";
+        let mut text = [0u8; 4];
+        for (slot, shift) in text.iter_mut().zip([12u16, 8, 4, 0]) {
+            let digit = usize::from((value >> shift) & 0xF);
+            *slot = DIGITS.get(digit).copied().unwrap_or(b'0');
+        }
+        self.text(&text)
+    }
+
     pub(crate) fn as_bytes(&self) -> &[u8] {
         self.bytes.get(..self.len).unwrap_or_default()
     }
@@ -70,6 +81,11 @@ mod tests {
     fn replies_are_built_from_text_and_numbers() {
         let reply = Reply::new().text(b"\x1b[").number(12).text(b";").number(0).number(1_234_567);
         assert_eq!(reply.as_bytes(), b"\x1b[12;01234567");
+    }
+
+    #[test]
+    fn hex_values_are_four_digits() {
+        assert_eq!(Reply::new().hex4(0xbeef).hex4(0x0a).as_bytes(), b"beef000a");
     }
 
     #[test]

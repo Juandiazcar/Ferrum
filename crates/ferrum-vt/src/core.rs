@@ -6,6 +6,7 @@ use crate::cursor::CursorStyle;
 use crate::events::EventSink;
 use crate::extras::Extras;
 use crate::modes::Mode;
+use crate::palette::Palette;
 use crate::screen::Screen;
 use crate::size::Size;
 use crate::tabs::TabStops;
@@ -21,6 +22,8 @@ pub(crate) struct Scratch {
     pub(crate) cluster: String,
     /// Sanitized title, link key and other short strings built from an OSC payload.
     pub(crate) short: String,
+    /// Decoded OSC 52 data.
+    pub(crate) bytes: Vec<u8>,
 }
 
 /// Everything except the byte-stream front end.
@@ -32,6 +35,10 @@ pub(crate) struct Core<S> {
     pub(crate) tabs: TabStops,
     pub(crate) scrollback: Scrollback,
     pub(crate) extras: Extras,
+    pub(crate) palette: Palette,
+    /// The last title and working directory the program set (for snapshots).
+    pub(crate) title: String,
+    pub(crate) cwd: String,
     pub(crate) scratch: Scratch,
     /// The last graphic character printed (REP repeats it).
     pub(crate) last_char: Option<char>,
@@ -52,6 +59,9 @@ impl<S: EventSink> Core<S> {
             tabs: TabStops::new(size.cols()),
             scrollback,
             extras: Extras::new(),
+            palette: Palette::default(),
+            title: String::new(),
+            cwd: String::new(),
             scratch: Scratch::default(),
             last_char: None,
             stop: false,

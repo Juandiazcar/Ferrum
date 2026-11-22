@@ -42,7 +42,7 @@ Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear h
 ### Environment notes
 - Toolchain 1.100.0 (the pin) installed via rustup; MSRV 1.97 is declared but not separately
   verified (no 1.97 toolchain was installed).
-- Local machine is Windows 11 with Application Control that intermittently blocks freshly built executables (os error 4551); re-running after a short wait succeeds, so `cargo xtask check` was run with a retry loop. No check was skipped. `cargo-machete` could not be built in release mode because Windows
+- Local machine is Windows 11. Smart App Control initially blocked freshly built executables (os error 4551); the maintainer disabled it, and `cargo xtask check` was re-run from a clean `target/` with no retries: all steps passed.
   Application Control blocked a dependency's build script; it was installed with `--debug`.
   CI installs prebuilt tools via `taiki-e/install-action`.
 

@@ -14,8 +14,13 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 dhat = { workspace = true }
 proptest = { workspace = true }
+
+[[bench]]
+name = "scrollback"
+harness = false
 
 [lints]
 workspace = true

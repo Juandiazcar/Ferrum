@@ -8,9 +8,9 @@ the work package that introduces the unverifiable behavior.
 
 | ID | Check | Linux | macOS | Windows |
 |---|---|---|---|---|
-| MV-00-1 | Fresh clone: `cargo xtask setup` activates hooks and reports tools correctly | pending | pending | pending |
-| MV-00-2 | `git commit` without `-s` or with a non-conventional subject is rejected by the hook | pending | pending | pending |
-| MV-00-3 | `.githooks/*` keep the executable bit after clone | pending | pending | pending |
+| MV-00-1 | Fresh clone: `cargo xtask setup` activates hooks and reports tools correctly | pending | pending | verified 2026-11-21 (author machine) |
+| MV-00-2 | `git commit` without `-s` or with a non-conventional subject is rejected by the hook | pending | pending | verified 2026-11-21 (author machine) |
+| MV-00-3 | `.githooks/*` keep the executable bit after clone | pending | pending | index mode 100755 verified |
 
 ## Later work packages
 

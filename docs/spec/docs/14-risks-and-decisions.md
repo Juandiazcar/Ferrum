@@ -72,7 +72,7 @@ ADR files live in `docs/adr/NNNN-title.md` (status: proposed / accepted / supers
 | 0013 | Phase 2 uses official CLIs for subscriptions; no OAuth token reuse | accepted |
 | 0014 | Agent-to-agent communication via built-in MCP server | proposed (confirm at P2-05) |
 | 0015 | Memory gate defined at 1440×900@1x + surface-excluded gate for HiDPI | accepted |
-| 0016 | Allocator choice | pending (S2) |
+| 0016 | Allocator choice per OS (spike S2): system allocator on Linux (glibc, no `M_ARENA_MAX`) and Windows, `mimalloc` on macOS; jemalloc not applicable on Windows MSVC; mimalloc costs +13.5 MB on Linux with THP `madvise` | accepted |
 | 0017 | Custom (client-drawn) titlebar in v1.0 with a native-titlebar fallback | accepted |
 | 0018 | Dark themes only in v1.0 | accepted |
 | 0019 | One variable monospace font family for terminal and UI; hierarchy by weight | accepted |

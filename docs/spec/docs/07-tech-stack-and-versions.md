@@ -66,7 +66,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | TLS | `rustls` | 0.23.46 | app (updater) | no OpenSSL |
 | Signature verify | `minisign-verify` | 0.3.0 | app (updater) | verify update manifests/artifacts |
 | Hash | `sha2` | 0.11.1 | updater | |
-| Allocator candidates | `mimalloc` 0.1.52 · `tikv-jemallocator` 0.7.0 | — | app, daemon | chosen by spike S2; may end up being the system allocator |
+| Allocator (ADR 0016) | system allocator on Linux and Windows; `mimalloc` 0.1.52 on macOS only (target dependency of app and daemon); `tikv-jemallocator` 0.7.0 evaluated, not chosen (not applicable on Windows MSVC) | — | app, daemon | decided by spike S2 per OS |
 
 ### Spike-only dependencies (never in product crates)
 
@@ -77,6 +77,8 @@ Used only by throwaway packages under `spikes/` (own workspace and lockfile, exc
 | `alacritty_terminal` | 0.26.0 (2026-11-21) | S1 | Measure its per-session scrollback memory against Ferrum's encoder (ADR 0024). Rejected for the product (§3) |
 | `dhat` | 0.3.3 (2026-11-21, latest stable) | S1 | Safe heap accounting (`HeapStats`) instead of a hand-written allocator; no `unsafe` in the spike (§4 lists it for tests) |
 | `portable-pty` | 0.9.0 (2026-11-21, latest stable; released 2025-02-11) | S4 | Measure ConPTY and Unix PTY behavior and decide keep vs direct `windows-sys` (ADR 0026). Same version as the product table above |
+| `mimalloc` | 0.1.52 (2026-11-21, latest stable; released 2026-05-22; bundles mimalloc 2.3.2 through `libmimalloc-sys` 0.1.49) | S2 | Allocator candidate measured against the system allocator and jemalloc on the S1 workload (ADR 0016). Also in the product table above (macOS only) |
+| `tikv-jemallocator` | 0.7.0 (2026-11-21, latest stable; released 2026-05-25) | S2 | Allocator candidate (ADR 0016); not applicable on Windows MSVC, so the spike resolves it on non-MSVC targets only. Not chosen for the product |
 | `anyhow` | 1.0.104 (2026-11-21, latest stable) | S4 | Error context in the harness binary (`docs/05` §3: bins may use `anyhow`); same version as the product table |
 
 ### Phase 2 only (not in v1.0 builds)

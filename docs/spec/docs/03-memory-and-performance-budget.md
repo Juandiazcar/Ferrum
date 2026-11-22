@@ -28,7 +28,7 @@ A second gate, `AC-MEM-04`, handles HiDPI honestly: the window surface (framebuf
 | – per session sealed chunks (≈ 9 000 lines) | 0.45 | **0.35 measured** on the synthetic reference mix; 0.52 on real prose and 0.70 on random text, both over the allowance (allowances unchanged by maintainer decision Q-17: WP-01 re-measures, the WP-08 gate decides) | LZ4 ratio measured 2.0× (mixed), 1.35× (prose), 1.0× (random); the earlier 2.5–4× expectation is not supported |
 | – per session misc (style table, parser, PTY buffers, indices) | 0.20 | **0.069 measured** (64 KiB read buffer, style table, scratch) | write queue, alt screen, hyperlink table not yet measured; parser state is on the stack |
 | – 10 sessions subtotal (10 × 1.0) | 10.0 | **6.8 measured** (10 × 0.684, reference mix); 8.5 prose; 10.3 random (over the allowance) | `dhat`-measured per-session bytes, ADR 0024 |
-| – allocator slack / fragmentation | 3.0 | 2–3 | measure allocators (S2) |
+| – allocator slack / fragmentation | 3.0 | 2–3 | S2 (ADR 0016) measured whole-process memory per allocator, not the slack alone: requested bytes are not comparable with resident bytes, so the slack stays an estimate; allocator choice per OS is in ADR 0016 |
 | **UI** | **≤ 26 MB** | ≈ 19–24 MB | 24 MB of components + 2 MB reserve |
 | – process base (binary, libwayland/X11, xkb; no fontconfig) | 4.5 | 4.0 | |
 | – window surface at 1440×900@1x (up to 2 buffers) | 10.5 | 5.2–10.4 | OS-owned; see §5 |
@@ -109,3 +109,5 @@ CI timing numbers are noisy on shared runners: gates for latency use a *relative
 ## 7. Allocator decision (spike S2)
 
 Candidates: system allocator (glibc `malloc` with `mallopt(M_ARENA_MAX=1)` on Linux, system allocators on macOS/Windows), `mimalloc` (0.1.52), `tikv-jemallocator` (0.7.0). Measure combined PSS in the reference scenario and parse throughput. Choose the lowest steady-state memory with throughput within 10 % of the best. Record the result in an ADR. Allocator choice is made once, in the composition roots (`ferrum-app`, `ferrumd`), never in libraries.
+
+**Decision (ADR 0016, spike S2):** Linux and Windows keep the system allocator (no `M_ARENA_MAX`, which showed no effect on the single-threaded S2 workload); macOS uses `mimalloc`; `tikv-jemallocator` is not applicable on Windows MSVC and was not chosen elsewhere. Purge/trim effects were not measured (they need `unsafe`); the `malloc_trim` policy of §3 rule 7 stays as written.

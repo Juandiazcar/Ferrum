@@ -1,0 +1,69 @@
+# Spike S2 (docs/12): THROWAWAY allocator comparison (system vs mimalloc vs jemalloc) on S1's workload.
+# Standalone package with its own [workspace] and Cargo.lock, excluded from the product workspace
+# (root `exclude = ["spikes"]`). Results live in docs/adr/0016. One build per allocator, selected by
+# cargo feature; the default build is the system allocator.
+[package]
+name = "ferrum-spike-s2"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Throwaway spike S2: allocator comparison on the S1 reference workload"
+
+[workspace]
+
+[dependencies]
+# Same pins as spike S1 (S1's src/ modules are compiled into this crate, see src/main.rs).
+vte = { version = "0.15.0", default-features = false }
+lz4_flex = { version = "0.14.2", default-features = false, features = ["std", "safe-encode", "safe-decode"] }
+unicode-width = "0.2.3"
+anyhow = "1.0.104"
+# Versions verified on crates.io 2026-11-21 (mimalloc 0.1.52, tikv-jemallocator 0.7.0).
+mimalloc = { version = "0.1.52", optional = true }
+
+# tikv-jemallocator does not support Windows MSVC; the dependency is not even resolved there.
+[target.'cfg(not(all(target_os = "windows", target_env = "msvc")))'.dependencies]
+tikv-jemallocator = { version = "0.7.0", optional = true }
+
+# Used by S1's modules compiled in through `#[path]` (outside this package's src/), which
+# cargo-machete does not scan.
+[package.metadata.cargo-machete]
+ignored = ["lz4_flex", "unicode-width"]
+
+[features]
+default = []
+mimalloc = ["dep:mimalloc"]
+jemalloc = ["dep:tikv-jemallocator"]
+
+# Same lint policy as the product workspace (docs/05 §11), including `unsafe_code = "forbid"`.
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+let_underscore_drop = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+indexing_slicing = "warn"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "warn"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = false

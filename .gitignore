@@ -13,6 +13,8 @@ Thumbs.db
 !.vscode/settings.json
 /fuzz/target
 /fuzz/artifacts
+/crates/*/fuzz/target
+/crates/*/fuzz/artifacts
 .env
 .env.*
 *.pem

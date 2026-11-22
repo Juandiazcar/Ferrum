@@ -1,6 +1,7 @@
 //! Spike S1 (docs/12): scrollback memory-model measurement. THROWAWAY; results in docs/adr/0024.
 //!
 //! One process measures one model (`ferrum`, `naive`, `alacritty`) so allocator deltas are clean.
+//! Heap figures need the default `dhat-heap` feature; `--no-default-features` gives undistorted throughput only.
 //! Usage: `ferrum-spike-s1 --model ferrum|naive|alacritty [--seed N] [--profile mixed|corpus|entropy]
 //! [--corpus-dir DIR] [--lines 12000] [--retain 10000]`
 
@@ -18,9 +19,6 @@ use anyhow::{Context, Result, anyhow, bail};
 use content::{Generator, Profile, Stats};
 use grid::{COLS, Cell, FLAG_SPACER, Grid, ROWS, Sink};
 use scrollback::{Fnv, Scrollback};
-
-#[global_allocator]
-static GLOBAL: alloc::Counting = alloc::Counting;
 
 const FEED_BUF: usize = 64 * 1024; // docs/03 §2 "read buffer 64 KiB"
 
@@ -178,7 +176,7 @@ fn kv(k: &str, v: impl std::fmt::Display) -> Result<()> {
     out(&format!("{k} {v}"))
 }
 
-fn report_common(a: &Args, r: &Run, live: usize, peak: usize, calls: usize) -> Result<()> {
+fn report_common(a: &Args, r: &Run, live: usize, peak: usize, calls: u64) -> Result<()> {
     let s = &r.generator;
     let pct = |n: usize| fl(n) * 100.0 / fl(s.lines);
     kv("model", &a.model)?;
@@ -194,21 +192,23 @@ fn report_common(a: &Args, r: &Run, live: usize, peak: usize, calls: usize) -> R
         format!("{:.2}", fl(s.sgr_runs) / fl(s.colored.max(1))),
     )?;
     kv("generator.avg_bytes_per_line_on_wire", format!("{:.1}", fl(s.bytes) / fl(s.lines)))?;
-    kv("alloc.session_live_bytes", live)?;
-    kv("alloc.session_peak_bytes", peak)?;
-    kv("alloc.session_calls", calls)?;
+    kv("alloc.enabled", alloc::ENABLED)?;
+    if alloc::ENABLED {
+        kv("alloc.session_live_bytes", live)?;
+        kv("alloc.process_peak_bytes", peak)?;
+        kv("alloc.session_blocks", calls)?;
+    }
     kv("throughput.lines_per_s", format!("{:.0}", fl(s.lines) / (fl(r.advance_ns) / 1e9)))?;
     Ok(())
 }
 
 fn run_ferrum(a: &Args) -> Result<()> {
     let base = alloc::live();
-    alloc::reset_peak();
-    let calls0 = alloc::calls();
+    let calls0 = alloc::blocks();
     let (run, grid) = run_grid(a, Scrollback::new(a.retain, a.hot_step))?;
     let live = alloc::live() - base;
-    let peak = alloc::peak() - base;
-    let calls = alloc::calls() - calls0;
+    let peak = alloc::peak();
+    let calls = alloc::blocks() - calls0;
     report_common(a, &run, live, peak, calls)?;
     let sb = &grid.sink;
     let cap = sb.capacity();
@@ -237,12 +237,14 @@ fn run_ferrum(a: &Args) -> Result<()> {
     kv("throughput.encode_rows_per_s", format!("{:.0}", rows / (fl(cnt.encode_ns) / 1e9)))?;
     kv("hot_step", a.hot_step)?;
     kv("hot_len_max_bytes", cnt.hot_len_max)?;
-    report_capacity(&grid, &cap, run.feed_cap, live)?;
+    if alloc::ENABLED {
+        report_capacity(&grid, &cap, run.feed_cap, live)?;
+    }
     verify(a, &grid.sink)?;
     Ok(())
 }
 
-/// Capacity-based accounting, reconciled against the allocator-measured total.
+/// Capacity-based accounting, reconciled against the dhat-measured total.
 fn report_capacity(
     grid: &Grid<Scrollback>,
     cap: &scrollback::Capacity,
@@ -300,11 +302,10 @@ fn verify(a: &Args, sb: &Scrollback) -> Result<()> {
 
 fn run_naive(a: &Args) -> Result<()> {
     let base = alloc::live();
-    alloc::reset_peak();
-    let calls0 = alloc::calls();
+    let calls0 = alloc::blocks();
     let (run, grid) = run_grid(a, NaiveSink { rows: VecDeque::new(), cap: a.retain })?;
     let live = alloc::live() - base;
-    report_common(a, &run, live, alloc::peak() - base, alloc::calls() - calls0)?;
+    report_common(a, &run, live, alloc::peak(), alloc::blocks() - calls0)?;
     kv("rows_pushed", grid.rows_pushed)?;
     kv("rows_retained", grid.sink.rows.len())?;
     kv("cap.live_grid", grid.capacity_bytes())?;
@@ -338,8 +339,7 @@ fn run_alacritty(a: &Args) -> Result<()> {
 
     let mut generator = new_gen(a)?;
     let base = alloc::live();
-    alloc::reset_peak();
-    let calls0 = alloc::calls();
+    let calls0 = alloc::blocks();
     let mut buf = Vec::with_capacity(FEED_BUF);
     let config = Config { scrolling_history: a.retain, ..Config::default() };
     let mut term = Term::new(config, &Size, VoidListener);
@@ -355,7 +355,7 @@ fn run_alacritty(a: &Args) -> Result<()> {
         feed_cap: buf.capacity(),
         _feed_buf: buf,
     };
-    report_common(a, &run, live, alloc::peak() - base, alloc::calls() - calls0)?;
+    report_common(a, &run, live, alloc::peak(), alloc::blocks() - calls0)?;
     let hist = term.grid().history_size();
     kv("rows_retained", hist)?;
     kv("alacritty.cell_size_bytes", size_of::<alacritty_terminal::term::cell::Cell>())?;
@@ -367,6 +367,7 @@ fn run_alacritty(a: &Args) -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    let _heap = alloc::start();
     let a = parse_args()?;
     match a.model.as_str() {
         "ferrum" => run_ferrum(&a),

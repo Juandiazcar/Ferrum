@@ -1,76 +1,61 @@
-//! Counting global allocator: sums the sizes of every live allocation (requested `Layout` sizes).
+//! Heap accounting through `dhat` 0.3.3 (docs/07 §4), a safe audited crate: no `unsafe` in the
+//! spike. `dhat` counts the requested size of every allocation. With the `dhat-heap` feature off
+//! (throughput runs) every figure is 0 and [`ENABLED`] is false, because `dhat`'s
+//! per-allocation backtraces distort timing.
 
-use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+/// True when heap figures are real.
+pub(crate) const ENABLED: bool = cfg!(feature = "dhat-heap");
 
-static LIVE: AtomicUsize = AtomicUsize::new(0);
-static PEAK: AtomicUsize = AtomicUsize::new(0);
-static CALLS: AtomicUsize = AtomicUsize::new(0);
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static GLOBAL: dhat::Alloc = dhat::Alloc;
 
-/// Wraps the system allocator and tracks live and peak requested bytes.
-pub(crate) struct Counting;
-
-fn add(n: usize) {
-    let now = LIVE.fetch_add(n, Relaxed) + n;
-    PEAK.fetch_max(now, Relaxed);
-    CALLS.fetch_add(1, Relaxed);
+/// Keeps the `dhat` profiler alive; heap statistics are valid only while it exists.
+pub(crate) struct Guard {
+    #[cfg(feature = "dhat-heap")]
+    _profiler: dhat::Profiler,
 }
 
-#[allow(unsafe_code)] // The only unsafe in the spike: a GlobalAlloc must be an unsafe impl.
-// SAFETY: every method forwards to `System` with the caller's arguments unchanged, so all
-// `GlobalAlloc` contracts are upheld by `System`; the counters are plain atomics.
-unsafe impl GlobalAlloc for Counting {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        // SAFETY: caller upholds the `alloc` contract; forwarded unchanged.
-        let p = unsafe { System.alloc(layout) };
-        if !p.is_null() {
-            add(layout.size());
-        }
-        p
-    }
-
-    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        // SAFETY: caller upholds the `alloc_zeroed` contract; forwarded unchanged.
-        let p = unsafe { System.alloc_zeroed(layout) };
-        if !p.is_null() {
-            add(layout.size());
-        }
-        p
-    }
-
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        // SAFETY: `ptr`/`layout` come from a prior allocation by this allocator (i.e. `System`).
-        unsafe { System.dealloc(ptr, layout) };
-        LIVE.fetch_sub(layout.size(), Relaxed);
-    }
-
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        // SAFETY: `ptr`/`layout` come from a prior allocation by this allocator; forwarded as is.
-        let p = unsafe { System.realloc(ptr, layout, new_size) };
-        if !p.is_null() {
-            LIVE.fetch_sub(layout.size(), Relaxed);
-            add(new_size);
-        }
-        p
+/// Starts profiling in testing mode (no output file).
+pub(crate) fn start() -> Guard {
+    Guard {
+        #[cfg(feature = "dhat-heap")]
+        _profiler: dhat::Profiler::builder().testing().build(),
     }
 }
 
 /// Bytes currently allocated.
+#[cfg(feature = "dhat-heap")]
 pub(crate) fn live() -> usize {
-    LIVE.load(Relaxed)
+    usize::try_from(dhat::HeapStats::get().curr_bytes as u64).unwrap_or(usize::MAX)
 }
 
-/// Highest value of [`live`] since the last [`reset_peak`].
+/// Highest live bytes of the whole process since [`start`] (`dhat` has no reset).
+#[cfg(feature = "dhat-heap")]
 pub(crate) fn peak() -> usize {
-    PEAK.load(Relaxed)
+    usize::try_from(dhat::HeapStats::get().max_bytes as u64).unwrap_or(usize::MAX)
 }
 
-/// Restarts peak tracking from the current live value.
-pub(crate) fn reset_peak() {
-    PEAK.store(LIVE.load(Relaxed), Relaxed);
+/// Number of allocation blocks created so far.
+#[cfg(feature = "dhat-heap")]
+pub(crate) fn blocks() -> u64 {
+    dhat::HeapStats::get().total_blocks
 }
 
-/// Number of allocation calls (`alloc`, `alloc_zeroed`, `realloc`) so far.
-pub(crate) fn calls() -> usize {
-    CALLS.load(Relaxed)
+/// Bytes currently allocated (heap accounting disabled).
+#[cfg(not(feature = "dhat-heap"))]
+pub(crate) fn live() -> usize {
+    0
+}
+
+/// Peak bytes (heap accounting disabled).
+#[cfg(not(feature = "dhat-heap"))]
+pub(crate) fn peak() -> usize {
+    0
+}
+
+/// Allocation blocks (heap accounting disabled).
+#[cfg(not(feature = "dhat-heap"))]
+pub(crate) fn blocks() -> u64 {
+    0
 }

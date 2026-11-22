@@ -21,11 +21,17 @@ lz4_flex = { version = "0.14.2", default-features = false, features = ["std", "s
 unicode-width = "0.2.3"
 anyhow = "1.0.104"
 alacritty_terminal = "0.26.0"
+# dhat 0.3.3 is the latest stable (crates.io, verified 2026-11-21) and is listed in docs/07 §4.
+dhat = { version = "0.3.3", optional = true }
 
-# Same lint policy as the product workspace (docs/05 §11), except `unsafe_code`: the counting
-# global allocator needs one `unsafe impl GlobalAlloc`, allowed in `src/alloc.rs` only.
+[features]
+default = ["dhat-heap"]
+# Heap accounting. Off for throughput runs: dhat records a backtrace per allocation.
+dhat-heap = ["dep:dhat"]
+
+# Same lint policy as the product workspace (docs/05 §11), including `unsafe_code = "forbid"`.
 [lints.rust]
-unsafe_code = "deny"
+unsafe_code = "forbid"
 missing_docs = "warn"
 unreachable_pub = "warn"
 unused_qualifications = "warn"

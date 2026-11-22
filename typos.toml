@@ -5,7 +5,11 @@ extend-exclude = [
   "LICENSE-MIT",
   "Cargo.lock",
   "assets/",          # brand assets and, later, fonts and generated files
+  "crates/*/fuzz/corpus/",  # raw bytes of terminal sessions and fixtures
+  "*.in",  # raw bytes of fixtures
+  "fixtures/vt/alacritty/", # recordings of real shells (third-party, byte exact)
 ]
 
 [default.extend-words]
 # Terminal vocabulary that looks like a typo (add entries only with a reason).
+ba = "ba"   # a byte in the hex annotations of fixtures/vt/**/*.md (0xBA)

@@ -1,0 +1,62 @@
+# Spike S1 (docs/12): THROWAWAY scrollback memory-model measurement harness.
+# Standalone package with its own [workspace] and Cargo.lock. It is excluded from the product
+# workspace (root `exclude = ["spikes"]`), so CI lints, cargo-deny and cargo xtask never see it.
+# Results live in docs/adr/0024; this code may be deleted once WP-01 lands.
+[package]
+name = "ferrum-spike-s1"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Throwaway spike S1: scrollback encoder + vte loop + memory measurements"
+
+[workspace]
+
+[dependencies]
+# Versions verified on crates.io 2026-11-21 (vte 0.15.0, lz4_flex 0.14.2, alacritty_terminal 0.26.0,
+# anyhow 1.0.104); vte, lz4_flex, unicode-width and anyhow mirror the root workspace pins.
+vte = { version = "0.15.0", default-features = false }
+lz4_flex = { version = "0.14.2", default-features = false, features = ["std", "safe-encode", "safe-decode"] }
+unicode-width = "0.2.3"
+anyhow = "1.0.104"
+alacritty_terminal = "0.26.0"
+# dhat 0.3.3 is the latest stable (crates.io, verified 2026-11-21) and is listed in docs/07 §4.
+dhat = { version = "0.3.3", optional = true }
+
+[features]
+default = ["dhat-heap"]
+# Heap accounting. Off for throughput runs: dhat records a backtrace per allocation.
+dhat-heap = ["dep:dhat"]
+
+# Same lint policy as the product workspace (docs/05 §11), including `unsafe_code = "forbid"`.
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+let_underscore_drop = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+indexing_slicing = "warn"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "warn"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = false

@@ -39,6 +39,7 @@
 | Q-10 | Flatpak / Snap | Not offered (see note below) |
 | Q-11 | Logo and icon | Designed by Claude: `assets/brand/`; approved by the maintainer 2026-11-20 |
 | Q-16 | Mockups tooling | Impeccable skill (installed from `pbakaus/impeccable`) guides the design work |
+| Q-17 | Sealed-chunk memory vs its 0.45 MB per-session allowance (spike S1, ADR 0024: 0.352–0.355 MB on the synthetic reference mix, 0.521–0.524 MB on real prose, 0.700–0.712 MB on random text; LZ4 ratio 2.02× / 1.35× / 1.0× instead of the expected 2.5–4×) | Maintainer decision 2026-11-21: **keep all allowances and LZ4 unchanged.** WP-01 re-measures with the product fixture generator; the WP-08 gate (reference scenario) decides. If WP-01 or WP-08 shows the reference scenario over budget, it goes back to the maintainer with numbers |
 
 *Note on Flatpak/Snap:* they are sandboxed Linux packaging formats. A terminal must reach the user's real shells, files and tools, and sandboxing fights that, so Ferrum ships `.deb`, `.rpm`, AppImage, tar.gz and an AUR package instead.
 
@@ -78,6 +79,7 @@ ADR files live in `docs/adr/NNNN-title.md` (status: proposed / accepted / supers
 | 0021 | macOS installers per architecture, not universal | accepted |
 | 0022 | CI jobs arrive with the work package that creates what they measure (nightly WP-01, memcheck WP-06/WP-08, soak WP-08, release WP-18) | accepted |
 | 0023 | `ferrum-daemon` may depend on `ferrum-platform` (traits in the library, real implementations wired only in the `ferrumd` bin) | accepted |
+| 0024 | Scrollback memory model: S1 measurements (confirms ADR 0004/0005 design; LZ4 ratio corrected; sealed-chunk allowance question resolved as Q-17) | accepted |
 
 ## 4. Change control for this specification
 

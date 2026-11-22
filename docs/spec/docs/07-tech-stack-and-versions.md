@@ -68,6 +68,15 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Hash | `sha2` | 0.11.1 | updater | |
 | Allocator candidates | `mimalloc` 0.1.52 · `tikv-jemallocator` 0.7.0 | — | app, daemon | chosen by spike S2; may end up being the system allocator |
 
+### Spike-only dependencies (never in product crates)
+
+Used only by throwaway packages under `spikes/` (own workspace and lockfile, excluded from the product workspace, CI lints and `deny.toml`). Versions already listed in this document (`vte`, `lz4_flex`, `unicode-width`, `anyhow`, `dhat`) are used at the same version.
+
+| Crate | Version (verified) | Spike | Reason |
+|---|---|---|---|
+| `alacritty_terminal` | 0.26.0 (2026-11-21) | S1 | Measure its per-session scrollback memory against Ferrum's encoder (ADR 0024). Rejected for the product (§3) |
+| `dhat` | 0.3.3 (2026-11-21, latest stable) | S1 | Safe heap accounting (`HeapStats`) instead of a hand-written allocator; no `unsafe` in the spike (§4 lists it for tests) |
+
 ### Phase 2 only (not in v1.0 builds)
 
 | Area | Crate | Version | Notes |

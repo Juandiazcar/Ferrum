@@ -38,7 +38,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Wire format | `postcard` | 1.1.3 | proto | compact, no-std friendly, deterministic |
 | Config format | `toml` | 1.2.2 (re-verified 2026-11-21) | config, xtask | serde-based; atomic writes by us |
 | Compression (scrollback) | `lz4_flex` | 0.14.2 | scrollback | pure Rust, `default-features = false`, `safe-encode`/`safe-decode` |
-| mmap | `memmap2` | 0.9.12 | scrollback, render | spill files and fonts |
+| mmap | `memmap2` | 0.9.12 | render | fonts only. The scrollback spill file uses plain positional reads and writes from `std` (ADR 0027), because mapping needs `unsafe` |
 | Byte search | `memchr` | 2.8.3 | vt, scrollback | |
 | POD casts | `bytemuck` | 1.25.2 | render, vt | `Cell` ↔ bytes where needed |
 | Small vectors | `smallvec` | 1.16.6 | vt | only where profiling justifies |

@@ -85,6 +85,7 @@ ADR files live in `docs/adr/NNNN-title.md` (status: proposed / accepted / supers
 | 0024 | Scrollback memory model: S1 measurements (confirms ADR 0004/0005 design; LZ4 ratio corrected; sealed-chunk allowance question resolved as Q-17) | accepted |
 | 0025 | Render pipeline: S3 measurements (confirms ADR 0006 as an architecture; tiny-skia kept for chrome tiles only; native folder dialog opened in a short-lived helper process, Q-06 extended; Q-19 and Q-20 resolved by the maintainer) | accepted |
 | 0026 | Windows PTY backend (spike S4): ConPTY measured on Windows 11, Windows Server 2025, Ubuntu and macOS; direct `windows-sys` backend for Windows, `portable-pty` kept for Unix/macOS; `PtyBackend` contract test list (PT-01 to PT-25); ADR 0008 Windows part validated; resolves Q-18 (docs/11 §4 wording) | accepted |
+| 0027 | Scrollback spill without mmap: the spill file uses plain positional reads and writes (no `unsafe`, no `memmap2` in `ferrum-scrollback`); FR-TERM-011, `docs/02` §3.2 and `docs/07` reworded | accepted |
 
 ## 4. Change control for this specification
 

@@ -89,7 +89,7 @@ Review rules:
 
 > **Note (ADR 0022):** the `memcheck (linux)` required check is added with WP-08, not before; until then branch protection requires the remaining checks only.
 
-- Require pull request; require status checks: `fmt`, `clippy`, `test (ubuntu)`, `test (macos)`, `test (windows)`, `deny`, `deps-graph`, `memcheck (linux)`, `docs`, `pr-title`.
+- Require pull request; require status checks: `fmt-clippy` (fmt + clippy), `test (ubuntu-latest)`, `test (macos-latest)`, `test (windows-latest)`, `deny-and-deps` (cargo deny + deps-graph + typos + machete), `memcheck (linux)`, `docs`, `pr-title`.
 - Require linear history; require conversation resolution; dismiss stale approvals; block force-pushes and deletions; require signed commits (optional).
 - Allow only squash merges.
 

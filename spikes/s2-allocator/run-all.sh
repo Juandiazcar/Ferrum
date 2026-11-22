@@ -25,6 +25,8 @@ rm -rf "$res" && mkdir -p "$res"
 configs=("system||")
 [ "$os" = linux ] && configs+=("system-arena1||MALLOC_ARENA_MAX=1")
 configs+=("mimalloc|mimalloc|")
+# Variant: mimalloc 2.3.2 (bundled) with transparent huge pages disabled by its own env option.
+[ "$os" = linux ] && configs+=("mimalloc-nothp|mimalloc|MIMALLOC_ALLOW_THP=0")
 if [ "$os" != windows ]; then configs+=("jemalloc|jemalloc|"); fi
 
 # Prints the metric in bytes for <pid>; raw tool output is kept in $res for the record.
@@ -54,6 +56,7 @@ for cfg in "${configs[@]}"; do
   IFS='|' read -r name features envs <<< "$cfg"
   tdir=target/$name
   [ "$name" = system-arena1 ] && tdir=target/system # same binary, env var differs
+  [ "$name" = mimalloc-nothp ] && tdir=target/mimalloc
   cargo build --release --target-dir "$tdir" ${features:+--features "$features"} >&2
   for run in $(seq 1 "$runs"); do
     tag=$name.$run

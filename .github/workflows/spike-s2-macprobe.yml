@@ -24,8 +24,8 @@ jobs:
           for _ in $(seq 1 120); do grep -q STEADY o.txt 2>/dev/null && break; sleep 0.5; done
           pid=$(grep -o 'pid=[0-9]*' o.txt | cut -d= -f2)
           echo "--- footprint --help"; footprint --help 2>&1 | head -60 || true
-          echo "--- footprint --precise"; footprint --precise "$pid" 2>&1 | head -40 || true
-          echo "--- footprint -j"; footprint -j fp.json "$pid" 2>&1 | tail -3 || true; head -c 1500 fp.json || true
+          echo "--- footprint -f bytes"; footprint -f bytes "$pid" 2>&1 | head -40 || true
+          echo "--- footprint -j"; footprint -j fp.json "$pid" 2>&1 | tail -3 || true; grep -o "\"[a-z_ ]*footprint[a-z_ ]*\":[^,]*" fp.json || true
           echo "--- vmmap --summary"; vmmap --summary "$pid" 2>&1 | tail -25 || true
           kill "$pid" || true
           true

@@ -1,8 +1,9 @@
 //! `cargo xtask`: repository automation (docs/04 §1, docs/05 §3).
 //!
-//! Subcommands that need later work packages are stubs: they print what is missing and exit
+//! `memcheck` and `soak` need later work packages and are stubs: they print what is missing and exit
 //! non-zero, never fake numbers.
 
+mod bench;
 mod check;
 mod deps;
 mod out;
@@ -32,8 +33,19 @@ enum Command {
     },
     /// Validate the crate dependency graph against xtask/deps-rules.toml (docs/04 §2).
     CheckDeps,
-    /// Criterion benches against committed baselines (not implemented yet).
-    Bench(StubArgs),
+    /// Run the criterion benches and gate them (docs/03 §6, docs/08 §8): against
+    /// `benches/baselines/{os}.json` by default, or against the previous commit with `--against`.
+    Bench {
+        /// Criterion quick mode: fewer samples, same comparison rules.
+        #[arg(long)]
+        quick: bool,
+        /// Write the baseline of this OS instead of comparing (a deliberate, reviewed act).
+        #[arg(long)]
+        save_baseline: bool,
+        /// Bench this git revision and the current commit on this machine and compare them (CI).
+        #[arg(long, value_name = "REV", conflicts_with = "save_baseline")]
+        against: Option<String>,
+    },
     /// Reference-scenario memory measurement (not implemented yet).
     Memcheck(StubArgs),
     /// Long-running leak check (not implemented yet).
@@ -63,9 +75,14 @@ fn main() -> ExitCode {
             check::run(if fast { check::Scope::Fast } else { check::Scope::Full })
         }
         Command::CheckDeps => deps::run(),
-        Command::Bench(_) => {
-            return not_implemented("bench", "WP-01/WP-02", "no benches exist before those crates");
-        }
+        Command::Bench { quick, save_baseline, against } => bench::run(
+            if quick { bench::Effort::Quick } else { bench::Effort::Full },
+            &match (save_baseline, against) {
+                (true, _) => bench::Mode::SaveBaseline,
+                (false, Some(rev)) => bench::Mode::Against(rev),
+                (false, None) => bench::Mode::Compare,
+            },
+        ),
         Command::Memcheck(_) => {
             return not_implemented("memcheck", "WP-08", "no binaries to measure yet");
         }

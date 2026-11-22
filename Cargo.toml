@@ -70,6 +70,7 @@ image             = { version = "0.25.10", default-features = false, features = 
 lexopt            = "0.3.2"
 clap              = { version = "4.6.9", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }  # xtask only (docs/07)
 cargo_metadata    = "0.23.1"                                                                                                       # xtask only (check-deps)
+serde_json        = { version = "1.0.154", default-features = false, features = ["std"] }                                      # xtask only (bench baselines)
 thiserror         = "2.0.21"
 anyhow            = "1.0.104"
 tracing           = { version = "0.1.44", features = ["release_max_level_warn"] }

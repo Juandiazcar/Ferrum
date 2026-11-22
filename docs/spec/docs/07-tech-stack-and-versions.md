@@ -58,6 +58,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | CLI args | `lexopt` | 0.3.2 | app, daemon | tiny; `clap` is only used in `xtask` |
 | xtask CLI | `clap` | 4.6.9 (verified 2026-11-21) | xtask only | derive parser for `cargo xtask`; never in shipped binaries |
 | xtask graph check | `cargo_metadata` | 0.23.1 (verified 2026-11-21) | xtask only | typed `cargo metadata` for `check-deps`; brings `serde_json`, build tooling only |
+| xtask bench baselines | `serde_json` | 1.0.154 (verified 2026-11-22, latest stable) | xtask only | reads criterion `estimates.json` and reads/writes `benches/baselines/*.json`; already compiled as a dependency of `cargo_metadata`, never in shipped binaries |
 | Error types | `thiserror` | 2.0.21 | libs | |
 | Error context (bins) | `anyhow` | 1.0.104 | app, daemon, xtask | |
 | Logging | `tracing` | 0.1.44 | all | `max_level_*` features compile out debug/trace in release |

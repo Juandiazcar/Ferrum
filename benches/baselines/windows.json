@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "os": "windows",
+  "median_ns": {
+    "scrollback_push/fixture_rows_retain_10k": 3498500.0,
+    "scrollback_read/random_1k": 138859050.0,
+    "scrollback_read/sequential_10k": 2621755.0,
+    "scrollback_read/spilled_file_sequential": 8072942.857142857,
+    "scrollback_read/spilled_memory_sequential": 7871592.857142856,
+    "scrollback_search/literal_10k_lines": 3333966.6666666665,
+    "scrollback_search/literal_insensitive_10k_lines": 5836766.666666666
+  }
+}

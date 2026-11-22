@@ -119,6 +119,41 @@ fn pen_text(pen: &Pen, extras: &Extras) -> String {
 }
 
 impl<S: EventSink> Terminal<S> {
+    /// The text of the history and the primary screen as logical lines: rows soft-wrapped into
+    /// one are joined, trailing blanks of a line are dropped, trailing empty lines are dropped,
+    /// and lines are separated by `\n`. Two terminals that show the same text at different widths
+    /// give the same string, which is what AC-TERM-02 checks.
+    pub fn logical_text(&self) -> String {
+        let mut lines: Vec<String> = Vec::new();
+        let mut joined = false;
+        let mut push_row = |text: &str, wrapped: bool| {
+            match lines.last_mut() {
+                Some(last) if joined => last.push_str(text),
+                _ => lines.push(text.to_owned()),
+            }
+            joined = wrapped;
+        };
+        let history = &self.core.scrollback;
+        let mut cursor = LineCursor::new();
+        for index in 0..history.len() {
+            if let Ok(Some(line)) = history.read_line(index, &mut cursor) {
+                push_row(&line.text, line.flags.contains(LineFlags::WRAPPED));
+            }
+        }
+        let grid = &self.core.primary.grid;
+        for y in 0..grid.lines() {
+            let wrapped = grid.row(y).is_some_and(crate::row::Row::is_wrapped);
+            push_row(&row_text(grid, y).replace(LEADING_SPACER_MARK, ""), wrapped);
+        }
+        for line in &mut lines {
+            line.truncate(line.trim_end_matches(' ').len());
+        }
+        while lines.last().is_some_and(String::is_empty) {
+            lines.pop();
+        }
+        lines.join("\n")
+    }
+
     /// Renders the whole state as text (see the module docs).
     pub fn dump(&self) -> String {
         let core = &self.core;

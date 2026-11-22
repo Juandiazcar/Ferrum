@@ -10,7 +10,7 @@ use rustc_hash::FxHashMap;
 use crate::limits::MAX_GRAPHEMES;
 
 /// Interned clusters of one grid.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct GraphemeTable {
     clusters: Vec<Box<str>>,
     index: FxHashMap<Box<str>, u32>,

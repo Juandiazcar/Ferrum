@@ -126,6 +126,50 @@ impl Grid {
         }
     }
 
+    /// Puts logical row 0 at physical index 0 again.
+    fn normalize(&mut self) {
+        self.rows.rotate_left(self.top);
+        self.top = 0;
+    }
+
+    /// Removes the first `n` rows (they have been saved elsewhere); the grid has `n` rows fewer
+    /// until [`set_lines`](Self::set_lines) restores the count.
+    pub(crate) fn drop_top_rows(&mut self, n: usize) {
+        self.normalize();
+        self.rows.drain(..n.min(self.rows.len()));
+    }
+
+    /// Cuts or pads the bottom so that the grid has `lines` rows.
+    pub(crate) fn set_lines(&mut self, lines: usize) {
+        self.normalize();
+        self.rows.truncate(lines);
+        while self.rows.len() < lines {
+            self.rows.push(Row::new(self.cols, Cell::default()));
+        }
+        self.damage.resize(lines);
+    }
+
+    /// Copies the part of `other` that fits (used for the alternate screen, which does not
+    /// reflow). A double-width character cut by the new right edge is blanked.
+    pub(crate) fn copy_clipped_from(&mut self, other: &Self) {
+        for y in 0..self.rows.len().min(other.rows.len()) {
+            let (Some(from), Some(to)) = (other.row(y), self.row_mut(y)) else { continue };
+            let width = from.len().min(to.len());
+            if let (Some(src), Some(dst)) =
+                (from.cells().get(..width), to.cells_mut().get_mut(..width))
+            {
+                dst.copy_from_slice(src);
+            }
+            if width < from.len()
+                && let Some(last) = to.cells_mut().get_mut(width.saturating_sub(1))
+                && last.flags().contains(CellFlags::WIDE)
+            {
+                *last = Cell::default();
+            }
+        }
+        self.graphemes = other.graphemes.clone();
+    }
+
     fn swap_rows(&mut self, a: usize, b: usize) {
         if let (Some(a), Some(b)) = (self.physical(a), self.physical(b)) {
             self.rows.swap(a, b);

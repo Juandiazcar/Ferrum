@@ -34,9 +34,20 @@ pub(crate) fn encode_row(
     text: &mut String,
     runs: &mut Vec<StyledRun>,
 ) {
+    encode_cells(row.cells(), row.is_wrapped(), graphemes, text, runs);
+}
+
+/// Encodes `cells` as one row; a `wrapped` row keeps its trailing blanks (see the module docs).
+pub(crate) fn encode_cells(
+    cells: &[Cell],
+    wrapped: bool,
+    graphemes: &GraphemeTable,
+    text: &mut String,
+    runs: &mut Vec<StyledRun>,
+) {
     text.clear();
     runs.clear();
-    for cell in row.cells() {
+    for cell in cells {
         if cell.flags().intersects(CellFlags::SPACER | CellFlags::LEADING_SPACER) {
             continue;
         }
@@ -50,13 +61,13 @@ pub(crate) fn encode_row(
         };
         push_run(runs, style_of(cell), scalars);
     }
-    if row.is_wrapped() {
+    if wrapped {
         pad_trailing_blanks(text, runs);
     }
 }
 
 /// Retags the default-styled trailing spaces of a wrapped row.
-fn pad_trailing_blanks(text: &str, runs: &mut Vec<StyledRun>) {
+pub(crate) fn pad_trailing_blanks(text: &str, runs: &mut Vec<StyledRun>) {
     let mut remaining = text.bytes().rev().take_while(|&byte| byte == b' ').count();
     let mut padded = 0;
     while remaining > 0 {

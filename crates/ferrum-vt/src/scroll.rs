@@ -9,7 +9,7 @@ use crate::events::{Event, EventSink};
 
 impl<S: EventSink> Core<S> {
     /// Encodes row `y` of the primary grid into the scrollback.
-    fn push_history_row(&mut self, y: usize) {
+    pub(crate) fn push_history_row(&mut self, y: usize) {
         let Some(row) = self.primary.grid.row(y) else { return };
         encode_row(
             row,

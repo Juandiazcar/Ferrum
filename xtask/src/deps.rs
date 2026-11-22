@@ -242,5 +242,6 @@ mod tests {
         let text = include_str!("../deps-rules.toml");
         let parsed: Rules = toml::from_str(text).expect("deps-rules.toml must parse");
         assert!(parsed.allowed.contains_key("ferrum-app"));
+        assert!(parsed.allowed["ferrum-daemon"].contains(&"ferrum-platform".to_string())); // ADR 0023
     }
 }

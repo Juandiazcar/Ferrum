@@ -17,18 +17,19 @@ publish = false
 
 # ───────────────────────── dependencies (single source of versions) ─────────────────────────
 [workspace.dependencies]
-# internal
-ferrum-vt         = { path = "crates/ferrum-vt" }
-ferrum-scrollback = { path = "crates/ferrum-scrollback" }
-ferrum-proto      = { path = "crates/ferrum-proto" }
-ferrum-pty        = { path = "crates/ferrum-pty" }
-ferrum-daemon     = { path = "crates/ferrum-daemon" }
-ferrum-render     = { path = "crates/ferrum-render" }
-ferrum-ui         = { path = "crates/ferrum-ui" }
-ferrum-config     = { path = "crates/ferrum-config" }
-ferrum-project    = { path = "crates/ferrum-project" }
-ferrum-platform   = { path = "crates/ferrum-platform" }
-ferrum-testkit    = { path = "crates/ferrum-testkit" }
+# internal. Each entry carries the workspace version: cargo-deny's wildcard ban rejects path-only entries.
+# `cargo xtask release prepare` (WP-18) must bump these together with [workspace.package].version.
+ferrum-vt         = { path = "crates/ferrum-vt", version = "0.1.0" }
+ferrum-scrollback = { path = "crates/ferrum-scrollback", version = "0.1.0" }
+ferrum-proto      = { path = "crates/ferrum-proto", version = "0.1.0" }
+ferrum-pty        = { path = "crates/ferrum-pty", version = "0.1.0" }
+ferrum-daemon     = { path = "crates/ferrum-daemon", version = "0.1.0" }
+ferrum-render     = { path = "crates/ferrum-render", version = "0.1.0" }
+ferrum-ui         = { path = "crates/ferrum-ui", version = "0.1.0" }
+ferrum-config     = { path = "crates/ferrum-config", version = "0.1.0" }
+ferrum-project    = { path = "crates/ferrum-project", version = "0.1.0" }
+ferrum-platform   = { path = "crates/ferrum-platform", version = "0.1.0" }
+ferrum-testkit    = { path = "crates/ferrum-testkit", version = "0.1.0" }
 
 # windowing & rendering
 winit             = { version = "0.30.13", default-features = false, features = ["rwh_06", "x11", "wayland", "wayland-dlopen"] }

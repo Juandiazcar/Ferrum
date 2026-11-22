@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Ferrum">
+  <title>Ferrum</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1A1D21"/>
+      <stop offset="1" stop-color="#0B0D0F"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+  <rect x="16.5" y="16.5" width="479" height="479" rx="111.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.08"/>
+  <!-- F: stem, top arm, middle arm -->
+  <rect x="148" y="116" width="72" height="280" fill="#E8590C"/>
+  <rect x="148" y="116" width="216" height="72" fill="#E8590C"/>
+  <rect x="148" y="224" width="156" height="64" fill="#E8590C"/>
+  <!-- cursor block, sitting at the baseline like a prompt cursor -->
+  <rect x="256" y="324" width="52" height="72" fill="#E7E9ED"/>
+</svg>

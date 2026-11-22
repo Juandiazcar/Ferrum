@@ -1,0 +1,8 @@
+# Maintainer: @Juandiazcar (Q-12 resolved).
+*                                  @Juandiazcar
+/crates/ferrum-proto/              @Juandiazcar
+/crates/ferrum-pty/                @Juandiazcar
+/crates/ferrum-platform/           @Juandiazcar
+/deny.toml                         @Juandiazcar
+/.github/                          @Juandiazcar
+/docs/spec/                        @Juandiazcar

@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| Allowed internal dependencies | ferrum-vt, ferrum-scrollback, ferrum-proto, ferrum-config, ferrum-project, ferrum-pty |
+| Allowed internal dependencies | ferrum-vt, ferrum-scrollback, ferrum-proto, ferrum-config, ferrum-project, ferrum-pty, ferrum-platform (traits only in the library; real implementations are wired only in `src/main.rs`, ADR 0023) |
 | Must never depend on | ferrum-ui, ferrum-render, ferrum-app, winit |
 | `unsafe` | forbidden (`#![forbid(unsafe_code)]`) |
 

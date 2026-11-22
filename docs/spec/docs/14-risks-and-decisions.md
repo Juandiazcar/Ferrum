@@ -76,6 +76,7 @@ ADR files live in `docs/adr/NNNN-title.md` (status: proposed / accepted / supers
 | 0019 | One variable monospace font family for terminal and UI; hierarchy by weight | accepted |
 | 0020 | Initial releases unsigned (ad-hoc on macOS); signing steps prepared behind flags | accepted |
 | 0021 | macOS installers per architecture, not universal | accepted |
+| 0023 | `ferrum-daemon` may depend on `ferrum-platform` (traits in the library, real implementations wired only in the `ferrumd` bin) | accepted |
 
 ## 4. Change control for this specification
 

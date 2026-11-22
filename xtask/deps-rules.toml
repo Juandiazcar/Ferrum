@@ -15,7 +15,7 @@ ferrum-pty        = []
 ferrum-platform   = []
 ferrum-vt         = ["ferrum-scrollback"]
 ferrum-render     = []
-ferrum-daemon     = ["ferrum-vt", "ferrum-scrollback", "ferrum-proto", "ferrum-config", "ferrum-project", "ferrum-pty"]
+ferrum-daemon     = ["ferrum-vt", "ferrum-scrollback", "ferrum-proto", "ferrum-config", "ferrum-project", "ferrum-pty", "ferrum-platform"]
 ferrum-ui         = ["ferrum-render", "ferrum-proto", "ferrum-config", "ferrum-project"]
 ferrum-app        = [
   "ferrum-vt", "ferrum-scrollback", "ferrum-proto", "ferrum-pty", "ferrum-daemon", "ferrum-render",

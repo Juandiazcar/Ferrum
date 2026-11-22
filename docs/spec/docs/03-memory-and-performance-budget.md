@@ -1,6 +1,6 @@
 # 03 — Memory and Performance Budget
 
-This file defines the numbers that decide whether a change may merge. The figures marked **(to validate)** are design estimates; spikes S1–S3 in `docs/12` replace them with measurements in the first work packages, and this file is then updated with the measured values.
+This file defines the numbers that decide whether a change may merge. The figures marked **(to validate)** are design estimates; spikes S1–S3 in `docs/12` replace them with measurements in the first work packages, and this file is then updated with the measured values. The per-session scrollback lines of §2 carry the S1 measurements (`docs/adr/0024-scrollback-memory-model-measurements.md`); every other figure is still to validate.
 
 ## 1. The reference scenario (`AC-MEM-01`)
 
@@ -19,15 +19,15 @@ A second gate, `AC-MEM-04`, handles HiDPI honestly: the window surface (framebuf
 
 ## 2. Budget table (design)
 
-| Component | Allowance | Expected (to validate) | Notes |
+| Component | Allowance | Expected (to validate) / measured | Notes |
 |---|---|---|---|
 | **Daemon** | **≤ 18 MB** | ≈ 11–14 MB | 16 MB of components + 2 MB reserve |
 | – process base (binary pages, libc, thread stacks) | 3.0 | 2.5 | no async runtime, 2 threads |
-| – per session live grid (≈ 200×55×16 B) | 0.25 | 0.18 | alt screen grid allocated lazily |
-| – per session hot chunk (1 024 lines × ≈ 90 B) | 0.10 | 0.09 | uncompressed |
-| – per session sealed chunks (≈ 9 000 lines) | 0.45 | 0.25–0.4 | LZ4; ratio 2.5–4× on typical text |
-| – per session misc (style table, parser, PTY buffers, indices) | 0.20 | 0.15 | read buffer 64 KiB, write queue bounded |
-| – 10 sessions subtotal (10 × 1.0) | 10.0 | ≈ 6.5–8 | |
+| – per session live grid (≈ 200×55×16 B) | 0.25 | **0.176 measured** (S1, ADR 0024) | alt screen grid allocated lazily |
+| – per session hot chunk (1 024 lines × ≈ 75 B) | 0.10 | **0.086 measured** with bounded buffer growth (plain `Vec` doubling: 0.088–0.152, over the allowance; Q-S1-02) | uncompressed; 75 B/row raw measured; includes the 4 KiB line-offset index |
+| – per session sealed chunks (≈ 9 000 lines) | 0.45 | **0.35 measured** on the synthetic reference mix; 0.52 on real prose and 0.70 on random text, both over the allowance (Q-S1-01) | LZ4 ratio measured 2.0× (mixed), 1.35× (prose), 1.0× (random); the earlier 2.5–4× expectation is not supported |
+| – per session misc (style table, parser, PTY buffers, indices) | 0.20 | **0.069 measured** (64 KiB read buffer, style table, scratch) | write queue, alt screen, hyperlink table not yet measured; parser state is on the stack |
+| – 10 sessions subtotal (10 × 1.0) | 10.0 | **6.8 measured** (10 × 0.684, reference mix); 8.5 prose; 10.3 random (over the allowance) | allocator-measured per-session bytes, ADR 0024 |
 | – allocator slack / fragmentation | 3.0 | 2–3 | measure allocators (S2) |
 | **UI** | **≤ 26 MB** | ≈ 19–24 MB | 24 MB of components + 2 MB reserve |
 | – process base (binary, libwayland/X11, xkb; no fontconfig) | 4.5 | 4.0 | |

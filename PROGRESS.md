@@ -2,7 +2,29 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
-## Current: WP-00 Repository bootstrap (branch `chore/repo-bootstrap`)
+## Spike S1 Memory model (branch `spike/s1-memory-model`, ADR 0024)
+
+Throwaway harness in `spikes/s1-memory-model/` (standalone package, excluded from the product
+workspace). Full tables, method and reproduction commands: `docs/adr/0024-scrollback-memory-model-measurements.md`.
+Allocator-measured (counting global allocator), 12 000 lines fed, 10 000 rows retained and all
+verified by round trip, 3 seeds each, Windows 11, i5-9400.
+
+| Measure | Result (seeds 1 / 2 / 3) |
+|---|---|
+| Raw encoded bytes per row | 75.32 / 74.95 / 75.23 (mixed) |
+| LZ4 bytes per row (+ index 1.04) | 37.45 / 37.14 / 37.28 (mixed); 55.5 (prose); 75.0 (random) |
+| LZ4 ratio | 2.02x mixed, 1.35x prose, 1.0x random (docs/03 expected 2.5-4x: not supported) |
+| Per session, 10 000 rows, incl. live grid, bounded hot growth | 684 566 / 682 981 / 684 887 B mixed; about 852 000 prose; about 1 035 000 random |
+| Naive 16-byte cells x 200 cols | 32 503 680 B (all seeds) |
+| `alacritty_terminal` 0.26.0 | 51 234 147 B (all seeds), 24-byte cells |
+| Parse + encode throughput (information) | 600 504 to 649 864 lines/s mixed |
+
+- Confirms ADR 0004 and 0005 (design of `docs/02` §3.2 round-trips; 47x to 75x smaller than the alternatives).
+- `docs/03` §2 per-session scrollback rows now hold measured values; allowances and gates untouched.
+- **Over allowance, flagged not relaxed:** sealed chunks 0.52 MB (prose) and 0.70 MB (random) vs 0.45 MB, random-text per-session sum 1.03-1.04 MB vs 1.0 MB (`docs/14` Q-S1-01, PROVISIONAL: keep allowances and LZ4, re-measure in WP-01/WP-08 with the product fixture generator); hot chunk with plain `Vec` growth 0.088-0.152 MB vs 0.10 MB (Q-S1-02, PROVISIONAL: WP-01 uses bounded growth).
+- Not measured: real PSS/private working set, allocator headers and fragmentation (S2), real terminal corpora, zstd or larger chunks, Linux and macOS.
+
+## Previous: WP-00 Repository bootstrap (branch `chore/repo-bootstrap`)
 
 ### Done
 - Workspace `Cargo.toml` (from `docs/spec/templates/`), 12 skeleton crates under `crates/` (each with

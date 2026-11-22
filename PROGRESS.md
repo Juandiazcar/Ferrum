@@ -2,6 +2,33 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## Spike S2 Allocator (branch `spike/s2-allocator`, ADR 0016)
+
+Throwaway harness in `spikes/s2-allocator/` (standalone package, `unsafe_code = "forbid"`, S1's
+workload compiled in through `#[path]`): 10 sessions x (12 000 lines fed, 10 000 retained) in one
+process, 10 s idle, then an external probe (Linux PSS from `smaps_rollup`, macOS `phys_footprint`
+from `footprint -f bytes`, Windows Private Working Set from PDH `Get-Counter`). 3 runs per
+allocator and OS plus 10 interleaved throughput rounds. Tables, method, reproduction and CI run
+links: `docs/adr/0016-allocator-choice.md`.
+
+| OS | Mean memory of the 10-session process, MB (system / mimalloc / jemalloc) | Decision |
+|---|---|---|
+| Linux (PSS, CI) | 8.350 / 21.831 / 9.675 (glibc + `MALLOC_ARENA_MAX=1`: 8.357; mimalloc with `MIMALLOC_ALLOW_THP=0`: 9.871) | system allocator |
+| macOS (phys_footprint, CI) | 10.372 / 10.312 / 10.569 | mimalloc |
+| Windows (Private WS, local / CI) | 8.800 / 10.547 and 8.928 / 10.648; jemalloc not applicable (MSVC) | system allocator |
+
+- Throughput (S1 parse + encode, interleaved 10 rounds, mean lines/s) is within 10 % of the best for
+  every candidate on every OS (worst: macOS system and mimalloc 3.8 % below jemalloc), so the
+  `docs/03` §7 rule reduces to the lowest memory.
+- mimalloc on Linux costs +13.5 MB: transparent huge pages (`AnonHugePages` 20 480 kB with THP
+  `madvise`); with `MIMALLOC_ALLOW_THP=0` it is 9.871 MB.
+- Back-to-back throughput on shared runners was noisier than the 10 % margin (identical binaries
+  swapped order between two CI runs), hence the interleaved series; both are in the ADR.
+- `MALLOC_ARENA_MAX=1` showed no effect, but the workload is single-threaded; purge/trim effects
+  were not measured (they need `unsafe`). Both are left to the WP-08 gate.
+- `docs/03` §2 slack rows not replaced (slack not isolable from whole-process numbers); no
+  allowance or gate changed; no open question raised.
+
 ## Spike S4 Windows PTY (branch `spike/s4-windows-pty`, ADR 0026)
 
 Throwaway harness in `spikes/s4-windows-pty/` (standalone package, `unsafe_code = "forbid"`, only

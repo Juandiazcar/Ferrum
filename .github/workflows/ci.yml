@@ -91,7 +91,7 @@ jobs:
           tool: cargo-hack
       - run: cargo hack check --workspace --each-feature --no-dev-deps --locked
 
-  # `memcheck` (docs/06 §5, docs/03) is intentionally NOT a job yet: there are no binaries to
-  # measure, and a job that passes without measuring would be a fake gate. It arrives with the
-  # work package that creates something measurable (`memcheck --daemon-only` in WP-06, the full
-  # reference scenario with the UI in WP-08). `cargo xtask memcheck` exits non-zero until then.
+  # `memcheck` (docs/06 §5) is intentionally NOT a job yet: nothing exists to measure and a job that
+  # passes without measuring would be a fake gate. ADR 0022: `memcheck --daemon-only` lands in WP-06,
+  # the full reference scenario (and the required status check) in WP-08; `nightly.yml` in WP-01.
+  # `cargo xtask memcheck` exits non-zero until then.

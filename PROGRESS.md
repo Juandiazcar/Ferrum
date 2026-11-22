@@ -12,7 +12,7 @@ Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear h
 - Templates copied to their real locations; `docs/spec/templates/` left untouched.
 - `cargo xtask`: `setup`, `check` (and `--fast`), `check-deps` (rules in `xtask/deps-rules.toml`, 6 unit
   tests for the checker). `bench`, `memcheck`, `soak` are stubs that print "not implemented until
-  WP-xx" and exit with code 2; they never print numbers.
+  WP-xx" (soak: WP-08) and exit with code 2; they never print numbers.
 - GitHub Actions pinned by SHA (table in the PR and in `docs/07` §4); Rust is installed by the local
   composite action `.github/actions/setup-rust`, which reads the channel from `rust-toolchain.toml`.
 - `deny.toml` reconciled with cargo-deny 0.22.0; `cargo deny check` passes.
@@ -21,6 +21,8 @@ Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear h
   `docs/manual-verification.md`, `typos.toml`.
 
 ### Decisions and deviations (read these)
+- **ADR 0022 (maintainer approved 2026-11-21):** CI jobs arrive with the work package that creates what they measure: `nightly.yml` in WP-01, `memcheck --daemon-only` in WP-06, full `memcheck` plus the required `memcheck (linux)` check and the nightly soak job in WP-08, `release.yml` in WP-18. The audit of each of those WPs blocks its merge if the job is missing. Until then `cargo xtask memcheck`/`soak` exit 2 and print no numbers. See [`docs/adr/0022-ci-jobs-arrive-with-the-wp-that-creates-what-they-measure.md`](docs/adr/0022-ci-jobs-arrive-with-the-wp-that-creates-what-they-measure.md).
+- **ADR 0023 (maintainer approved 2026-11-21):** `ferrum-daemon` may depend on `ferrum-platform` (traits only in the library; real implementations wired only in `ferrumd`'s `src/main.rs`). See [`docs/adr/0023-daemon-may-depend-on-platform.md`](docs/adr/0023-daemon-may-depend-on-platform.md).
 - **unsafe lint:** `[workspace.lints.rust] unsafe_code = "forbid"` as in the template. A crate cannot
   inherit the workspace table and override one entry, so `ferrum-pty`, `ferrum-platform` and
   `ferrum-render` repeat the lint tables with `unsafe_code = "deny"` (`docs/05` §4). Keep them in sync.
@@ -46,12 +48,3 @@ Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear h
 - Next: spikes S1 to S4 and WP-01 (`ferrum-scrollback`).
 - Branch protection (`docs/06` §5) is a GitHub setting for the maintainer.
 - Measured numbers: none (no code to measure yet).
-
-### Awaiting maintainer decision
-- **`memcheck` CI job and `nightly.yml` are not present.** `docs/06` §5 requires the status check
-  `memcheck (linux)` and §6 lists a `memcheck` job in `ci.yml` and a `nightly.yml` workflow, but there
-  is nothing to measure yet (no binaries) and a job that passes without measuring would be a fake
-  gate. `ci.yml` carries a comment saying so; `cargo xtask memcheck` exits 2 ("not implemented until
-  WP-08") and prints no numbers. This is a conflict between `docs/06` and `CLAUDE.md` non-negotiable 1,
-  not a `docs/14` §2 default, so it is not marked PROVISIONAL. Until decided, branch protection must
-  not require `memcheck (linux)`.

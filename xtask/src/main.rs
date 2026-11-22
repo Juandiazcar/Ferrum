@@ -70,7 +70,7 @@ fn main() -> ExitCode {
             return not_implemented("memcheck", "WP-08", "no binaries to measure yet");
         }
         Command::Soak(_) => {
-            return not_implemented("soak", "WP-17", "no daemon or UI to soak yet");
+            return not_implemented("soak", "WP-08", "no daemon or UI to soak yet");
         }
     };
     match result {

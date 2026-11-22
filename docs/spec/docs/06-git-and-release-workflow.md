@@ -87,11 +87,15 @@ Review rules:
 
 ## 5. Branch protection (GitHub settings for `main`)
 
+> **Note (ADR 0022):** the `memcheck (linux)` required check is added with WP-08, not before; until then branch protection requires the remaining checks only.
+
 - Require pull request; require status checks: `fmt`, `clippy`, `test (ubuntu)`, `test (macos)`, `test (windows)`, `deny`, `deps-graph`, `memcheck (linux)`, `docs`, `pr-title`.
 - Require linear history; require conversation resolution; dismiss stale approvals; block force-pushes and deletions; require signed commits (optional).
 - Allow only squash merges.
 
 ## 6. Continuous integration
+
+> **Note (ADR 0022):** the `memcheck` job (WP-06 `--daemon-only`, WP-08 full), `nightly.yml` (WP-01) and its soak job (WP-08) arrive with the work package that creates what they measure; `release.yml` arrives in WP-18. See `docs/adr/0022-ci-jobs-arrive-with-the-wp-that-creates-what-they-measure.md`.
 
 | Workflow | Trigger | Jobs |
 |---|---|---|

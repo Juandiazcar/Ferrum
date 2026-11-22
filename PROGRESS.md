@@ -16,6 +16,7 @@ Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear h
 - GitHub Actions pinned by SHA (table in the PR and in `docs/07` §4); Rust is installed by the local
   composite action `.github/actions/setup-rust`, which reads the channel from `rust-toolchain.toml`.
 - `deny.toml` reconciled with cargo-deny 0.22.0; `cargo deny check` passes.
+- `audit.yml` (daily and on lockfile changes: cargo audit, cargo deny advisories and licenses); layout directories from `docs/04` §1 each with a purpose README.
 - Docs: licenses, README, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, CHANGELOG, ADR 0001,
   `docs/manual-verification.md`, `typos.toml`.
 
@@ -23,17 +24,12 @@ Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear h
 - **unsafe lint:** `[workspace.lints.rust] unsafe_code = "forbid"` as in the template. A crate cannot
   inherit the workspace table and override one entry, so `ferrum-pty`, `ferrum-platform` and
   `ferrum-render` repeat the lint tables with `unsafe_code = "deny"` (`docs/05` §4). Keep them in sync.
-- **`memcheck` CI job omitted (PROVISIONAL, awaiting WP-06/WP-08):** there is nothing to measure, and a
-  job that passes without measuring would be a fake gate. A comment in `ci.yml` records this.
-  `docs/06` §5 lists `memcheck (linux)` as a required status check: do not require it in branch
-  protection until the job exists. `cargo xtask memcheck` exits 2 until WP-08.
 - **`cargo xtask check` includes `machete` and `cargo hack`** because CI runs them (docs/06 §3 says
   "everything CI runs"). Missing tools fail the check; they are never skipped.
 - **Unused workspace dependencies:** the template's `[workspace.dependencies]` is kept whole as the
   single source of versions; cargo's `unused_workspace_dependencies` lint is set to `allow`.
 - **New dev-tool crates** `clap` 4.6.9 and `cargo_metadata` 0.23.1 (xtask only) and `toml` bumped to
   1.2.2, verified on crates.io 2026-11-21 and recorded in `docs/07`.
-- **`.githooks/` landed in the first commit** (with `.gitattributes`), not in its own commit.
 - **`git add --renormalize .`** produced no change (the index already held LF content), so there is no
   renormalize commit.
 - **dtolnay/rust-toolchain** publishes no releases: pinned to the default-branch tip
@@ -50,3 +46,12 @@ Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear h
 - Next: spikes S1 to S4 and WP-01 (`ferrum-scrollback`).
 - Branch protection (`docs/06` §5) is a GitHub setting for the maintainer.
 - Measured numbers: none (no code to measure yet).
+
+### Awaiting maintainer decision
+- **`memcheck` CI job and `nightly.yml` are not present.** `docs/06` §5 requires the status check
+  `memcheck (linux)` and §6 lists a `memcheck` job in `ci.yml` and a `nightly.yml` workflow, but there
+  is nothing to measure yet (no binaries) and a job that passes without measuring would be a fake
+  gate. `ci.yml` carries a comment saying so; `cargo xtask memcheck` exits 2 ("not implemented until
+  WP-08") and prints no numbers. This is a conflict between `docs/06` and `CLAUDE.md` non-negotiable 1,
+  not a `docs/14` §2 default, so it is not marked PROVISIONAL. Until decided, branch protection must
+  not require `memcheck (linux)`.

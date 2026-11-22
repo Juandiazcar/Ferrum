@@ -105,6 +105,27 @@ mod tests {
         assert!(buf.line(texts.len(), &mut line).is_none());
     }
 
+    /// Writes valid sealed blobs as the initial fuzz corpus:
+    /// `cargo test -p ferrum-scrollback seeds -- --ignored` (the fuzzer grows it from there).
+    #[test]
+    #[ignore = "regenerates crates/ferrum-scrollback/fuzz/corpus/decode_chunk"]
+    fn write_fuzz_seeds() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("fuzz")
+            .join("corpus")
+            .join("decode_chunk");
+        std::fs::create_dir_all(&dir).expect("corpus dir");
+        let seeds: [&[&str]; 4] = [
+            &["one line"],
+            &["alpha", "", "gamma gamma gamma gamma", "漢字 😀 é\u{301}"],
+            &["", "", ""],
+            &["wide 漢字漢字漢字漢字漢字漢字", "\t tab", "error: warning: error: warning: error"],
+        ];
+        for (index, texts) in seeds.iter().enumerate() {
+            std::fs::write(dir.join(format!("seed-{index}")), sealed_blob(texts)).expect("seed");
+        }
+    }
+
     #[test]
     fn every_single_byte_corruption_is_handled_without_panicking() {
         let blob = sealed_blob(&["alpha beta gamma", "delta", "epsilon zeta eta theta"]);

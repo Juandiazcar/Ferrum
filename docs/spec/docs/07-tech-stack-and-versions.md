@@ -125,6 +125,7 @@ Used only by throwaway packages under `spikes/` (own workspace and lockfile, exc
 | `cargo-hack` | 0.6.46 | feature-matrix checks |
 | `cargo-machete` | 0.10.1 | unused dependencies |
 | `cargo-fuzz` | 0.13.2 | libFuzzer targets (needs nightly toolchain in that job only) |
+| `libfuzzer-sys` | 0.4.13 (2026-11-22, latest stable) | fuzz targets only: the `fuzz/` package of a crate (own workspace, nightly in the fuzz job only), `default-features = false` + `link_libfuzzer`; never in product crates |
 | `cargo-bloat` | 0.12.1 | binary size attribution (last release 2024-05; still works) |
 | `criterion` | 0.8.2 | benchmarks |
 | `proptest` | 1.12.0 | property tests |

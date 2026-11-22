@@ -1,0 +1,24 @@
+[package]
+name = "ferrum-scrollback-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "cargo-fuzz targets of ferrum-scrollback (not part of the product workspace)"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4.13", default-features = false, features = ["link_libfuzzer"] }
+ferrum-scrollback = { path = ".." }
+
+# A workspace of its own: the fuzz crate needs a nightly toolchain and sanitizers, and must not
+# change the product lockfile.
+[workspace]
+
+[[bin]]
+name = "decode_chunk"
+path = "fuzz_targets/decode_chunk.rs"
+test = false
+doc = false
+bench = false

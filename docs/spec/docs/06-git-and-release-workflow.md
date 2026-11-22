@@ -28,7 +28,7 @@ Signed-off-by: Name <email>
 - Performance commits include before/after numbers from `cargo xtask bench`.
 - `!` after the scope or a `BREAKING CHANGE:` footer marks breaking changes (config schema, protocol, CLI).
 - DCO: every commit carries `Signed-off-by` (`git commit -s`). Optional but recommended: sign commits (SSH or GPG).
-- Commits made with AI assistance keep the `Co-Authored-By:` trailer that the tool adds; do not remove it.
+- Commits and PRs made with AI assistance carry **no** `Co-Authored-By:` trailer and no "Generated with" line (maintainer decision, 2026-11-21).
 - **Atomic commits**: each commit builds, passes tests, and does one logical thing. Refactors and behavior changes are separate commits. Use `git add -p`.
 - `commit-msg` hook validates the format locally; CI re-validates the PR title (squash merge uses the PR title as the commit subject).
 

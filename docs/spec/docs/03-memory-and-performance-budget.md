@@ -24,10 +24,10 @@ A second gate, `AC-MEM-04`, handles HiDPI honestly: the window surface (framebuf
 | **Daemon** | **≤ 18 MB** | ≈ 11–14 MB | 16 MB of components + 2 MB reserve |
 | – process base (binary pages, libc, thread stacks) | 3.0 | 2.5 | no async runtime, 2 threads |
 | – per session live grid (≈ 200×55×16 B) | 0.25 | **0.176 measured** (S1, ADR 0024) | alt screen grid allocated lazily |
-| – per session hot chunk (1 024 lines × ≈ 75 B) | 0.10 | **0.086 measured** with bounded buffer growth (plain `Vec` doubling: 0.088–0.152, over the allowance; Q-S1-02) | uncompressed; 75 B/row raw measured; includes the 4 KiB line-offset index |
-| – per session sealed chunks (≈ 9 000 lines) | 0.45 | **0.35 measured** on the synthetic reference mix; 0.52 on real prose and 0.70 on random text, both over the allowance (Q-S1-01) | LZ4 ratio measured 2.0× (mixed), 1.35× (prose), 1.0× (random); the earlier 2.5–4× expectation is not supported |
+| – per session hot chunk (1 024 lines × ≈ 75 B) | 0.10 | **0.086 measured** with bounded buffer growth (plain `Vec` doubling: 0.088–0.152, over the allowance, so bounded growth is required; ADR 0024) | uncompressed; 75 B/row raw measured; includes the 4 KiB line-offset index |
+| – per session sealed chunks (≈ 9 000 lines) | 0.45 | **0.35 measured** on the synthetic reference mix; 0.52 on real prose and 0.70 on random text, both over the allowance (allowances unchanged by maintainer decision Q-17: WP-01 re-measures, the WP-08 gate decides) | LZ4 ratio measured 2.0× (mixed), 1.35× (prose), 1.0× (random); the earlier 2.5–4× expectation is not supported |
 | – per session misc (style table, parser, PTY buffers, indices) | 0.20 | **0.069 measured** (64 KiB read buffer, style table, scratch) | write queue, alt screen, hyperlink table not yet measured; parser state is on the stack |
-| – 10 sessions subtotal (10 × 1.0) | 10.0 | **6.8 measured** (10 × 0.684, reference mix); 8.5 prose; 10.3 random (over the allowance) | allocator-measured per-session bytes, ADR 0024 |
+| – 10 sessions subtotal (10 × 1.0) | 10.0 | **6.8 measured** (10 × 0.684, reference mix); 8.5 prose; 10.3 random (over the allowance) | `dhat`-measured per-session bytes, ADR 0024 |
 | – allocator slack / fragmentation | 3.0 | 2–3 | measure allocators (S2) |
 | **UI** | **≤ 26 MB** | ≈ 19–24 MB | 24 MB of components + 2 MB reserve |
 | – process base (binary, libwayland/X11, xkb; no fontconfig) | 4.5 | 4.0 | |

@@ -39,6 +39,7 @@
 | Q-10 | Flatpak / Snap | Not offered (see note below) |
 | Q-11 | Logo and icon | Designed by Claude: `assets/brand/`; approved by the maintainer 2026-11-20 |
 | Q-16 | Mockups tooling | Impeccable skill (installed from `pbakaus/impeccable`) guides the design work |
+| Q-17 | Sealed-chunk memory vs its 0.45 MB per-session allowance (spike S1, ADR 0024: 0.352–0.355 MB on the synthetic reference mix, 0.521–0.524 MB on real prose, 0.700–0.712 MB on random text; LZ4 ratio 2.02× / 1.35× / 1.0× instead of the expected 2.5–4×) | Maintainer decision 2026-11-21: **keep all allowances and LZ4 unchanged.** WP-01 re-measures with the product fixture generator; the WP-08 gate (reference scenario) decides. If WP-01 or WP-08 shows the reference scenario over budget, it goes back to the maintainer with numbers |
 
 *Note on Flatpak/Snap:* they are sandboxed Linux packaging formats. A terminal must reach the user's real shells, files and tools, and sandboxing fights that, so Ferrum ships `.deb`, `.rpm`, AppImage, tar.gz and an AUR package instead.
 
@@ -48,8 +49,6 @@
 |---|---|---|---|
 | Q-13 | Start code signing (Apple Developer ID, Windows certificate or OSS signing service) | Unsigned until the maintainer supplies accounts | WP-18 |
 | Q-14 | Website/domain | None; the README is the landing page | after v1.0 |
-| Q-S1-01 | **Sealed-chunk memory exceeds its 0.45 MB per-session allowance for content that compresses poorly.** Evidence (ADR 0024, allocator-measured, 3 seeds each): LZ4 sealed chunks for 10 000 rows cost 0.352–0.355 MB on the synthetic reference mix (ratio 2.02×, inside the allowance), 0.521–0.524 MB on real prose (1.35×) and 0.700–0.712 MB on random text (1.0×); the per-session sum is 0.85 MB for prose and 1.03–1.04 MB for random text against the 1.0 MB per-session allowance (10 sessions: 8.5 and 10.3 MB against 10.0). The 2.5–4× ratio in `docs/03` §2 was not reproduced. Options, none applied: (a) keep allowances and LZ4, and decide with the WP-01/WP-08 fixture generator whether the real fixtures look like the mixed or the prose profile; (b) rebalance inside the per-session 1.0 MB (the misc line uses 0.069 of 0.20 MB) by an ADR approved by the maintainer; (c) a stronger codec for sealed chunks (zstd 0.14.4 is already pinned for export; costs a C dependency, binary size and CPU; not measured in S1); (d) larger sealed chunks for a better ratio (costs decode work per search/scroll; not measured). | Option (a): allowances and LZ4 unchanged; mark `PROVISIONAL` in `PROGRESS.md` | WP-01 (re-measure), WP-08 (gate) |
-| Q-S1-02 | **Hot chunk exceeds its 0.10 MB allowance with default `Vec` growth.** Evidence (ADR 0024): the 1 024-line hot chunk holds at most 81 188 bytes of data, but plain `Vec` doubling leaves 88 064–151 552 bytes allocated (over 0.10 MB in 2 of 3 seeds); `reserve_exact` in 16 KiB steps gives 85 518–85 846 bytes in every run with unchanged throughput. Option: `ferrum-scrollback` uses bounded growth (no allowance change). | Bounded growth in WP-01; allowance unchanged | WP-01 |
 
 ## 3. Decision log (ADR index)
 
@@ -80,7 +79,7 @@ ADR files live in `docs/adr/NNNN-title.md` (status: proposed / accepted / supers
 | 0021 | macOS installers per architecture, not universal | accepted |
 | 0022 | CI jobs arrive with the work package that creates what they measure (nightly WP-01, memcheck WP-06/WP-08, soak WP-08, release WP-18) | accepted |
 | 0023 | `ferrum-daemon` may depend on `ferrum-platform` (traits in the library, real implementations wired only in the `ferrumd` bin) | accepted |
-| 0024 | Scrollback memory model: S1 measurements (confirms ADR 0004/0005 design; LZ4 ratio and sealed/hot allowances corrected or flagged, see Q-S1-01/02) | accepted (measurements); open items in §2 |
+| 0024 | Scrollback memory model: S1 measurements (confirms ADR 0004/0005 design; LZ4 ratio corrected; sealed-chunk allowance question resolved as Q-17) | accepted |
 
 ## 4. Change control for this specification
 

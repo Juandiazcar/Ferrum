@@ -1,8 +1,11 @@
 # 0024. Scrollback memory model: S1 measurements
 
 - Status: accepted for the measurements and for the conclusions each number supports (see
-  "Decision"); the points the numbers do not support are not accepted here and are open in
-  `docs/14` §2 (Q-S1-01, Q-S1-02)
+  "Decision"). The sealed-chunk allowance question (Q-17) was decided by the maintainer on
+  2026-11-21: keep all allowances and LZ4 unchanged, re-measure in WP-01 with the product fixture
+  generator, and let the WP-08 gate (reference scenario) decide; if WP-01 or WP-08 shows the
+  reference scenario over budget it goes back to the maintainer with numbers (`docs/14` §2,
+  Resolved)
 - Date: 2026-11-21
 
 ## Context
@@ -39,17 +42,25 @@ stays in the spike because it is not yet the reusable product fixture generator
   and printed per run (table below), never assumed. Three text profiles:
   - `mixed`: synthetic log-like lines (timestamps, compiler lines, JSON, `ls -la`, git graph, hex
     dump) from a vocabulary of about 120 words. This is the reference fixture profile.
-  - `corpus`: real prose, the `docs/spec` markdown files ASCII-sanitized (harsher: natural text).
+  - `corpus`: real prose, the `docs/spec` markdown files ASCII-sanitized (harsher: natural text),
+    taken as of commit `e4a3e52` (`git archive`, done by `run-all.sh`) so later spec edits do not
+    move the numbers.
   - `entropy`: uniformly random printable ASCII (lower bound for any compressor).
-- **Accounting**: a counting global allocator (`src/alloc.rs`) sums the requested size of every
-  live allocation. The per-session number is the live-byte delta around building the whole
-  session (grid, parser, encoder, 64 KiB read buffer, style table, indices) after feeding
-  12 000 lines. Capacity-based accounting (`Vec::capacity`, `Box<[u8]>::len`) is printed beside
-  it and reconciles with the allocator to +84 bytes in every run. The shared LZ4 output scratch
-  (about 171 KB) is excluded from the per-session figure because `docs/02` §5 compresses on one
-  worker thread per daemon; the figure including it is also shown. The allocator counts
-  requested bytes, not malloc headers or fragmentation (that is S2 and the 3 MB allocator slack
-  line).
+- **Accounting**: `dhat` 0.3.3 (docs/07 §4; latest stable on crates.io, verified 2026-11-21) as
+  the global allocator in testing mode, reading `dhat::HeapStats` (`src/alloc.rs`); the spike
+  contains no `unsafe` and sets `unsafe_code = "forbid"` (`docs/05` §4). `dhat` sums the
+  requested size of every live allocation. The per-session number is the `curr_bytes` delta
+  around building the whole session (grid, parser, encoder, 64 KiB read buffer, style table,
+  indices) after feeding 12 000 lines. Capacity-based accounting (`Vec::capacity`,
+  `Box<[u8]>::len`) is printed beside it and reconciles with `dhat` to +84 bytes in every run.
+  The shared LZ4 output scratch (about 171 KB) is excluded from the per-session figure because
+  `docs/02` §5 compresses on one worker thread per daemon; the figure including it is also
+  shown. `dhat` counts requested bytes, not malloc headers or fragmentation (that is S2 and the
+  3 MB allocator slack line). An earlier draft of the harness used a hand-written counting
+  allocator (needs `unsafe`, replaced after audit); re-running everything with `dhat` gave
+  byte-identical per-session figures in all 18 memory configurations, because both count
+  requested sizes. `dhat` records a backtrace per allocation, which distorts timing, so
+  throughput is measured with a second build without it (`--no-default-features`).
 - **Correctness**: after measuring, the same seed is replayed into an independent reference sink
   that hashes each scrolled-off row straight from its cells; every one of the 10 000 retained
   rows is decoded from the store (decompressing sealed chunks) and its hash compared. All 18
@@ -58,32 +69,37 @@ stays in the spike because it is not yet the reusable product fixture generator
   `alacritty` = `alacritty_terminal` 0.26.0 (latest on crates.io, verified 2026-11-21, released
   2026-04-06) `Term` with `scrolling_history = 10000` fed the same bytes through its own
   `vte::ansi::Processor`; history length verified equal to 10 000. Both measured by the same
-  allocator delta. It was cheap, so it is measured rather than estimated.
+  `dhat` delta. It was cheap, so it is measured rather than estimated.
 - **Hot chunk growth**: `--hot-step 0` is plain `Vec` growth; `--hot-step 16384` reserves
   exactly (`reserve_exact`) in steps of 16 KiB. Both are reported because the capacity policy
   changes the hot-chunk figure.
-- **Repetition**: each configuration was run with seeds 1, 2, 3 (one process per run, so 24
-  runs). Memory figures are deterministic given the seed; throughput varies with the machine.
+- **Repetition**: each configuration was run with seeds 1, 2, 3 (one process per run): 24 `dhat`
+  memory runs (18 encoder, 3 naive, 3 Alacritty) and 12 throughput runs without `dhat` (2 encoder variants, naive, Alacritty). Memory
+  figures are deterministic given the seed; throughput varies with the machine.
 - **Machine**: Windows 11 Pro 10.0.26300, Intel Core i5-9400 (6 cores), 15.9 GB RAM, rustc
   1.100.0, `--release` (fat LTO, codegen-units 1). All processes ran sequentially.
 
 Reproduce (repository root, Git Bash):
 
 ```bash
-bash spikes/s1-memory-model/run-all.sh > s1-results.txt      # all 24 runs, about 1 minute
-# single runs:
+bash spikes/s1-memory-model/run-all.sh > s1-results.txt   # memory (dhat) + throughput runs, a few minutes
+# single runs (memory):
 cargo build --release --manifest-path spikes/s1-memory-model/Cargo.toml
 B=spikes/s1-memory-model/target/release/ferrum-spike-s1
 $B --model ferrum --profile mixed --seed 1 --hot-step 16384
-$B --model ferrum --profile corpus --corpus-dir docs/spec --seed 1
+$B --model ferrum --profile corpus --corpus-dir <dir holding docs/spec at e4a3e52> --seed 1
 $B --model naive --seed 1
 $B --model alacritty --seed 1
+# throughput (no dhat):
+cargo build --release --manifest-path spikes/s1-memory-model/Cargo.toml --no-default-features \
+  --target-dir spikes/s1-memory-model/target/nodhat
+spikes/s1-memory-model/target/nodhat/release/ferrum-spike-s1 --model ferrum --seed 1
 cargo test --release --manifest-path spikes/s1-memory-model/Cargo.toml   # encoder unit tests
 ```
 
-`cargo clippy --release --all-targets -- -D warnings` and `cargo fmt --check` were run inside the
-spike (they are not part of CI; the spike is excluded) and are clean with the workspace lint
-policy, except for the one `unsafe impl GlobalAlloc` (see Deviations).
+`cargo clippy --release --all-targets -- -D warnings` (with and without `--no-default-features`)
+and `cargo fmt --check` were run inside the spike (they are not part of CI; the spike is
+excluded) and are clean with the workspace lint policy, including `unsafe_code = "forbid"`.
 
 ## Results
 
@@ -113,7 +129,7 @@ A row averages 2.02 to 2.05 runs (all runs); 64.4 to 65.4 % of rows are a single
 which cost 1.95 to 1.98 bytes per row (averaged over all rows) on `run_count|style_id|run_len` (informational: encoding "no
 runs" for them would save about 2.6 % of raw bytes; not done, the spike follows the spec).
 
-### Per-session memory for 10 000 retained lines (allocator-measured)
+### Per-session memory for 10 000 retained lines (`dhat`-measured)
 
 Per-session = everything except the shared LZ4 scratch. "Incl. scratch" adds it back.
 
@@ -126,7 +142,7 @@ Per-session = everything except the shared LZ4 scratch. "Incl. scratch" adds it 
 | entropy, bounded | 1 030 583 / 1 035 275 / 1 042 498 | 11 915 | 1 200 251 / 1 202 305 / 1 215 468 |
 | entropy, plain growth | 1 096 449 / 1 053 982 / 1 044 874 | 51 575 | 1 266 117 / 1 221 012 / 1 217 844 |
 
-Component breakdown (capacity-based, bounded growth; allocator minus capacity sum is +84 in all
+Component breakdown (capacity-based, bounded growth; `dhat` minus capacity sum is +84 in all
 runs):
 
 | Component (`docs/03` §2 line) | mixed | corpus | entropy | Allowance |
@@ -147,9 +163,9 @@ hyperlink table, parser state (`vte::Parser` lives on the stack, no heap).
 
 | Model | Bytes per session | Per history row | Seeds / spread | Throughput (lines/s) |
 |---|---|---|---|---|
-| Ferrum encoder, mixed, bounded | 684 566 / 682 981 / 684 887 | 38.3 B compressed incl. index | 1 906 | 600 504 / 640 933 / 636 875 (plain growth: 649 864 / 638 009 / 625 039) |
-| Naive 16-byte cells x 200 cols | 32 503 680 on all 3 seeds | 3 200 B | 0 | 621 845 / 634 518 / 564 302 |
-| `alacritty_terminal` 0.26.0 (24-byte cell) | 51 234 147 on all 3 seeds | about 5 123 B | 0 | 294 080 / 323 371 / 284 427 |
+| Ferrum encoder, mixed, bounded | 684 566 / 682 981 / 684 887 | 38.3 B compressed incl. index | 1 906 | 649 077 / 606 002 / 665 716 (plain growth: 605 745 / 666 315 / 519 654) |
+| Naive 16-byte cells x 200 cols | 32 503 680 on all 3 seeds | 3 200 B | 0 | 647 389 / 642 512 / 646 677 |
+| `alacritty_terminal` 0.26.0 (24-byte cell) | 51 234 147 on all 3 seeds | about 5 123 B | 0 | 339 240 / 338 427 / 340 886 |
 
 Naive and Alacritty sizes do not depend on content (fixed-size rows), hence zero spread. Ratios
 against the Ferrum encoder (mixed, bounded): naive 47.5x, Alacritty 74.8x. Alacritty's
@@ -157,13 +173,14 @@ against the Ferrum encoder (mixed, bounded): naive 47.5x, Alacritty 74.8x. Alacr
 
 ### Encode throughput (information only, not a gate)
 
-Whole pipeline `vte` parse + grid + encode + inline LZ4 (generation excluded), mixed profile:
-600 504 to 649 864 logical lines/s over the 6 runs above. Encoder only (row encode and sealing,
-timed inside `push_row`): 970 074 to 1 026 899 rows/s with plain growth, 972 006 to 1 012 156
-with bounded growth. Corpus and entropy runs are in the same range (502 082 to 743 342 lines/s,
-718 958 to 1 268 021 rows/s) on a noisy desktop; the spread between repetitions (up to 30 %)
-shows these are not stable enough to be baselines. Compression runs inline in the spike; the
-design runs it on the worker thread.
+Measured with the build without `dhat` (12 runs), mixed profile, generation excluded. Whole
+pipeline `vte` parse + grid + encode + inline LZ4: 519 654 to 666 315 logical lines/s over the 6
+encoder runs. Encoder only (row encode and sealing, timed inside `push_row`): 827 008 to
+1 073 883 rows/s (bounded growth: 919 452 / 1 037 365 / 1 067 768 over seeds 2 / 1 / 3; plain:
+932 810 / 1 073 883 / 827 008 over seeds 1 / 2 / 3). The spread between repetitions (up to 30 %)
+on a noisy desktop shows these are not stable enough to be baselines. Compression runs inline in
+the spike; the design runs it on the worker thread. The `dhat` memory runs also print a
+throughput line; ignore it, `dhat` slows allocation.
 
 ## Decision
 
@@ -190,13 +207,15 @@ Corrected by the numbers:
 5. **The sealed-chunk line is not within its 0.45 MB allowance for every content type**:
    0.352 to 0.355 MB (mixed) but 0.521 to 0.524 MB (prose) and 0.700 to 0.712 MB (random), and the
    per-session sum for random text is 1.03 to 1.04 MB against 1.0 MB. No allowance or gate is
-   changed by this ADR; the evidence and options are in `docs/14` §2 (Q-S1-01). Which content
-   the real `memcheck` fixtures resemble is decided in WP-01/WP-08 with the product fixture
-   generator.
+   changed by this ADR. This was Q-17; the maintainer decided on 2026-11-21 to keep all
+   allowances and LZ4 unchanged, re-measure in WP-01 with the product fixture generator, and let
+   the WP-08 gate (reference scenario) decide (`docs/14` §2, Resolved). Which content the real
+   `memcheck` fixtures resemble is therefore decided there, not here.
 6. **The hot chunk needs a bounded growth policy.** With plain `Vec` doubling its capacity ends at
    88 064 to 151 552 bytes, above the 0.10 MB allowance in 2 of 3 seeds; with exact 16 KiB
    reservations it is 85 518 to 85 846 bytes in every run and throughput is unchanged within
-   noise. WP-01 must implement bounded growth (Q-S1-02, default taken, no allowance change).
+   noise. This needs no spec change, so it is an implementation requirement (see Consequences),
+   not an open question.
 
 Not decided here: the `docs/03` §2 daemon totals, the allocator slack line (S2), the UI side (S3),
 any change to the 1 024-line chunk size or to LZ4, and spill behavior (not exercised; 10 000 is
@@ -205,24 +224,27 @@ below the 50 000 threshold).
 ## Consequences
 
 - `docs/03` §2: per-session scrollback rows now carry measured values citing this ADR; no
-  allowance or gate edited. `docs/14` §2 gains Q-S1-01 and Q-S1-02; §3 has the 0024 row.
+  allowance or gate edited. `docs/14` §2 records Q-17 as resolved by the maintainer (allowances
+  and LZ4 unchanged; WP-01 re-measures, the WP-08 gate decides; over budget goes back to the
+  maintainer with numbers); §3 has the 0024 row. `docs/07` §2 lists the spike-only dependencies.
+- **Requirement for WP-01:** the `ferrum-scrollback` hot chunk uses bounded buffer growth
+  (`reserve_exact` in 16 KiB steps or equivalent, never unbounded `Vec` doubling) and must stay
+  at or below 0.10 MB including its line-offset index (measured here: 85 518 to 85 846 bytes).
 - WP-01 starts from these numbers and must reproduce them with the product fixture generator and
-  `dhat`; it must not copy the spike code (counting allocator, inline compression, `HashMap`
-  style table are spike shortcuts).
+  `dhat`; it must not copy the spike code (inline compression and the `HashMap` style table are
+  spike shortcuts).
 - The spike may be deleted after WP-01; the numbers stay here.
 
 ## Deviations and limits (stated plainly)
 
-- The counting allocator needs one `unsafe impl GlobalAlloc` (with `// SAFETY:`), allowed in
-  `src/alloc.rs` of the excluded spike only; `docs/05` §4 would otherwise forbid it. It is not in
-  any product crate.
+- No `unsafe` anywhere in the spike (`unsafe_code = "forbid"`); heap accounting uses `dhat`.
 - The spike uses `anyhow`, `std::HashMap`, and `print`-free reporting through `writeln!`;
-  `alacritty_terminal` is a spike-only dependency in the spike's own lockfile, not in the
-  product workspace, `docs/07` or `deny.toml` scope.
+  `alacritty_terminal` 0.26.0 is a spike-only dependency in the spike's own lockfile, never in
+  product crates, and is listed in `docs/07` §2 "Spike-only dependencies".
 - The content is synthetic or documentation prose; no real terminal session corpus (compiler
   output, `git log`, build logs of real repositories) was measured. LZ4 ratio depends strongly on
   that content, so the sealed-chunk figures are a range, not a point.
-- Measured: requested allocation bytes. Not measured: allocator headers and fragmentation, real
+- Measured: requested allocation bytes (`dhat`). Not measured: allocator headers and fragmentation, real
   process PSS/private working set, idle behavior, reflow, search, spill, alt screen, zstd or
   larger chunks as alternatives, macOS and Linux (only Windows 11 was run; allocation sizes are
   platform independent but throughput is not).

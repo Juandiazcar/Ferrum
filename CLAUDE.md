@@ -15,6 +15,13 @@ The specification lives in `docs/spec/` (this package's `docs/`). Read in this o
 7. **No telemetry, no network** beyond the opt-out update check. No secrets in the repo, logs, or argv.
 8. **Do not expand scope.** Anything not in `docs/01` needs a requirement ID or an ADR first. Phase 2 code does not start until v1.0 is released.
 
+## Project skills (`.claude/skills/`)
+
+- `ferrum-wp` — implement one work package end to end (implementer agents).
+- `ferrum-audit` — audit a WP branch against the spec before merge (auditor).
+- `ferrum-git` — branch/commit/PR rules. No `Co-Authored-By` or "Generated with" lines, ever.
+- `ferrum-deps` — add or bump a dependency.
+
 ## The loop (per work package, `docs/12`)
 
 1. Read the WP, its requirement IDs, and the relevant budget lines.

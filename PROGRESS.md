@@ -4,9 +4,12 @@ Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear h
 
 ## WP-01 `ferrum-scrollback` (stack of PRs from `docs/adr-spill-without-mmap`)
 
-Done so far: ADR 0027 (spill without mmap), the crate (encoding, style table, chunks, spill ring,
-search, memory report, `decode_chunk`), property/spill/search/dhat tests, the `SpillStore` contract
-suite in `ferrum-testkit`, the product fixture generator in `fixtures/output/`.
+Done: ADR 0027 (spill without mmap), the crate (encoding, style table, chunks, spill ring, search,
+memory report, `decode_chunk`), property/spill/search/dhat tests, the `SpillStore` contract suite in
+`ferrum-testkit`, the product fixture generator in `fixtures/output/`, criterion benches with
+baselines, a real `cargo xtask bench`, the `decode_chunk` fuzz target with committed corpus, and
+`.github/workflows/nightly.yml` (ADR 0022). Next: WP-02 `ferrum-vt` (grid, reflow on top of this
+store; the live-grid line of `docs/03` §2 is re-measured there).
 
 Per-session memory re-measured with the product fixture generator (Q-17; 12 000 logical lines fed,
 10 000 rows retained, `dhat` requested bytes reconcile with `memory_report()` to 84 bytes, seeds 1-3):
@@ -26,10 +29,39 @@ Per-session memory re-measured with the product fixture generator (Q-17; 12 000 
 - `push_line` allocation (dhat, `tests/alloc_push_line.rs`): 0 blocks inside a chunk; exactly 1
   block (the sealed blob) on the push that seals; the LZ4 hash table is reused (`CompressTable`).
 
+Benches (`cargo xtask bench`, medians). The committed baseline `benches/baselines/windows.json` is
+from an i5-9400 / Windows 11 desktop (for maintainer machines); the Linux column is one nightly run
+on `ubuntu-latest`:
+
+| Bench | Windows | Linux CI |
+|---|---|---|
+| push 12 256 fixture rows, retain 10 000 | 3.50 ms | 2.84 ms |
+| read 10 000 lines sequentially | 2.62 ms | 1.92 ms |
+| read 1 000 random lines (each decompresses its chunk) | 138.9 ms | 97.7 ms |
+| read 20 480 spilled lines, memory fake / file ring | 7.87 / 8.07 ms | 5.77 / 5.81 ms |
+| search 10 000 lines, literal / case-insensitive (target 15 ms, ceiling 30 ms) | 3.33 / 5.84 ms | 2.49 / 3.55 ms |
+
+CI gate (docs/08 §8): the nightly job runs `cargo xtask bench --against HEAD~1`, which benches the
+previous commit and the current one on the same runner in the same job (two interleaved rounds,
+best median each) and fails above +10 % or above the 2x-target ceiling. On identical code it
+measured -0.5 % to -0.1 % on all seven benches (run 45054066134), where comparing with numbers from
+another run of the same runner class had differed by up to +18.9 %. The gate also failed as intended
+on a doctored baseline (+270.8 %, exit 1).
+
+Nightly (`nightly.yml`, run on `ubuntu-latest` from a temporary push-triggered copy of the
+workflow, deleted afterwards; run https://github.com/Juandiazcar/Ferrum/actions/runs/45054066134):
+fuzz `decode_chunk` 10 min, 50 912 728 runs, 0 crashes (cov 376, 251 corpus entries; earlier runs
+did 74 347 460 and 34 716 106, runner speed varies 2x); Miri (unit tests and the single-line
+property) green; ASan test run green; `cargo audit` green; benches vs previous commit green. Miri
+cannot run the multi-thousand-line property tests in reasonable time (28 minutes without finishing),
+so the workflow runs the smaller subset and says what is excluded.
+
 Deviations / notes:
-- Internal entries of `[workspace.dependencies]` now carry `version = "0.1.0"` (cargo-deny rejects
-  path-only entries); `cargo xtask release prepare` (WP-18) must bump them with the workspace version.
-  `cargo hack` runs `--locked` again, without `--no-dev-deps`.
+- Internal entries of `[workspace.dependencies]` carry `version = "0.1.0"` (cargo-deny rejects
+  path-only entries); `cargo xtask release prepare` (WP-18) must bump them with the workspace
+  version. `cargo hack` runs `--locked`, without `--no-dev-deps`.
+- The fuzz package has its own committed `Cargo.lock`; `cargo fuzz run` has no `--locked`, so the nightly job
+  runs `cargo fetch --locked` before it and `git diff --exit-code` on the lock after it.
 - Sealing and spill I/O run inline on the pushing thread; `docs/02` §5 puts compression on the
   worker, which is a WP-06 wiring decision (`Scrollback` is `Send`).
 - Search matches per row (a match spanning a soft wrap is not found here); regex is a

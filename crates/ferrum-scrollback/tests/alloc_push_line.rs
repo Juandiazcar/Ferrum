@@ -2,6 +2,7 @@
 //! sealed blob, which is the retained data itself (exactly one allocation per sealed chunk).
 //! One test per binary: `dhat` profiles the whole process.
 
+#![cfg(not(miri))] // dhat is not supported under Miri
 #![allow(clippy::expect_used, reason = "test code: a failed expectation is a failed test")]
 
 #[path = "support/lines.rs"]

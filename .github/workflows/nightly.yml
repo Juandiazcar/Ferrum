@@ -1,0 +1,119 @@
+# Nightly — fuzz smoke, Miri, ASan, full benches with baseline comparison, cargo audit
+# (docs/06 §6, docs/08 §2, ADR 0022: lands with WP-01). Actions are pinned by commit SHA with the
+# release in a comment, as in ci.yml. The nightly toolchain is used in the jobs that need it only
+# (docs/07 §4); every other job uses the toolchain pinned in rust-toolchain.toml. The soak job
+# arrives with WP-08 (ADR 0022).
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  fuzz:
+    name: fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { package: ferrum-scrollback, target: decode_chunk }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master, 2026-11-15
+        with:
+          toolchain: nightly
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: crates/${{ matrix.package }}/fuzz
+      # docs/07 §4: cargo-fuzz 0.13.2 (taiki-e/install-action has no manifest for it).
+      - run: cargo +nightly install --locked cargo-fuzz@0.13.2
+      # docs/10 §6: builds use --locked. `cargo fuzz run` has no --locked flag, so the committed
+      # fuzz/Cargo.lock is enforced by failing on a stale lock before the run (fetch --locked) and
+      # on any change to it after the run.
+      - name: Check the fuzz lock file is current
+        run: cargo +nightly fetch --locked --manifest-path crates/${{ matrix.package }}/fuzz/Cargo.toml
+      - name: Fuzz ${{ matrix.target }} for 10 minutes (docs/08 §2)
+        working-directory: crates/${{ matrix.package }}
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=600 -timeout=10 -rss_limit_mb=2048
+      - name: Check the fuzz run left the lock file unchanged
+        run: git diff --exit-code -- crates/${{ matrix.package }}/fuzz/Cargo.lock
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-${{ matrix.target }}-artifacts
+          path: crates/${{ matrix.package }}/fuzz/artifacts
+
+  miri:
+    name: miri (pure crates)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Isolation off: the spill tests create files in the temp directory.
+      MIRIFLAGS: -Zmiri-disable-isolation
+      PROPTEST_CASES: "16"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master, 2026-11-15
+        with:
+          toolchain: nightly
+          components: miri, rust-src
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      # Pure crates (docs/04 §2). Crates that are still skeletons run zero tests.
+      # ferrum-scrollback: the unit tests (encode, decode, chunk corruption, matcher) and the
+      # single-line round trip property under Miri. The multi-thousand-line property tests, spill,
+      # dhat (cfg(not(miri))) and bench-sized tests take hours under Miri; they run in ci.yml and ASan.
+      - run: cargo +nightly miri test --locked -p ferrum-scrollback --lib --test roundtrip -- single_line zero_max sealing_happens
+      - run: cargo +nightly miri test --locked -p ferrum-vt -p ferrum-proto -p ferrum-config -p ferrum-project -p ferrum-ui -p ferrum-render
+
+  asan:
+    name: asan (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RUSTFLAGS: -Zsanitizer=address
+      RUSTDOCFLAGS: -Zsanitizer=address
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master, 2026-11-15
+        with:
+          toolchain: nightly
+          components: rust-src
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo +nightly test --locked -Zbuild-std --target x86_64-unknown-linux-gnu -p ferrum-scrollback -p ferrum-testkit
+
+  bench:
+    name: benches vs previous commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2 # HEAD~1 is the previous main commit
+      - uses: ./.github/actions/setup-rust
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      # docs/08 §8: shared runners are too noisy to compare with numbers measured elsewhere, so the
+      # previous main commit and this one are benched on this runner, in this job, and compared:
+      # fails if a bench is more than 10 % slower (docs/03 §6) or above its absolute ceiling (2x the
+      # budget target). The committed benches/baselines/{os}.json are for maintainer machines.
+      - run: cargo xtask bench --against HEAD~1
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rust
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: cargo-audit
+      - run: cargo audit

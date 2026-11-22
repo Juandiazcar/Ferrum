@@ -2,6 +2,7 @@
 //! (10 000 retained rows out of 12 000 logical lines). One test per binary: `dhat` profiles the
 //! whole process.
 
+#![cfg(not(miri))] // dhat is not supported under Miri
 #![allow(clippy::expect_used, reason = "test code: a failed expectation is a failed test")]
 
 #[path = "../../../fixtures/output/output.rs"]

@@ -49,7 +49,10 @@ impl Sealer {
         put_len(&mut self.out, self.index.len());
         self.out.extend_from_slice(&self.index);
         let header = self.out.len();
-        self.out.resize(header + get_maximum_output_size(raw.len()), 0);
+        let total = header + get_maximum_output_size(raw.len());
+        // Exact growth: `resize` alone would double the capacity of this shared scratch.
+        self.out.reserve_exact(total.saturating_sub(self.out.len()));
+        self.out.resize(total, 0);
         let target = self.out.get_mut(header..).ok_or(ScrollbackError::Compress)?;
         let written = compress_into_with_table(raw, target, &mut self.table)
             .map_err(|_| ScrollbackError::Compress)?;

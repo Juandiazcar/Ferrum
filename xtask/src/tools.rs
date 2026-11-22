@@ -31,7 +31,7 @@ pub(crate) const TOOLS: &[Tool] = &[
     },
     Tool {
         name: "cargo-machete",
-        probe: &["cargo", "machete", "--version"],
+        probe: &["cargo-machete", "--version"],
         install: "cargo install --locked cargo-machete@0.10.1",
     },
     Tool {

@@ -44,7 +44,7 @@ const STEPS: &[Step] = &[
     Step { name: "deny", argv: &["cargo", "deny", "check"], envs: &[], fast: false },
     Step { name: "check-deps", argv: &["cargo", "xtask", "check-deps"], envs: &[], fast: true },
     Step { name: "typos", argv: &["typos"], envs: &[], fast: true },
-    Step { name: "machete", argv: &["cargo", "machete"], envs: &[], fast: false },
+    Step { name: "machete", argv: &["cargo-machete"], envs: &[], fast: false },
     Step {
         name: "docs",
         argv: &["cargo", "doc", "--workspace", "--no-deps", "--locked"],

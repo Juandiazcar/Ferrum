@@ -8,9 +8,14 @@ use crate::events::EventSink;
 impl<S: EventSink> Core<S> {
     /// Routes a CSI sequence. Unknown sequences are ignored (and never reported back).
     pub(crate) fn csi(&mut self, args: Args<'_>, intermediates: &[u8], action: char) {
-        match intermediates {
-            [] => self.csi_plain(args, action),
-            [b'?'] => self.csi_private(args, action),
+        match (intermediates, action) {
+            ([], _) => self.csi_plain(args, action),
+            ([b'?'], _) => self.csi_private(args, action),
+            ([b' '], 'q') => self.set_cursor_style(args.mode(0)),
+            ([b'"'], 'q') => self.set_pen_protection(args.mode(0)),
+            ([b'!'], 'p') => self.soft_reset(),
+            ([b'$'], 'p') => self.report_mode(args, false),
+            ([b'?', b'$'], 'p') => self.report_mode(args, true),
             _ => {}
         }
     }
@@ -20,6 +25,9 @@ impl<S: EventSink> Core<S> {
             return;
         }
         match action {
+            'm' => self.sgr(args),
+            'h' => self.set_modes(args, false, true),
+            'l' => self.set_modes(args, false, false),
             'g' => self.clear_tab_stops(args.mode(0)),
             'r' => self.set_scroll_region(args),
             's' => self.save_cursor(),
@@ -77,6 +85,8 @@ impl<S: EventSink> Core<S> {
         match action {
             'J' => self.erase_display(args.mode(0), Protection::Respect),
             'K' => self.erase_line(args.mode(0), Protection::Respect),
+            'h' => self.set_modes(args, true, true),
+            'l' => self.set_modes(args, true, false),
             _ => {}
         }
     }

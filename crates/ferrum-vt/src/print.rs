@@ -9,6 +9,9 @@ use crate::modes::Mode;
 use crate::screen::Screen;
 use crate::width::{char_width, cluster_width, joins_cluster};
 
+/// DEL is never displayed (xterm ignores it).
+const DEL: char = '\u{7f}';
+
 /// What a glyph cell shows.
 #[derive(Clone, Copy)]
 enum Glyph {
@@ -65,6 +68,37 @@ impl<S: EventSink> Core<S> {
         self.index();
     }
 
+    /// Prints a run of printable ASCII (0x20..=0x7E) in bulk.
+    pub(crate) fn print_ascii(&mut self, bytes: &[u8]) {
+        if !self.screen().charsets.is_plain() || self.modes.contains(Mode::INSERT) {
+            for &byte in bytes {
+                self.print_char(char::from(byte));
+            }
+            return;
+        }
+        let mut rest = bytes;
+        while !rest.is_empty() {
+            self.settle_wrap();
+            let autowrap = self.modes.contains(Mode::AUTOWRAP);
+            let screen = self.screen_mut();
+            let (x, y, cols) = (screen.cursor.x, screen.cursor.y, screen.grid.cols());
+            let count = rest.len().min(cols.saturating_sub(x));
+            let (chunk, tail) = rest.split_at(count);
+            let pen = screen.cursor.pen;
+            screen.grid.clear_wide_edges(y, x, x + count, pen.blank());
+            let span = screen.grid.row_mut(y).and_then(|row| row.cells_mut().get_mut(x..x + count));
+            if let Some(span) = span {
+                let (fg, bg, attrs) = (pen.fg_word(), pen.bg_word(), pen.attrs);
+                for (cell, &byte) in span.iter_mut().zip(chunk) {
+                    *cell = Cell::styled(char::from(byte), fg, bg, attrs);
+                }
+            }
+            Self::advance_cursor(screen, count, autowrap);
+            rest = tail;
+        }
+        self.last_char = bytes.last().map(|&byte| char::from(byte));
+    }
+
     /// Moves the cursor right by `columns` after printing; at the margin it stays on the last
     /// column and a wrap becomes pending.
     fn advance_cursor(screen: &mut Screen, columns: usize, autowrap: bool) {
@@ -80,6 +114,16 @@ impl<S: EventSink> Core<S> {
 
     /// Prints one character (any width, after the active character set mapping).
     pub(crate) fn print_char(&mut self, c: char) {
+        if c == DEL {
+            return;
+        }
+        // `vte` executes C1 controls when it decodes text in one piece but prints them when a
+        // character was split across reads; both end up here and are controls.
+        if let Some(control) = u8::try_from(u32::from(c)).ok().filter(|b| (0x80..=0x9F).contains(b))
+        {
+            self.control(control);
+            return;
+        }
         let c = self.screen_mut().charsets.map(c);
         self.last_char = Some(c);
         let width = char_width(c);

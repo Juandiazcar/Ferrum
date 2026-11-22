@@ -432,6 +432,8 @@ dependencies = [
  "bitflags",
  "ferrum-scrollback",
  "insta",
+ "memchr",
+ "proptest",
  "rustc-hash 2.1.3",
  "thiserror",
  "tracing",

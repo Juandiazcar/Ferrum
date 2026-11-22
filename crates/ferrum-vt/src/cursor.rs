@@ -1,9 +1,9 @@
 //! The cursor, the drawing pen and the state DECSC saves.
 
-use crate::cell::{Attrs, Cell};
+use crate::cell::{Attrs, Cell, UNDERLINE_MASK, Underline};
 use crate::charset::Charsets;
 use crate::color::{Color, EXTRA_HALF_BITS, EXTRA_SHIFT};
-use crate::extras::ExtraId;
+use crate::extras::{ExtraId, LinkId};
 
 /// Shape of the cursor (DECSCUSR).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -36,8 +36,12 @@ pub struct Pen {
     pub bg: Color,
     /// Attribute word (flags and underline style, see `Cell::attr_word`).
     pub attrs: u16,
-    /// Hyperlink and underline color.
+    /// Hyperlink and underline color, interned from `link` and `underline_color`.
     pub extra: ExtraId,
+    /// The active hyperlink (OSC 8).
+    pub link: LinkId,
+    /// Underline color (SGR 58).
+    pub underline_color: Color,
 }
 
 impl Pen {
@@ -68,6 +72,27 @@ impl Pen {
     /// True when `attr` is set.
     pub fn has(&self, attr: Attrs) -> bool {
         self.attrs & attr.bits() != 0
+    }
+
+    /// Sets or clears one attribute flag.
+    pub fn set_attr(&mut self, attr: Attrs, on: bool) {
+        if on {
+            self.attrs |= attr.bits();
+        } else {
+            self.attrs &= !attr.bits();
+        }
+    }
+
+    /// The underline style.
+    pub fn underline(&self) -> Underline {
+        let mut cell = Cell::default();
+        cell.set_style(0, 0, self.attrs);
+        cell.underline()
+    }
+
+    /// Sets the underline style.
+    pub fn set_underline(&mut self, underline: Underline) {
+        self.attrs = (self.attrs & !UNDERLINE_MASK) | underline.to_bits();
     }
 }
 

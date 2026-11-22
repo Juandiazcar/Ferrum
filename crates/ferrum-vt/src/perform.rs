@@ -56,14 +56,20 @@ impl<S: EventSink> Perform for Core<S> {
     }
 
     fn csi_dispatch(&mut self, params: &Params, intermediates: &[u8], ignore: bool, action: char) {
+        self.stop = true;
         if !ignore {
             self.csi(Args::new(params), intermediates, action);
         }
     }
 
     fn esc_dispatch(&mut self, intermediates: &[u8], ignore: bool, byte: u8) {
+        self.stop = true;
         if !ignore {
             self.esc(intermediates, byte);
         }
+    }
+
+    fn terminated(&self) -> bool {
+        self.stop
     }
 }

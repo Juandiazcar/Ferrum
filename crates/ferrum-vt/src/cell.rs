@@ -33,7 +33,7 @@ bitflags! {
 
 /// Position of the 3-bit underline style inside the attribute bits.
 const UNDERLINE_SHIFT: u16 = 3;
-const UNDERLINE_MASK: u16 = 0b111 << UNDERLINE_SHIFT;
+pub(crate) const UNDERLINE_MASK: u16 = 0b111 << UNDERLINE_SHIFT;
 
 /// How a cell is underlined.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -55,6 +55,11 @@ pub enum Underline {
 }
 
 impl Underline {
+    /// The 3 bits placed where the attribute word keeps them.
+    pub(crate) const fn to_bits(self) -> u16 {
+        (self as u16) << UNDERLINE_SHIFT
+    }
+
     const fn from_bits(bits: u16) -> Self {
         match (bits & UNDERLINE_MASK) >> UNDERLINE_SHIFT {
             1 => Self::Single,

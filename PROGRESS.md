@@ -2,6 +2,29 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## Spike S4 Windows PTY (branch `spike/s4-windows-pty`, ADR 0026)
+
+Throwaway harness in `spikes/s4-windows-pty/` (standalone package, `unsafe_code = "forbid"`, only
+`portable-pty` 0.9.0). Method, per-OS tables, reproduction commands and CI run links:
+`docs/adr/0026-windows-pty-backend.md`. Measured on Windows 11 (build 26300, local), Windows Server
+2025, Ubuntu and macOS CI (run 44977495884 of the refactored harness; the temporary workflow was deleted in the last commit).
+
+| Item | Result |
+|---|---|
+| Spawn/echo (`cmd`, `powershell`, `pwsh`, `sh`, `bash`) | all work; marker 5-32 ms after input (cold `powershell.exe` on CI 1.4-2.27 s) |
+| Exit codes | 0/3/255 exact in 12-36 ms; **exit 259 never reported** by `portable-pty` on Windows; `clone_killer().kill()` returns `Err` on success; Windows reader gets no EOF until the master is closed (Unix: at exit) |
+| Resize | 0 errors in 39-49 resizes during a 16 MB flood, no loss; viewport-only repaint (225-324 bytes) after every resize, even same size; scrollback never re-emitted; child sees the new size |
+| 64 MB output | ConPTY 5.2-6.5 MB/s (1.3 under load) flood, 0.6-0.9 MB/s `cmd /c type`; Ubuntu 36-59, macOS 34-61 MB/s; reader memory flat; no stalls (max gap 9-85 ms) |
+| Startup | `portable-pty` sets `INHERIT_CURSOR`: the first and only bytes are `ESC[6n` until answered `ESC[1;1R`; no repaint of existing content at start |
+| I/O model | reader handle hidden and synchronous: one blocking reader thread per session is forced with `portable-pty`; 0.08-0.12 MiB working set (0.11-0.15 MiB private) per session, plus one `conhost.exe` (0.5-0.8 MB) outside the process |
+| Env/cwd | `TERM` inherited unless removed; `COLORTERM`/Unicode values reach the child; default cwd is the home directory |
+
+- Decision (maintainer, 2026-11-21; ADR 0026 accepted): direct `windows-sys` ConPTY backend in `ferrum-pty` for Windows (audited `unsafe`), `portable-pty` kept for Linux/macOS; fallback to `portable-pty` plus the documented workarounds if the direct backend cannot pass the 25-test `PtyBackend` contract list (PT-01 to PT-25) on a supported Windows build. ADR 0008 Windows part validated as written (reader thread per session, 0.08-0.12 MiB working set each).
+- `docs/11` §4 PTY bullet rewritten to the measured behavior (startup cursor query, no initial repaint, viewport-only repaint after every resize); Q-18 recorded as resolved in `docs/14` §2; R-04 mitigation updated (incl. the ConPTY throughput finding), R-05 likelihood Medium -> High (reason in the row). No question from S4 stays open; `docs/07` rows for `portable-pty`, `windows-sys` and the spike-only `anyhow` updated.
+- The spike obeys the product lint policy (docs/05): `unsafe_code = "forbid"`, no `unwrap`/`expect`/`println!`, functions of at most 40 lines, modules per concept, clippy `-D warnings` and fmt clean. A one-off direct-API experiment needed `unsafe` and was removed; ADR 0026 keeps its results only as "Unverified exploratory notes (not evidence; WP-05 must prove)".
+- Not verified: Windows before build 26100 (MV-S4-1 to 3 in `docs/manual-verification.md`), ARM64, the repaint against the reflowing `ferrum-vt` grid, close right after a fast exit with output still in the pipe.
+- Next: WP-05 `ferrum-pty` implements the traits, the direct ConPTY backend and the contract suite.
+
 ## Spike S1 Memory model (branch `spike/s1-memory-model`, ADR 0024)
 
 Throwaway harness in `spikes/s1-memory-model/` (standalone package, excluded from the product

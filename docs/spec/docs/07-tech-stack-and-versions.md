@@ -28,8 +28,8 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | VT parsing | `vte` | 0.15.0 | vt | state machine only; Ferrum owns the grid/handlers |
 | Unicode widths | `unicode-width` | 0.2.3 | vt | |
 | Grapheme clusters | `unicode-segmentation` | 1.13.3 | vt | |
-| PTY | `portable-pty` | 0.9.0 | pty | Unix PTY + ConPTY; last release Feb 2025 → wrap behind `PtyBackend` so it can be replaced (spike S4) |
-| Windows APIs | `windows-sys` | 0.61.2 | pty, platform | only if `portable-pty` is insufficient; prefer `-sys` (no bloat) |
+| PTY | `portable-pty` | 0.9.0 | pty | Linux and macOS PTY only (ADR 0026); last release Feb 2025 → wrapped behind `PtyBackend` so it can be replaced. Windows uses `windows-sys` directly |
+| Windows APIs | `windows-sys` | 0.61.2 | pty, platform | required by the direct ConPTY backend in `ferrum-pty` (`portable-pty` was insufficient on Windows: ADR 0026); prefer `-sys` (no bloat) |
 | Unix syscalls | `rustix` | 1.1.6 | pty, platform, daemon | safe wrappers; avoids hand-written `libc` unsafe |
 | libc (fallback) | `libc` | 0.2.191 | platform | only for what `rustix` lacks (e.g., `mallopt`, `malloc_trim`) |
 | Event loop I/O (Unix) | `mio` | 1.2.5 | daemon | no async runtime; Windows uses reader threads (see `docs/11`) |
@@ -76,6 +76,8 @@ Used only by throwaway packages under `spikes/` (own workspace and lockfile, exc
 |---|---|---|---|
 | `alacritty_terminal` | 0.26.0 (2026-11-21) | S1 | Measure its per-session scrollback memory against Ferrum's encoder (ADR 0024). Rejected for the product (§3) |
 | `dhat` | 0.3.3 (2026-11-21, latest stable) | S1 | Safe heap accounting (`HeapStats`) instead of a hand-written allocator; no `unsafe` in the spike (§4 lists it for tests) |
+| `portable-pty` | 0.9.0 (2026-11-21, latest stable; released 2025-02-11) | S4 | Measure ConPTY and Unix PTY behavior and decide keep vs direct `windows-sys` (ADR 0026). Same version as the product table above |
+| `anyhow` | 1.0.104 (2026-11-21, latest stable) | S4 | Error context in the harness binary (`docs/05` §3: bins may use `anyhow`); same version as the product table |
 
 ### Phase 2 only (not in v1.0 builds)
 

@@ -2,12 +2,18 @@
   "schema": 1,
   "os": "windows",
   "median_ns": {
-    "scrollback_push/fixture_rows_retain_10k": 3498500.0,
-    "scrollback_read/random_1k": 138859050.0,
-    "scrollback_read/sequential_10k": 2621755.0,
-    "scrollback_read/spilled_file_sequential": 8072942.857142857,
-    "scrollback_read/spilled_memory_sequential": 7871592.857142856,
-    "scrollback_search/literal_10k_lines": 3333966.6666666665,
-    "scrollback_search/literal_insensitive_10k_lines": 5836766.666666666
+    "scrollback_push/fixture_rows_retain_10k": 4138970.833333333,
+    "scrollback_read/random_1k": 151931150.0,
+    "scrollback_read/sequential_10k": 2869822.222222222,
+    "scrollback_read/spilled_file_sequential": 8866300.0,
+    "scrollback_read/spilled_memory_sequential": 8672941.666666668,
+    "scrollback_search/literal_10k_lines": 3641667.8571428577,
+    "scrollback_search/literal_insensitive_10k_lines": 6386281.25,
+    "vt_parse/ascii_8mib": 51090150.0,
+    "vt_parse/ascii_8mib_no_history": 20032383.333333336,
+    "vt_parse/sgr_heavy_8mib": 98652100.0,
+    "vt_parse/sgr_heavy_8mib_no_history": 64420450.0,
+    "vt_parse/unicode_8mib": 272098350.0,
+    "vt_reflow/10k_lines_200_to_100_columns": 58663800.0
   }
 }

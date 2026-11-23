@@ -2,6 +2,43 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## WP-02 `ferrum-vt` (stack of PRs from `feat/scrollback-pop-front`)
+
+Done: `ferrum-scrollback::pop_front`; the crate (cell/color/row/extras/graphemes, ring grid, modes,
+charsets, tabs, SGR with underline styles and colors, ED/EL/ECH/ICH/DCH/IL/DL/SU/SD/REP, scroll
+regions, alternate screen, OSC 0/1/2/4/7/8/10/11/12/52/104/110-112/133/9;4, DA/DSR/CPR/XTVERSION,
+DECRQM, DECRQSS safe subset, kitty keyboard stack, mouse/focus/paste/sync mode state, hyperlinks,
+shell marks, damage tracking, event sink, selection model, resize with reflow into the
+scrollback); `xtask import-alacritty-refs`; `docs/user/compat.md`; ADR 0028; README.
+
+Evidence (Windows 11, i5-9400, this machine):
+
+| Exit criterion | Result |
+|---|---|
+| Alacritty ref-tests | 43 of 45 imported and passing, whole and in 7-byte reads; excluded with reasons in `fixtures/vt/THIRD_PARTY.md`: `selective_erasure` (Alacritty has no DECSCA/DECSED/DECSEL), `underline` (SGR 21 is "bold off" there) |
+| vt fixtures | 331 cases under `fixtures/vt/<topic>/` (each `.in`, `.md`, `.snap`): every implemented sequence has a positive and a `malformed` case (checked by `tests/fixtures.rs`) |
+| Unicode vectors | `tests/unicode_vectors.rs` (UAX #29, #11, UTS #51) and 26 `fixtures/vt/unicode` cases |
+| Reflow property (AC-TERM-02) | `tests/reflow.rs`: 80 -> 132 -> 40 -> 80 keeps the logical text, 3 000 cases green. The chunking property (`tests/chunking.rs`) found six bugs while the front end was written (a lost pending ESC across an empty read, three wrong "vte is in the ground state" inferences, C1 controls handled differently when a character is split) and one grid bug (a spacer left behind by DCH/ECH); each has a regression |
+| dhat | `tests/alloc_parse.rs`: 0 blocks in steady state without history; with history only sealed chunks (at most the expected number) |
+| Fuzz | `crates/ferrum-vt/fuzz` target `parse` in `nightly.yml`; 356 seed files; lock committed; 30-minute run: see the section below |
+| NFR-PERF-02 | state machine alone: ASCII 391-401 MiB/s (410-420 MB/s), SGR-heavy 120-124 MiB/s (126-130 MB/s) over 3 runs: **met**. With the scrollback push (the product configuration): ASCII 151-153 MiB/s (159-160 MB/s), SGR-heavy 79-80 MiB/s (83-84 MB/s): **not met**, ADR 0028 explains the gap and the plan (push on the worker, WP-06) |
+| Reflow 10 000 lines | 58.7 ms (target 40 ms, `docs/03` §4): **not met**, ADR 0028 (WP-06 worker with a time budget, WP-17 tuning) |
+
+Benches are in `benches/baselines/windows.json` (13 benches, saved with `cargo xtask bench
+--save-baseline`); ceilings for `vt_parse/*_no_history` (2x target) and the reflow are in
+`xtask/src/bench/baseline.rs`.
+
+Deviations and notes (details in `docs/user/compat.md` and ADR 0028):
+- PRs are larger than the ~400 lines of `docs/06` where modules depend on each other (terminal core,
+  OSC set); every branch builds and passes `cargo xtask check`.
+- Where the Alacritty tests and xterm's documented behavior differ, the tests won (DECALN keeps the
+  cursor, EL/ED keep a pending wrap, RIS drops history, shared charsets).
+- `vte` is used in its `no_std` buffer mode: OSC strings are captured by `ferrum-vt`.
+- Miri runs only the `ferrum-vt` unit tests (the file-driven tests take hours under Miri).
+- Not verified: macOS and Linux runs of the benches (CI Linux numbers come from the nightly job),
+  `vttest` (manual list in `docs/manual-verification.md` is WP-17/WP-20).
+- Next: WP-03 `ferrum-proto`.
+
 ## WP-01 `ferrum-scrollback` (stack of PRs from `docs/adr-spill-without-mmap`)
 
 Done: ADR 0027 (spill without mmap), the crate (encoding, style table, chunks, spill ring, search,

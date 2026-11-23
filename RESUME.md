@@ -4,7 +4,7 @@ Handoff document so a new AI session (or a human) can pick up the work exactly w
 It is updated at every milestone (merge, WP state change, agent launch) and before a session's
 context runs out. `PROGRESS.md` remains the per-WP record; this file is the "how to resume" view.
 
-Last update: 2026-11-22 (night): WP-02 PR stack #18–#33 open, pending audit.
+Last update: 2026-11-22 (night): WP-02 PR stack #18–#33 open, fuzz crash under rework, pending audit.
 
 ## 1. How to resume (paste into a new Claude Code session, working directory `Ferrum/`)
 
@@ -75,10 +75,15 @@ macOS · S3 repaint ~1.0 ms typical / ~2.6–2.8 ms dense (i5-9400) · S4 direct
 - **WP-02 `ferrum-vt` implemented, NOT yet audited.** The Sonnet subagent opened a stack of 16 PRs,
   **#18 → #33** (each based on the previous one; #18 is `feat(scrollback): add pop_front`, #33 is
   `docs(vt): add compat notes, ADR 0028, crate README and progress`). Local worktree:
-  `.claude/worktrees/agent-a97aa3a26c3bb442e` (branch `worktree-agent-a97aa3a26c3bb442e`). At the last
-  check (2026-11-22 ~21:30) it still had uncommitted edits in `crates/ferrum-vt/src/grid.rs` and
-  `tests/fuzz_seeds.rs` — the subagent session may have ended; check `git status` there and, if work is
-  pending, launch a new Sonnet subagent to finish it on the matching PR branch.
+  `.claude/worktrees/agent-a97aa3a26c3bb442e`.
+- **The stack is mid-rework.** The subagent was stopped at shutdown (2026-11-22 ~21:40) while rewriting
+  the stack: its `vt::parse` fuzz run **failed after 6m43s** (crash cause not yet known, no artifact
+  saved) and it was folding a `grid.rs` fix into the early commits. Its rewritten local stack is backed up
+  as branch **`wip/vt-rework`** (tip `2f0f7b8`, pushed with `--no-verify`, never merged as-is). The PR
+  branches #18–#33 on GitHub still hold the older version. First step tomorrow: compare `wip/vt-rework`
+  with the PR branches, launch a Sonnet subagent to finish the rework (reproduce the fuzz crash, add a
+  regression test, fix, run fuzz 30 min clean), force-push-with-lease the PR branches, then delete
+  `wip/vt-rework`.
 - **ADR 0028 (`docs/adr/0028-vt-design-and-parse-throughput.md`, status proposed)** says some spec points
   "could not be followed to the letter" and that NFR-PERF-02 is met by the state machine alone, not the
   product configuration. Under the zero-exception rule this needs the **maintainer's decision** before any

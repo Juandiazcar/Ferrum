@@ -382,6 +382,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "bitflags",
+ "dhat",
  "ferrum-scrollback",
  "insta",
  "memchr",

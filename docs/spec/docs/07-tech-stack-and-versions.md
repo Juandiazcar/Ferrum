@@ -59,9 +59,9 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | xtask CLI | `clap` | 4.6.9 (verified 2026-11-21) | xtask only | derive parser for `cargo xtask`; never in shipped binaries |
 | xtask graph check | `cargo_metadata` | 0.23.1 (verified 2026-11-21) | xtask only | typed `cargo metadata` for `check-deps`; brings `serde_json`, build tooling only |
 | xtask bench baselines | `serde_json` | 1.0.154 (verified 2026-11-22, latest stable) | xtask only | reads criterion `estimates.json` and reads/writes `benches/baselines/*.json`; already compiled as a dependency of `cargo_metadata`, never in shipped binaries |
-| Error types | `thiserror` | 2.0.21 | libs | |
+| Error types | `thiserror` | 2.0.21 (2026-11-23, latest stable) | libs | `default-features = false`, `std` |
 | Error context (bins) | `anyhow` | 1.0.104 | app, daemon, xtask | |
-| Logging | `tracing` | 0.1.44 | all | `max_level_*` features compile out debug/trace in release |
+| Logging | `tracing` | 0.1.44 (2026-11-23, latest stable) | all | `default-features = false`, `std` and `release_max_level_warn` (the `max_level_*` features compile out debug/trace in release) |
 | Log sink | `tracing-subscriber` | 0.3.23 | app, daemon | `default-features = false`, `fmt` only; own tiny rotating file writer |
 | Update download | `ureq` | 3.5.2 | app (updater) | blocking, small; `rustls` backend |
 | TLS | `rustls` | 0.23.46 | app (updater) | no OpenSSL |
@@ -128,9 +128,9 @@ Used only by throwaway packages under `spikes/` (own workspace and lockfile, exc
 | `libfuzzer-sys` | 0.4.13 (2026-11-22, latest stable) | fuzz targets only: the `fuzz/` package of a crate (own workspace, nightly in the fuzz job only), `default-features = false` + `link_libfuzzer`; never in product crates |
 | `cargo-bloat` | 0.12.1 | binary size attribution (last release 2024-05; still works) |
 | `criterion` | 0.8.2 | benchmarks |
-| `proptest` | 1.12.0 | property tests |
-| `insta` | 1.49.0 | snapshot/golden tests |
-| `dhat` | 0.3.3 | allocation counting in tests |
+| `proptest` | 1.12.0 (2026-11-23, latest stable) | property tests (`default-features = false`, `std`) |
+| `insta` | 1.49.0 (2026-11-23, latest stable) | snapshot/golden tests (`default-features = false`) |
+| `dhat` | 0.3.3 (2026-11-23, latest stable) | allocation counting in tests (`default-features = false`) |
 | `git-cliff` | 2.14.2 | changelog |
 | `typos-cli` | 1.52.2 | typo check |
 | `taplo-cli` | 0.10.0 | TOML formatting |

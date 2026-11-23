@@ -71,16 +71,16 @@ lexopt            = "0.3.2"
 clap              = { version = "4.6.9", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }  # xtask only (docs/07)
 cargo_metadata    = "0.23.1"                                                                                                       # xtask only (check-deps)
 serde_json        = { version = "1.0.154", default-features = false, features = ["std"] }                                      # xtask only (bench baselines)
-thiserror         = "2.0.21"
+thiserror         = { version = "2.0.21", default-features = false, features = ["std"] }
 anyhow            = "1.0.104"
-tracing           = { version = "0.1.44", features = ["release_max_level_warn"] }
+tracing           = { version = "0.1.44", default-features = false, features = ["std", "release_max_level_warn"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std"] }
 
 # dev
 criterion         = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }
-proptest          = "1.12.0"
-insta             = "1.49.0"
-dhat              = "0.3.3"
+proptest          = { version = "1.12.0", default-features = false, features = ["std"] }
+insta             = { version = "1.49.0", default-features = false }
+dhat              = { version = "0.3.3", default-features = false }
 
 # ───────────────────────── lints ─────────────────────────
 [workspace.lints.rust]

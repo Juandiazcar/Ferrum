@@ -127,6 +127,11 @@ impl Cell {
         self.flags &= !(CellFlags::GRAPHEME | CellFlags::SPACER | CellFlags::LEADING_SPACER).bits();
     }
 
+    /// Replaces the raw character word (a scalar, or a grapheme index for `GRAPHEME` cells).
+    pub(crate) fn set_raw_char(&mut self, raw: u32) {
+        self.ch = raw;
+    }
+
     /// Structural flags.
     pub const fn flags(&self) -> CellFlags {
         CellFlags::from_bits_retain(self.flags)

@@ -8,9 +8,10 @@
 use rustc_hash::FxHashMap;
 
 use crate::limits::MAX_GRAPHEMES;
+use crate::slot_set::SlotSet;
 
 /// Interned clusters of one grid.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct GraphemeTable {
     clusters: Vec<Box<str>>,
     index: FxHashMap<Box<str>, u32>,
@@ -57,23 +58,22 @@ impl GraphemeTable {
         Some(index)
     }
 
-    /// Keeps the clusters for which `keep(index)` is true and returns the old-to-new index map.
-    /// Indices of dropped clusters are absent from the map.
-    pub fn retain(&mut self, keep: impl Fn(u32) -> bool) -> FxHashMap<u32, u32> {
-        let old = std::mem::take(&mut self.clusters);
-        self.index.clear();
-        let mut remap = FxHashMap::default();
-        for (position, cluster) in old.into_iter().enumerate() {
-            let Ok(old_index) = u32::try_from(position) else { continue };
-            if !keep(old_index) {
-                continue;
+    /// Keeps the clusters in `used` and renumbers them in order, without allocating: the cells
+    /// that refer to them get their new index from [`SlotSet::rank`].
+    pub(crate) fn compact(&mut self, used: &SlotSet) {
+        let mut write = 0;
+        for read in 0..self.clusters.len() {
+            if used.contains(read) {
+                // INVARIANT: write <= read < len, so both indices are in bounds.
+                self.clusters.swap(write, read);
+                write += 1;
             }
-            let Ok(new_index) = u32::try_from(self.clusters.len()) else { continue };
-            self.index.insert(cluster.clone(), new_index);
-            self.clusters.push(cluster);
-            remap.insert(old_index, new_index);
         }
-        remap
+        self.clusters.truncate(write);
+        self.index.retain(|_, slot| usize::try_from(*slot).is_ok_and(|s| used.contains(s)));
+        for slot in self.index.values_mut() {
+            *slot = used.rank(usize::try_from(*slot).unwrap_or(0));
+        }
     }
 
     /// Heap bytes held, by capacity.
@@ -100,15 +100,20 @@ mod tests {
     }
 
     #[test]
-    fn retain_compacts_and_remaps() {
+    fn compact_keeps_the_used_clusters_in_order_and_renumbers_them() {
         let mut table = GraphemeTable::new();
         table.intern("a\u{0301}");
         table.intern("b\u{0301}");
         table.intern("c\u{0301}");
-        let remap = table.retain(|index| index != 1);
+        let mut used = SlotSet::new();
+        used.insert(0);
+        used.insert(2);
+        used.seal();
+        table.compact(&used);
         assert_eq!(table.len(), 2);
-        assert_eq!(remap.get(&2), Some(&1));
+        assert_eq!(used.rank(2), 1);
         assert_eq!(table.get(1), Some("c\u{0301}"));
         assert_eq!(table.intern("c\u{0301}"), Some(1));
+        assert_eq!(table.intern("a\u{0301}"), Some(0));
     }
 }

@@ -56,11 +56,7 @@ impl Grid {
         let blank = Cell::styled(' ', 0, crate::color::without_extra(words.1), 0);
         break_wide_at(row, x, blank);
         break_wide_at(row, end - 1, blank);
-        if let Some(span) = row.cells_mut().get_mut(x..end) {
-            for (cell, &byte) in span.iter_mut().zip(bytes) {
-                *cell = Cell::styled(char::from(byte), words.0, words.1, words.2);
-            }
-        }
+        row.write_ascii(x, bytes, words);
     }
 
     /// Erases cells `from..to` of row `y` with `blank` (clamped to the row).

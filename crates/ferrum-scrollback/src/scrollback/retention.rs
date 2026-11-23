@@ -86,16 +86,22 @@ impl Scrollback {
     pub(super) fn evict(&mut self) {
         let limit = self.effective_max_lines();
         while self.retained > limit {
-            self.retained -= 1;
-            self.dropped_lines += 1;
-            let Some(front) = self.chunks.front() else {
-                self.hot_skip += 1;
-                continue;
-            };
-            self.head_skip += 1;
-            if self.head_skip >= front.lines {
-                self.pop_front_chunk();
-            }
+            self.drop_front_line();
+        }
+    }
+
+    /// Drops the oldest retained line; does nothing when there is none.
+    pub(super) fn drop_front_line(&mut self) {
+        let Some(retained) = self.retained.checked_sub(1) else { return };
+        self.retained = retained;
+        self.dropped_lines += 1;
+        let Some(front) = self.chunks.front() else {
+            self.hot_skip += 1;
+            return;
+        };
+        self.head_skip += 1;
+        if self.head_skip >= front.lines {
+            self.pop_front_chunk();
         }
     }
 

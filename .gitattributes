@@ -4,6 +4,7 @@
 *.md text eol=lf
 *.in binary
 *.recording binary
+crates/*/fuzz/corpus/** binary
 *.snap text eol=lf
 *.png binary
 *.ttf binary

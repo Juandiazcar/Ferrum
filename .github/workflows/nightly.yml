@@ -27,6 +27,7 @@ jobs:
       matrix:
         include:
           - { package: ferrum-scrollback, target: decode_chunk }
+          - { package: ferrum-vt, target: parse }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master, 2026-11-15
@@ -69,12 +70,17 @@ jobs:
           toolchain: nightly
           components: miri, rust-src
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      # Pure crates (docs/04 §2). Crates that are still skeletons run zero tests.
+      # Pure crates (docs/04 §2). Crates that are still skeletons run zero tests. ferrum-vt: the unit
+      # tests only (`--lib`). Its integration tests (fixture runner over ~400 cases, 44 Alacritty
+      # recordings of up to 1 MB, property tests, the Unicode data files) were not run under Miri:
+      # they are file- and CPU-heavy and Miri interprets 10 to 100 times slower, and no measurement
+      # shows they fit the job's 60 minutes. They run natively in ci.yml and under ASan (below).
       # ferrum-scrollback: the unit tests (encode, decode, chunk corruption, matcher) and the
       # single-line round trip property under Miri. The multi-thousand-line property tests, spill,
       # dhat (cfg(not(miri))) and bench-sized tests take hours under Miri; they run in ci.yml and ASan.
       - run: cargo +nightly miri test --locked -p ferrum-scrollback --lib --test roundtrip -- single_line zero_max sealing_happens
-      - run: cargo +nightly miri test --locked -p ferrum-vt -p ferrum-proto -p ferrum-config -p ferrum-project -p ferrum-ui -p ferrum-render
+      - run: cargo +nightly miri test --locked -p ferrum-vt --lib
+      - run: cargo +nightly miri test --locked -p ferrum-proto -p ferrum-config -p ferrum-project -p ferrum-ui -p ferrum-render
 
   asan:
     name: asan (linux)
@@ -90,7 +96,7 @@ jobs:
           toolchain: nightly
           components: rust-src
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - run: cargo +nightly test --locked -Zbuild-std --target x86_64-unknown-linux-gnu -p ferrum-scrollback -p ferrum-testkit
+      - run: cargo +nightly test --locked -Zbuild-std --target x86_64-unknown-linux-gnu -p ferrum-scrollback -p ferrum-testkit -p ferrum-vt
 
   bench:
     name: benches vs previous commit

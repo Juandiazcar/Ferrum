@@ -4,10 +4,17 @@ source: crates/ferrum-vt/tests/fixtures.rs
 size 20x6 primary
 cursor row=1 col=3 wrap_pending=false
 modes AUTOWRAP|CURSOR_VISIBLE
+pen bg=i4 bold
 00 |                    |
 01 |                    |
 02 |                    |
 03 |                    |
 04 |                    |
 05 |                    |
+  r0 c0-19 bg=i4
+  r1 c0-19 bg=i4
+  r2 c0-19 bg=i4
+  r3 c0-19 bg=i4
+  r4 c0-19 bg=i4
+  r5 c0-19 bg=i4
 history 0

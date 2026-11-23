@@ -7,6 +7,7 @@ use crate::cursor::Pen;
 use crate::events::EventSink;
 use crate::limits::{MAX_CLUSTER_BYTES, MAX_UTF8_BYTES};
 use crate::modes::Mode;
+use crate::perform::control;
 use crate::row::Row;
 use crate::screen::Screen;
 use crate::width::{WIDE_COLUMNS, char_width, cluster_width, joins_cluster};
@@ -34,6 +35,9 @@ enum JoinRule {
     /// Wider scalars: only when they continue the cluster.
     IfContinues,
 }
+
+/// DEL is never displayed (xterm ignores it).
+const DEL: char = '\u{7f}';
 
 /// What a glyph cell shows.
 #[derive(Clone, Copy)]
@@ -109,6 +113,41 @@ impl<S: EventSink> Core<S> {
         self.index();
     }
 
+    /// Prints a run of printable ASCII (0x20..=0x7E) in bulk.
+    pub(crate) fn print_ascii(&mut self, bytes: &[u8]) {
+        if !self.screen().charsets.is_plain() || self.modes.contains(Mode::INSERT) {
+            for &byte in bytes {
+                self.print_char(char::from(byte));
+            }
+            return;
+        }
+        let mut rest = bytes;
+        if let Some((&first, tail)) = rest.split_first().filter(|_| self.after_non_ascii()) {
+            self.print_char(char::from(first));
+            rest = tail;
+        }
+        while !rest.is_empty() {
+            self.settle_wrap();
+            let wrap = Wrap::of(self.modes);
+            let screen = self.screen_mut();
+            let (x, y, cols) = (screen.cursor.x, screen.cursor.y, screen.grid.cols());
+            let count = rest.len().min(cols.saturating_sub(x));
+            let Some((chunk, tail)) = rest.split_at_checked(count) else { break };
+            let pen = screen.cursor.pen;
+            screen.grid.clear_wide_edges(y, x, x + count, pen.blank());
+            let span = screen.grid.row_mut(y).and_then(|row| row.cells_mut().get_mut(x..x + count));
+            if let Some(span) = span {
+                let (fg, bg, attrs) = (pen.fg_word(), pen.bg_word(), pen.attrs);
+                for (cell, &byte) in span.iter_mut().zip(chunk) {
+                    *cell = Cell::styled(char::from(byte), fg, bg, attrs);
+                }
+            }
+            Self::advance_cursor(screen, count, wrap);
+            rest = tail;
+        }
+        self.last_char = bytes.last().map(|&byte| char::from(byte));
+    }
+
     /// True when the last printed scalar was not ASCII, so an ASCII scalar may continue its cluster.
     fn after_non_ascii(&self) -> bool {
         self.last_char.is_some_and(|previous| !previous.is_ascii())
@@ -129,6 +168,16 @@ impl<S: EventSink> Core<S> {
 
     /// Prints one character (any width, after the active character set mapping).
     pub(crate) fn print_char(&mut self, c: char) {
+        if c == DEL {
+            return;
+        }
+        // `vte` executes C1 controls when it decodes text in one piece but prints them when a
+        // character was split across reads; both end up here and are controls.
+        let c1 = control::C1_FIRST..=control::C1_LAST;
+        if let Some(control) = u8::try_from(u32::from(c)).ok().filter(|b| c1.contains(b)) {
+            self.control(control);
+            return;
+        }
         let c = self.screen_mut().charsets.map(c);
         let after_non_ascii = self.after_non_ascii();
         self.last_char = Some(c);

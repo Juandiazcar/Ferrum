@@ -7,6 +7,7 @@ use crate::cursor::Cursor;
 use crate::damage::Damage;
 use crate::events::EventSink;
 use crate::grid::Grid;
+use crate::input::Input;
 use crate::modes::Mode;
 use crate::screen::Screen;
 use crate::size::Size;
@@ -17,7 +18,7 @@ use crate::size::Size;
 /// [`grid`](Self::grid), the history with [`scrollback`](Self::scrollback) and learn about
 /// everything else (title, bell, replies for the PTY, ...) through the [`EventSink`].
 pub struct Terminal<S: EventSink> {
-    parser: vte::Parser,
+    input: Input,
     pub(crate) core: Core<S>,
 }
 
@@ -25,13 +26,13 @@ impl<S: EventSink> Terminal<S> {
     /// A blank terminal. The scrollback is created by the caller so that the daemon decides on
     /// the spill store.
     pub fn new(size: Size, scrollback: Scrollback, sink: S) -> Self {
-        Self { parser: vte::Parser::new(), core: Core::new(size, scrollback, sink) }
+        Self { input: Input::new(), core: Core::new(size, scrollback, sink) }
     }
 
     /// Feeds bytes from the program. Never panics and never fails: malformed input is dropped
     /// (`docs/10` §3 item 9).
     pub fn parse(&mut self, bytes: &[u8]) {
-        self.parser.advance(&mut self.core, bytes);
+        self.input.advance(&mut self.core, bytes);
     }
 
     /// The visible screen (primary or alternate).

@@ -4,6 +4,7 @@ use ferrum_scrollback::Scrollback;
 
 use crate::codec::Encoded;
 
+use crate::cursor::CursorStyle;
 use crate::events::EventSink;
 use crate::extras::Extras;
 use crate::modes::Mode;
@@ -18,6 +19,8 @@ pub(crate) struct Scratch {
     pub(crate) line: Encoded,
     /// Cluster buffer for grapheme joining.
     pub(crate) cluster: String,
+    /// Sanitized title, link key and other short strings built from an OSC payload.
+    pub(crate) short: String,
 }
 
 /// Everything except the byte-stream front end.
@@ -32,6 +35,8 @@ pub(crate) struct Core<S> {
     pub(crate) scratch: Scratch,
     /// The last graphic character printed (REP repeats it).
     pub(crate) last_char: Option<char>,
+    /// DECSCUSR; `None` until a program sets it (the UI default applies).
+    pub(crate) cursor_style: Option<CursorStyle>,
 }
 
 impl<S: EventSink> Core<S> {
@@ -46,6 +51,7 @@ impl<S: EventSink> Core<S> {
             extras: Extras::new(),
             scratch: Scratch::default(),
             last_char: None,
+            cursor_style: None,
         }
     }
 

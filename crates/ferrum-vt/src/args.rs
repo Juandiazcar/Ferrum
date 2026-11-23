@@ -26,6 +26,11 @@ impl<'a> Args<'a> {
         self.raw(index).filter(|&value| value != 0).map_or(default, usize::from)
     }
 
+    /// The parameters with their sub-parameters.
+    pub(crate) fn iter(self) -> vte::ParamsIter<'a> {
+        self.params.iter()
+    }
+
     /// Parameter `index` with 0 as a real value (erase modes and the like).
     pub(crate) fn mode(self, index: usize) -> u16 {
         self.raw(index).unwrap_or(0)

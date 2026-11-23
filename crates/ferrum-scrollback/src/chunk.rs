@@ -17,4 +17,4 @@ mod seal;
 
 pub(crate) use hot::HotChunk;
 pub use read::{ChunkBuf, decode_chunk};
-pub(crate) use seal::Sealer;
+pub(crate) use seal::ChunkSealer;

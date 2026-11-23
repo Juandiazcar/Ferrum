@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 
 pub use access::LineCursor;
 
-use crate::chunk::{HotChunk, Sealer};
+use crate::chunk::{ChunkSealer, HotChunk};
 use crate::config::ScrollbackConfig;
 use crate::encode::Encoder;
 use crate::error::ScrollbackError;
@@ -73,7 +73,7 @@ pub struct Scrollback {
     styles: StyleTable,
     encoder: Encoder,
     hot: HotChunk,
-    sealer: Sealer,
+    sealer: ChunkSealer,
     chunks: VecDeque<SealedChunk>,
     /// Lines of the oldest sealed chunk already dropped (the chunk is freed when all are).
     head_skip: usize,
@@ -108,7 +108,7 @@ impl Scrollback {
             styles: StyleTable::new(),
             encoder: Encoder::default(),
             hot: HotChunk::new(),
-            sealer: Sealer::default(),
+            sealer: ChunkSealer::default(),
             chunks: VecDeque::new(),
             head_skip: 0,
             hot_skip: 0,

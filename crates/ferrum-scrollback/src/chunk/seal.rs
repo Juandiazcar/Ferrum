@@ -8,7 +8,7 @@ use crate::varint::put_len;
 
 /// Scratch buffers shared by all seals of a session (`docs/02` §5: compression runs on one worker,
 /// so the scratch is shared, not per chunk).
-pub(crate) struct Sealer {
+pub(crate) struct ChunkSealer {
     index: Vec<u8>,
     out: Vec<u8>,
     /// LZ4 hash table, reused so a seal allocates nothing but its result (`docs/05` §6).
@@ -18,7 +18,7 @@ pub(crate) struct Sealer {
 /// Heap size of the large LZ4 hash table (4 096 entries of `u32`), counted as shared scratch.
 const LZ4_TABLE_BYTES: usize = 4_096 * size_of::<u32>();
 
-impl Default for Sealer {
+impl Default for ChunkSealer {
     fn default() -> Self {
         // The large table is needed from the first seal: a full chunk is above 64 KiB of input
         // only sometimes, and a table upgrade later would allocate on the hot path.
@@ -26,15 +26,15 @@ impl Default for Sealer {
     }
 }
 
-impl std::fmt::Debug for Sealer {
+impl std::fmt::Debug for ChunkSealer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Sealer").field("scratch_bytes", &self.capacity_bytes()).finish()
+        f.debug_struct("ChunkSealer").field("scratch_bytes", &self.capacity_bytes()).finish()
     }
 }
 
-impl Sealer {
+impl ChunkSealer {
     /// Builds the sealed blob of `hot` (which must hold at least one line).
-    pub(crate) fn seal(&mut self, hot: &HotChunk) -> Result<Box<[u8]>, ScrollbackError> {
+    pub(crate) fn seal_hot(&mut self, hot: &HotChunk) -> Result<Box<[u8]>, ScrollbackError> {
         self.index.clear();
         let raw = hot.data();
         let mut previous = 0usize;
@@ -87,7 +87,7 @@ mod tests {
             let planned = encoder.plan(&mut styles, &line).expect("plan");
             hot.append(&encoder, &planned);
         }
-        Sealer::default().seal(&hot).expect("seal")
+        ChunkSealer::default().seal_hot(&hot).expect("seal")
     }
 
     #[test]

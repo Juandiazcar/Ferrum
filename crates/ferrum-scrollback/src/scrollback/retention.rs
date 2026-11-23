@@ -8,7 +8,7 @@ use crate::style::StyleTable;
 impl Scrollback {
     /// Seals the full hot chunk, then moves cold chunks out of RAM if the threshold is crossed.
     pub(super) fn seal_hot(&mut self) -> Result<(), ScrollbackError> {
-        let blob = self.sealer.seal(&self.hot)?;
+        let blob = self.sealer.seal_hot(&self.hot)?;
         let lines = self.hot.len();
         let id = self.next_chunk_id;
         self.next_chunk_id += 1;

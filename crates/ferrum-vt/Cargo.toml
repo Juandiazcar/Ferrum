@@ -23,7 +23,12 @@ vte = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true }
 dhat = { workspace = true }
+criterion = { workspace = true }
 proptest = { workspace = true }
+
+[[bench]]
+name = "parse"
+harness = false
 
 [lints]
 workspace = true

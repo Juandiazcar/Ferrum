@@ -19,6 +19,17 @@ docs/08 §8: "full-precision numbers are taken on the maintainer's machines").
   current one are benched in the same job on the same runner and compared (+10 %, same ceilings).
 - `windows.json` was produced locally (Intel Core i5-9400, Windows 11, rustc 1.100.0, release
   profile). There is no `linux.json` or `macos.json` yet: a maintainer creates them on their own
-  machines.
+  machines. Numbers measured on another machine (for example an Apple M2 during development) are
+  never written here.
+- Benches in the file: the seven `scrollback_*` benches of WP-01. The six `vt_*` benches of WP-02
+  (`vt_parse/{ascii_8mib, sgr_heavy_8mib, unicode_8mib, ascii_8mib_no_history,
+  sgr_heavy_8mib_no_history}` and `vt_reflow/10k_lines_200_to_100_columns`) have **no baseline
+  yet**: the inputs come from the seeded `fixtures/output/` generator and the reference machine
+  (the maintainer's i5-9400, Windows 11) has not run them on this code. A maintainer saves them
+  with `cargo xtask bench --save-baseline` on that machine; until then the absolute ceilings
+  above are the gate that matters for NFR-PERF-02 and `docs/03` §4, and `cargo xtask bench` on
+  Windows reports the missing baselines instead of passing.
 
-**Filled by:** WP-01 (`ferrum-scrollback`: push, read, spilled read, search); later work packages add their benches.
+**Filled by:** WP-01 (`ferrum-scrollback`: push, read, spilled read, search, in `windows.json`)
+and WP-02 (`ferrum-vt`: parse and reflow; their baselines come from the maintainer's run on the
+i5-9400, maintainer decision Q-27).

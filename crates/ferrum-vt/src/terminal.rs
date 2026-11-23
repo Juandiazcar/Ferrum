@@ -1,0 +1,81 @@
+//! The public terminal: bytes in, grid and events out.
+
+use ferrum_scrollback::Scrollback;
+
+use crate::core::Core;
+use crate::cursor::Cursor;
+use crate::damage::Damage;
+use crate::events::EventSink;
+use crate::grid::Grid;
+use crate::modes::Mode;
+use crate::screen::Screen;
+use crate::size::Size;
+
+/// One terminal session's state machine (`docs/02` §3).
+///
+/// Feed it the bytes the program writes with [`parse`](Self::parse); read the screen with
+/// [`grid`](Self::grid), the history with [`scrollback`](Self::scrollback) and learn about
+/// everything else (title, bell, replies for the PTY, ...) through the [`EventSink`].
+pub struct Terminal<S: EventSink> {
+    parser: vte::Parser,
+    pub(crate) core: Core<S>,
+}
+
+impl<S: EventSink> Terminal<S> {
+    /// A blank terminal. The scrollback is created by the caller so that the daemon decides on
+    /// the spill store.
+    pub fn new(size: Size, scrollback: Scrollback, sink: S) -> Self {
+        Self { parser: vte::Parser::new(), core: Core::new(size, scrollback, sink) }
+    }
+
+    /// Feeds bytes from the program. Never panics and never fails: malformed input is dropped
+    /// (`docs/10` §3 item 9).
+    pub fn parse(&mut self, bytes: &[u8]) {
+        self.parser.advance(&mut self.core, bytes);
+    }
+
+    /// The visible screen (primary or alternate).
+    pub fn screen(&self) -> &Screen {
+        self.core.screen()
+    }
+
+    /// The visible grid.
+    pub fn grid(&self) -> &Grid {
+        &self.core.screen().grid
+    }
+
+    /// The cursor of the visible screen.
+    pub fn cursor(&self) -> &Cursor {
+        &self.core.screen().cursor
+    }
+
+    /// The terminal modes.
+    pub fn modes(&self) -> Mode {
+        self.core.modes
+    }
+
+    /// The history of rows that scrolled off the primary screen.
+    pub fn scrollback(&self) -> &Scrollback {
+        &self.core.scrollback
+    }
+
+    /// The damage of the visible screen since the last [`take_damage`](Self::take_damage).
+    pub fn damage(&self) -> &Damage {
+        self.core.screen().grid.damage()
+    }
+
+    /// Clears the damage of the visible screen.
+    pub fn take_damage(&mut self) {
+        self.core.screen_mut().grid.damage_mut().take();
+    }
+
+    /// The event sink.
+    pub fn sink(&self) -> &S {
+        &self.core.sink
+    }
+
+    /// The event sink, mutable.
+    pub fn sink_mut(&mut self) -> &mut S {
+        &mut self.core.sink
+    }
+}

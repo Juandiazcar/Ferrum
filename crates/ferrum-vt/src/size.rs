@@ -11,7 +11,16 @@ pub struct Size {
 }
 
 impl Size {
-    /// A size clamped into the supported range.
+    /// The size `cols` x `rows` exactly, or `None` when it is outside the supported range. The
+    /// daemon uses this to tell the UI that a request cannot be honored, instead of letting the
+    /// UI believe in a size the terminal does not have (ADR 0028).
+    pub fn exact(cols: u16, rows: u16) -> Option<Self> {
+        let size = Self::new(cols, rows);
+        (size.cols == cols && size.rows == rows).then_some(size)
+    }
+
+    /// A size clamped into the supported range. Compare with [`Size::exact`] to learn whether it
+    /// was clamped.
     pub fn new(cols: u16, rows: u16) -> Self {
         Self {
             cols: cols.clamp(MIN_DIMENSION, MAX_COLS),
@@ -45,5 +54,7 @@ mod tests {
         assert_eq!((Size::new(0, 0).cols(), Size::new(0, 0).rows()), (1, 1));
         let huge = Size::new(u16::MAX, u16::MAX);
         assert_eq!((huge.cols(), huge.rows()), (usize::from(MAX_COLS), usize::from(MAX_ROWS)));
+        assert_eq!(Size::exact(u16::MAX, 1), None);
+        assert_eq!(Size::exact(80, 24), Some(Size::new(80, 24)));
     }
 }

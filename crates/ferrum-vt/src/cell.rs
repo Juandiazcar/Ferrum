@@ -108,6 +108,11 @@ impl Cell {
         Self { ch: BLANK_CHAR as u32, fg: 0, bg: bg.bits(), attrs: 0, flags: 0 }
     }
 
+    /// A cell showing `ch` with the given style words (extras included).
+    pub(crate) const fn styled(ch: char, fg: u32, bg: u32, attrs: u16) -> Self {
+        Self { ch: ch as u32, fg, bg, attrs, flags: 0 }
+    }
+
     /// The scalar, or the grapheme table index when [`CellFlags::GRAPHEME`] is set.
     pub const fn raw_char(&self) -> u32 {
         self.ch

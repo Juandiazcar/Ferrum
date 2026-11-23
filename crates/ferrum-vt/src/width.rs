@@ -23,10 +23,6 @@ pub fn cluster_width(cluster: &str) -> usize {
 /// True when `c` continues the cluster `previous` instead of starting a new one (UAX #29).
 /// `scratch` is a reusable buffer, so the check does not allocate in steady state.
 pub fn joins_cluster(previous: &str, c: char, scratch: &mut String) -> bool {
-    if c.is_ascii() {
-        // Printable ASCII always starts a cluster (prepend scalars are not supported).
-        return false;
-    }
     scratch.clear();
     scratch.push_str(previous);
     scratch.push(c);

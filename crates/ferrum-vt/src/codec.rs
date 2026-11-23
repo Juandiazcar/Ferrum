@@ -134,8 +134,16 @@ const BLOCK: usize = 8;
 /// perf: the style check and the character gather share one pass over 8-cell blocks, and each
 /// block is appended with one copy (bench `vt_parse/ascii_8mib`).
 fn push_ascii_run(bytes: &mut Vec<u8>, cells: &[Cell], key: &AsciiStyle) -> usize {
+    // Short runs (colored text changes style every few cells) are cheaper cell by cell.
     let mut run = 0;
-    let (blocks, _) = cells.as_chunks::<BLOCK>();
+    for cell in cells.iter().take(BLOCK).take_while(|cell| cell.differs_from(key) == 0) {
+        bytes.push(cell.ascii_byte());
+        run += 1;
+    }
+    if run < BLOCK {
+        return run;
+    }
+    let (blocks, _) = cells.get(run..).unwrap_or_default().as_chunks::<BLOCK>();
     for block in blocks {
         let mut gathered = [0u8; BLOCK];
         let mut diff = 0;

@@ -56,7 +56,8 @@ fn stream() -> Vec<u8> {
 
 /// Parses the stream `PASSES` times to warm everything up (with history this fills it past
 /// `max_lines`, so the last pass evicts), then once more. Returns the heap blocks allocated by
-/// the last pass and the sealed chunks it produced.
+/// the last pass and the chunks it sealed inline (nobody takes the pending chunks here, so once
+/// `MAX_PENDING_CHUNKS` wait the push path seals; ferrum-scrollback `tests/pending.rs`).
 fn run(max_lines: usize, threshold: usize) -> (u64, u64) {
     let config = ScrollbackConfig::new(max_lines, threshold).expect("config");
     let mut term = Terminal::new(Size::new(COLS, ROWS), Scrollback::new(config), NullSink);
@@ -64,8 +65,8 @@ fn run(max_lines: usize, threshold: usize) -> (u64, u64) {
     for _ in 0..PASSES {
         term.parse(&bytes);
     }
-    let chunk = u64::try_from(HOT_CHUNK_LINES).expect("fits");
     let pushed_before = term.scrollback().pushed_lines();
+    let inline_before = term.scrollback().memory_report().inline_seals;
     let before = blocks();
     term.parse(&bytes);
     let allocated = blocks() - before;
@@ -74,7 +75,9 @@ fn run(max_lines: usize, threshold: usize) -> (u64, u64) {
         assert!(term.scrollback().dropped_lines() > 0, "the history is full: the pass evicts");
         assert!(pushed > pushed_before, "the pass pushes lines");
     }
-    (allocated, pushed / chunk - pushed_before / chunk)
+    let chunk = u64::try_from(HOT_CHUNK_LINES).expect("fits");
+    assert!(pushed / chunk > pushed_before / chunk || max_lines == 0, "the pass fills chunks");
+    (allocated, term.scrollback().memory_report().inline_seals - inline_before)
 }
 
 #[test]
@@ -83,9 +86,9 @@ fn parse_allocates_nothing_in_steady_state() {
     // No history: every allocation would be the parser's.
     let (without_history, _) = run(0, SPILL_THRESHOLD_LINES);
     assert_eq!(without_history, 0, "parse allocates in steady state");
-    // History on and full (eviction steady state): exactly one allocation per sealed chunk (the
-    // retained blob, as in `alloc_push_line.rs` of ferrum-scrollback) and none per line.
-    let (with_history, sealed) = run(RETAINED_LINES, RETAINED_LINES);
-    assert!(sealed > 0, "the pass seals chunks");
-    assert_eq!(with_history, sealed, "{with_history} allocations for {sealed} sealed chunks");
+    // History on and full (eviction steady state): exactly one allocation per chunk sealed inline
+    // (the retained blob, as in `alloc_push_line.rs` of ferrum-scrollback), none per line and
+    // none for a chunk that becomes pending (pooled buffers).
+    let (with_history, inline) = run(RETAINED_LINES, RETAINED_LINES);
+    assert_eq!(with_history, inline, "{with_history} allocations for {inline} inline seals");
 }

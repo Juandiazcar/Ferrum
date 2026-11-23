@@ -11,6 +11,7 @@ use ferrum_scrollback::{
 };
 use lines::{GenLine, numbered, push, read};
 use proptest::prelude::*;
+use proptest::test_runner::FileFailurePersistence;
 
 const STYLE_CHOICES: u32 = 5;
 /// RAM threshold above every `keep` the property uses, so the spill cap never interferes.
@@ -43,7 +44,20 @@ fn small_store() -> Scrollback {
     Scrollback::new(ScrollbackConfig::default())
 }
 
+/// Failing seeds are committed under `proptest-regressions/` (`docs/08` §2); the case count is
+/// proptest's default (256, or `PROPTEST_CASES`).
+fn config() -> ProptestConfig {
+    ProptestConfig {
+        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(
+            "proptest-regressions/roundtrip.txt",
+        ))),
+        ..ProptestConfig::default()
+    }
+}
+
 proptest! {
+    #![proptest_config(config())]
+
     #[test]
     fn single_line_round_trips(line in gen_line(), cuts in prop::collection::vec(0usize..120, 0..6)) {
         let mut store = small_store();

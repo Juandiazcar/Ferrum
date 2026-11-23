@@ -1,6 +1,7 @@
 //! Chunks: the newest lines live in one uncompressed [`HotChunk`]; when it holds
-//! [`HOT_CHUNK_LINES`](crate::HOT_CHUNK_LINES) lines it is sealed into a self-describing
-//! LZ4 blob (`docs/02` §3.2).
+//! [`HOT_CHUNK_LINES`](crate::HOT_CHUNK_LINES) lines it becomes a [`PendingChunk`] that a
+//! [`ChunkSealer`] compresses, off the push path, into a self-describing LZ4 blob
+//! (`docs/02` §3.2, §5).
 //!
 //! Sealed blob layout (also the spill record):
 //!
@@ -12,9 +13,11 @@
 //! ```
 
 mod hot;
+mod pending;
 mod read;
 mod seal;
 
 pub(crate) use hot::HotChunk;
+pub use pending::{PendingChunk, SealedBlob};
 pub use read::{ChunkBuf, decode_chunk};
-pub(crate) use seal::ChunkSealer;
+pub use seal::ChunkSealer;

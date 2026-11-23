@@ -1,15 +1,20 @@
 //! [`Scrollback`]: the per-session store of encoded history (`docs/02` §3.2).
 //!
 //! Lines are numbered from 0 = the oldest retained line. Layout, oldest to newest: spilled
-//! chunks (on the spill store), sealed chunks (RAM, LZ4), the hot chunk (RAM, raw). History is
+//! chunks (on the spill store), sealed chunks (RAM, LZ4) and pending chunks (RAM, raw, waiting
+//! for the worker; at most [`MAX_PENDING_CHUNKS`](crate::MAX_PENDING_CHUNKS)), the hot chunk
+//! (RAM, raw). History is
 //! bounded: past `max_lines` the oldest lines are dropped; past the spill threshold the oldest
 //! sealed chunks move to the spill store; if the store is full the oldest spilled chunks are
 //! dropped, and if it fails the spill is disabled for the session (`docs/02` §10).
 
 mod access;
+mod pending;
 mod retention;
 
 use std::collections::VecDeque;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use access::LineCursor;
 
@@ -22,6 +27,10 @@ use crate::line::LineRef;
 use crate::memory::MemoryReport;
 use crate::spill::{SpillHandle, SpillStore};
 use crate::style::StyleTable;
+
+/// The origin token of the next scrollback: chunk ids restart at 0 in every scrollback, so a
+/// sealed blob also carries the token of the scrollback it came from.
+static NEXT_ORIGIN: AtomicU64 = AtomicU64::new(0);
 
 /// Whether cold chunks can leave RAM.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,6 +52,8 @@ pub enum SpillDisableCause {
     Io,
     /// One chunk is larger than the whole store capacity.
     RecordTooLarge,
+    /// A chunk could not be compressed before spilling (LZ4 failed).
+    Compress,
 }
 
 /// Something the owner should tell the user (once).
@@ -57,6 +68,18 @@ pub enum ScrollbackEvent {
 enum Place {
     Ram(Box<[u8]>),
     Spilled(SpillHandle),
+    /// Full and uncompressed, waiting for [`Scrollback::install`]; `handed` once given out.
+    Pending {
+        lines: Arc<HotChunk>,
+        handed: Handed,
+    },
+}
+
+/// Whether a pending chunk was given out by [`Scrollback::take_pending`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Handed {
+    No,
+    Yes,
 }
 
 #[derive(Debug)]
@@ -69,12 +92,21 @@ struct SealedChunk {
 /// The scrollback of one session.
 #[derive(Debug)]
 pub struct Scrollback {
+    /// Unique per process; matches [`SealedBlob`](crate::SealedBlob)s to their scrollback.
+    origin: u64,
     config: ScrollbackConfig,
     styles: StyleTable,
     encoder: Encoder,
     hot: HotChunk,
     sealer: ChunkSealer,
     chunks: VecDeque<SealedChunk>,
+    /// Chunk buffers for the next hot chunk (with the pending chunks, at most
+    /// `MAX_PENDING_CHUNKS`), so a pending seal allocates nothing in steady state. A buffer may
+    /// still be shared with the worker (its chunk was dropped while handed out) until the worker
+    /// drops its handle.
+    pool: Vec<Arc<HotChunk>>,
+    pending_chunks: usize,
+    inline_seals: u64,
     /// Lines of the oldest sealed chunk already dropped (the chunk is freed when all are).
     head_skip: usize,
     /// Lines of the hot chunk already dropped (only while there is no sealed chunk).
@@ -104,12 +136,17 @@ impl Scrollback {
     fn build(config: ScrollbackConfig, store: Option<Box<dyn SpillStore>>) -> Self {
         let spill = if store.is_some() { SpillState::Active } else { SpillState::Unavailable };
         Self {
+            // Only uniqueness matters, no ordering with other memory.
+            origin: NEXT_ORIGIN.fetch_add(1, Ordering::Relaxed),
             config,
             styles: StyleTable::new(),
             encoder: Encoder::default(),
             hot: HotChunk::new(),
             sealer: ChunkSealer::default(),
             chunks: VecDeque::new(),
+            pool: Vec::new(),
+            pending_chunks: 0,
+            inline_seals: 0,
             head_skip: 0,
             hot_skip: 0,
             next_chunk_id: 0,
@@ -125,31 +162,30 @@ impl Scrollback {
     }
 
     /// Appends a row that scrolled off the grid. Hot path: allocates only when a new style is
-    /// seen, when the hot buffer needs its next 16 KiB step, and once per 1 024 lines for the
-    /// sealed blob (the retained data itself).
+    /// seen and while the hot and pooled buffers grow to their working size. A full hot chunk
+    /// becomes a pending chunk (see [`take_pending`](Self::take_pending)); only when
+    /// [`MAX_PENDING_CHUNKS`](crate::MAX_PENDING_CHUNKS) are already waiting is it sealed here,
+    /// which allocates the sealed blob (the retained data itself).
     ///
     /// # Errors
     /// A line over the size limits, or with runs that do not cover its text, is still stored and
     /// counted, so that line numbers stay stable: as its text cut to
     /// [`MAX_LINE_TEXT_BYTES`](crate::MAX_LINE_TEXT_BYTES) at a character boundary, without
-    /// styles; the error says what was lost. A compression failure keeps the line (and retries
-    /// sealing on the next push).
+    /// styles; the error says what was lost. A compression failure is returned too, but the line
+    /// is stored and counted all the same: the chunk that could not be sealed stays readable,
+    /// uncompressed.
     pub fn push_line(&mut self, line: &LineRef<'_>) -> Result<(), ScrollbackError> {
         if self.config.max_lines() == 0 {
             self.pushed_lines += 1;
             return Ok(());
         }
-        if self.hot.is_full() {
-            self.seal_hot()?;
-        }
+        let before = if self.hot.is_full() { self.seal_hot() } else { Ok(()) };
         let stored = self.append(line);
         self.pushed_lines += 1;
         self.retained += 1;
-        if self.hot.is_full() {
-            self.seal_hot()?;
-        }
+        let after = if self.hot.is_full() { self.seal_hot() } else { Ok(()) };
         self.evict();
-        stored
+        before.and(stored).and(after)
     }
 
     /// Appends `line` to the hot chunk, or its clipped plain text when it cannot be stored as is.
@@ -216,20 +252,29 @@ impl Scrollback {
 
     /// Heap bytes by category (capacities).
     pub fn memory_report(&self) -> MemoryReport {
-        let blobs: usize = self
-            .chunks
-            .iter()
-            .map(|chunk| match &chunk.place {
-                Place::Ram(blob) => blob.len(),
-                Place::Spilled(_) => 0,
-            })
-            .sum();
+        let (mut blobs, mut pending) = (0, 0);
+        for chunk in &self.chunks {
+            match &chunk.place {
+                Place::Ram(blob) => blobs += blob.len(),
+                Place::Pending { lines, .. } => pending += pooled_bytes(lines),
+                Place::Spilled(_) => {}
+            }
+        }
+        let pooled: usize = self.pool.iter().map(|lines| pooled_bytes(lines)).sum();
         MemoryReport {
-            hot_chunk_bytes: self.hot.data_capacity() + self.hot.index_capacity_bytes(),
+            hot_chunk_bytes: self.hot.capacity_bytes(),
             sealed_bytes: blobs + self.chunks.capacity() * size_of::<SealedChunk>(),
+            pending_bytes: pending + pooled + self.pool.capacity() * size_of::<Arc<HotChunk>>(),
+            inline_seals: self.inline_seals,
             misc_bytes: self.styles.capacity_bytes() + self.encoder.capacity_bytes(),
             shared_scratch_bytes: self.sealer.capacity_bytes(),
             spill_disk_bytes: self.store.as_ref().map_or(0, |store| store.live_bytes()),
         }
     }
+}
+
+/// Heap bytes of a shared chunk buffer: its two buffers and the shared allocation that holds the
+/// `HotChunk` (the reference counts are within the reconciliation slack of `memory_budget.rs`).
+fn pooled_bytes(lines: &HotChunk) -> usize {
+    lines.capacity_bytes() + size_of::<HotChunk>()
 }

@@ -99,7 +99,10 @@ impl Scrollback {
         let mut offset = index + skipped;
         for (chunk, sealed) in self.chunks.iter().enumerate() {
             if offset < sealed.lines {
-                return Some(Location::Sealed { chunk, line: offset });
+                return Some(match &sealed.place {
+                    Place::Pending { lines, .. } => Location::Raw { lines, line: offset },
+                    Place::Ram(_) | Place::Spilled(_) => Location::Sealed { chunk, line: offset },
+                });
             }
             offset -= sealed.lines;
         }
@@ -118,6 +121,8 @@ impl Scrollback {
                 store.read(*handle, &mut cursor.spill)?;
                 decode_chunk(&cursor.spill, &mut cursor.chunk)?;
             }
+            // `locate` reads pending chunks in place; this arm is never taken.
+            Place::Pending { .. } => return Err(DecodeError::BadIndex.into()),
         }
         cursor.chunk.id = Some(sealed.id);
         Ok(())

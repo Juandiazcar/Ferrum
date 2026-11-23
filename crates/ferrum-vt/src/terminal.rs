@@ -3,12 +3,13 @@
 use ferrum_scrollback::Scrollback;
 
 use crate::core::Core;
-use crate::cursor::Cursor;
+use crate::cursor::{Cursor, CursorStyle};
 use crate::damage::Damage;
 use crate::events::EventSink;
 use crate::grid::Grid;
 use crate::input::Input;
 use crate::modes::Mode;
+use crate::palette::Palette;
 use crate::screen::Screen;
 use crate::size::Size;
 
@@ -68,6 +69,39 @@ impl<S: EventSink> Terminal<S> {
     /// Clears the damage of the visible screen.
     pub fn take_damage(&mut self) {
         self.core.screen_mut().grid.damage_mut().take();
+    }
+
+    /// The last title a program set (already sanitized).
+    pub fn title(&self) -> &str {
+        &self.core.title
+    }
+
+    /// The last working directory a program reported with OSC 7, as a `file://` URI.
+    pub fn cwd(&self) -> &str {
+        &self.core.cwd
+    }
+
+    /// The cursor style a program chose with DECSCUSR; `None` until it chooses one.
+    pub fn cursor_style(&self) -> Option<CursorStyle> {
+        self.core.cursor_style
+    }
+
+    /// The color palette and default colors.
+    pub fn palette(&self) -> &Palette {
+        &self.core.palette
+    }
+
+    /// Replaces the palette (a new theme). Marks the whole screen as damaged.
+    pub fn set_palette(&mut self, palette: Palette) {
+        self.core.palette = palette;
+        self.core.screen_mut().grid.damage_mut().mark_all();
+    }
+
+    /// Answers a [`Event::ClipboardLoad`](crate::Event::ClipboardLoad) that the owner approved:
+    /// writes the `OSC 52` reply carrying `clipboard` for `selection` to the sink. A denied
+    /// request is simply never answered.
+    pub fn answer_clipboard_request(&mut self, selection: &str, clipboard: &[u8]) {
+        self.core.answer_clipboard(selection, clipboard);
     }
 
     /// The event sink.

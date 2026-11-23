@@ -3,6 +3,10 @@
 
 /// Bytes of the longest UTF-8 encoded scalar.
 pub(crate) const MAX_UTF8_BYTES: usize = 4;
+/// First printable ASCII byte (space).
+pub(crate) const FIRST_PRINTABLE: u8 = 0x20;
+/// Last printable ASCII byte (`~`).
+pub(crate) const LAST_PRINTABLE: u8 = 0x7E;
 /// Smallest grid dimension: a terminal of one cell is legal (`docs/05` §13 item 3).
 pub const MIN_DIMENSION: u16 = 1;
 /// Most columns a grid may have. A request above it is clamped: 1 024 x 512 cells of 16 bytes is

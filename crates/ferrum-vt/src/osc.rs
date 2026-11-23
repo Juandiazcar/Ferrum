@@ -3,7 +3,7 @@
 
 use crate::core::Core;
 use crate::events::{Event, EventSink};
-use crate::limits::MAX_TITLE_BYTES;
+use crate::limits::{MAX_CWD_BYTES, MAX_TITLE_BYTES};
 
 /// Most digits of the numeric command of an OSC (`OSC 133 ; ...` has three).
 const MAX_COMMAND_DIGITS: usize = 5;
@@ -13,6 +13,19 @@ pub(crate) mod command {
     pub(crate) const TITLE_AND_ICON: u16 = 0;
     pub(crate) const ICON: u16 = 1;
     pub(crate) const TITLE: u16 = 2;
+    pub(crate) const PALETTE: u16 = 4;
+    pub(crate) const CWD: u16 = 7;
+    pub(crate) const HYPERLINK: u16 = 8;
+    pub(crate) const PROGRESS: u16 = 9;
+    pub(crate) const FOREGROUND: u16 = 10;
+    pub(crate) const BACKGROUND: u16 = 11;
+    pub(crate) const CURSOR_COLOR: u16 = 12;
+    pub(crate) const CLIPBOARD: u16 = 52;
+    pub(crate) const RESET_PALETTE: u16 = 104;
+    pub(crate) const RESET_FOREGROUND: u16 = 110;
+    pub(crate) const RESET_BACKGROUND: u16 = 111;
+    pub(crate) const RESET_CURSOR_COLOR: u16 = 112;
+    pub(crate) const SHELL_MARKS: u16 = 133;
 }
 
 /// Splits `payload` at its first `;` into the numeric command and the rest.
@@ -36,6 +49,17 @@ impl<S: EventSink> Core<S> {
         match command {
             command::TITLE_AND_ICON | command::TITLE => self.set_title(rest, TitleKind::Window),
             command::ICON => self.set_title(rest, TitleKind::Icon),
+            command::PALETTE => self.osc_palette(rest),
+            command::CWD => self.set_cwd(rest),
+            command::HYPERLINK => self.osc_hyperlink(rest),
+            command::FOREGROUND..=command::CURSOR_COLOR => self.osc_dynamic_colors(command, rest),
+            command::CLIPBOARD => self.osc_clipboard(rest),
+            command::RESET_PALETTE => self.reset_palette(rest),
+            command::RESET_FOREGROUND..=command::RESET_CURSOR_COLOR => {
+                self.reset_dynamic_color(command);
+            }
+            command::SHELL_MARKS => self.osc_shell_mark(rest),
+            command::PROGRESS => self.osc_progress(rest),
             _ => {}
         }
     }
@@ -45,9 +69,28 @@ impl<S: EventSink> Core<S> {
     fn set_title(&mut self, raw: &[u8], kind: TitleKind) {
         sanitize_title(raw, &mut self.scratch.short);
         match kind {
-            TitleKind::Window => self.sink.event(Event::Title(&self.scratch.short)),
+            TitleKind::Window => {
+                self.title.clear();
+                self.title.push_str(&self.scratch.short);
+                self.sink.event(Event::Title(&self.scratch.short));
+            }
             TitleKind::Icon => self.sink.event(Event::IconName(&self.scratch.short)),
         }
+    }
+
+    /// OSC 7: the shell's working directory as a `file://` URI. Anything else, a URI with control
+    /// characters or an over-long one is ignored.
+    fn set_cwd(&mut self, raw: &[u8]) {
+        let Ok(uri) = std::str::from_utf8(raw) else { return };
+        if !uri.starts_with("file://")
+            || uri.len() > MAX_CWD_BYTES
+            || uri.chars().any(char::is_control)
+        {
+            return;
+        }
+        self.cwd.clear();
+        self.cwd.push_str(uri);
+        self.sink.event(Event::Cwd(uri));
     }
 }
 

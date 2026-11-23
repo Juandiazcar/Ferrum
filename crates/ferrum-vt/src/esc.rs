@@ -80,7 +80,9 @@ impl<S: EventSink> Core<S> {
         }
     }
 
-    /// RIS: back to the power-on state. The history is kept.
+    /// RIS: back to the power-on state, the title included (Alacritty's `Term::reset_state`,
+    /// maintainer decisions Q-23 and Q-25; like Alacritty no event is sent for it). The palette,
+    /// the working directory and the history are kept.
     pub(crate) fn reset(&mut self) {
         let size = self.primary.grid.size();
         self.alt = None;
@@ -88,5 +90,6 @@ impl<S: EventSink> Core<S> {
         self.tabs.reset();
         self.primary = Screen::new(size);
         self.last_char = None;
+        self.title.clear();
     }
 }

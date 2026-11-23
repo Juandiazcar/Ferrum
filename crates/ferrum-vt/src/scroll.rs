@@ -3,7 +3,7 @@
 
 use ferrum_scrollback::{LineRef, Scrollback};
 
-use crate::codec::{Tail, encode_cells};
+use crate::codec::encode_row_prefix;
 use crate::core::Core;
 use crate::events::{Event, EventSink};
 use crate::extras::Extras;
@@ -26,9 +26,8 @@ impl<S: EventSink> Core<S> {
         // Blanks after the last character are trimmed by the scrollback anyway, so only a
         // wrapped row (whose blanks are content) is encoded to its full width.
         let width = if row.is_wrapped() { row.len() } else { row.used_len() };
-        let cells = row.cells().get(..width).unwrap_or_default();
         let encoded = &mut self.scratch.line;
-        encode_cells(cells, Tail::of(row), self.primary.grid.graphemes(), encoded);
+        encode_row_prefix(row, width, self.primary.grid.graphemes(), encoded);
         let line = LineRef { flags: row.flags(), text: encoded.text(), runs: &encoded.runs };
         Self::store_history_line(&mut self.scrollback, &mut self.extras, &mut self.sink, &line);
     }

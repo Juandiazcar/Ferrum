@@ -9,7 +9,7 @@ use ferrum_scrollback::{Style, StyledRun};
 
 use crate::cell::{AsciiStyle, Cell, CellFlags};
 use crate::graphemes::GraphemeTable;
-use crate::row::Row;
+use crate::row::{DEFAULT_WORDS, Row, StyleWords};
 
 /// Attribute bit that marks trailing blanks of a wrapped row so they survive trimming. Never
 /// present in a grid cell: it is removed when a line is decoded.
@@ -81,6 +81,39 @@ impl Tail {
 #[cfg(test)]
 pub(crate) fn encode_row(row: &Row, graphemes: &GraphemeTable, out: &mut Encoded) {
     encode_cells(row.cells(), Tail::of(row), graphemes, out);
+}
+
+/// Encodes the first `width` cells of `row` into `out` (cleared first).
+pub(crate) fn encode_row_prefix(
+    row: &Row,
+    width: usize,
+    graphemes: &GraphemeTable,
+    out: &mut Encoded,
+) {
+    let cells = row.cells().get(..width).unwrap_or_default();
+    match row.ascii_style() {
+        // perf: a row of printed text in one style needs no per-cell checks (bench
+        // `vt_parse/ascii_8mib`). Cells past the written part are default blanks.
+        Some((words, used)) if width <= used || words == DEFAULT_WORDS => {
+            encode_uniform(cells, words, Tail::of(row), out);
+        }
+        _ => encode_cells(cells, Tail::of(row), graphemes, out),
+    }
+}
+
+/// Encodes plain ASCII `cells` that all have the style `words`.
+fn encode_uniform(cells: &[Cell], words: StyleWords, tail: Tail, out: &mut Encoded) {
+    let Encoded { bytes, runs } = out;
+    bytes.clear();
+    runs.clear();
+    bytes.extend(cells.iter().map(Cell::ascii_byte));
+    if !cells.is_empty() {
+        let (fg, bg, attrs) = words;
+        runs.push(StyledRun { style: Style { fg, bg, attrs }, len: cells.len() });
+    }
+    if tail == Tail::Keep {
+        pad_blank_bytes(bytes, runs);
+    }
 }
 
 /// Encodes `cells` as one row into `out` (cleared first).
@@ -194,6 +227,8 @@ mod tests {
     use super::*;
     use crate::cell::BLANK_CHAR;
 
+    type Write<'a> = (usize, &'a [u8], StyleWords);
+
     fn row_of(text: &str, wrapped: bool) -> Row {
         let mut row = Row::new(text.chars().count(), Cell::default());
         for (x, c) in text.chars().enumerate() {
@@ -244,5 +279,35 @@ mod tests {
         encode_row(&row, &graphemes, &mut out);
         assert_eq!(out.text(), "漢e\u{0301} ");
         assert_eq!(out.runs.iter().map(|run| run.len).sum::<usize>(), out.text().chars().count());
+    }
+
+    #[test]
+    fn the_uniform_shortcut_encodes_exactly_like_the_cell_by_cell_path() {
+        let red = (1, 0, 0);
+        let writes: [&[Write<'_>]; 6] = [
+            &[],
+            &[(0, b"hello  ", DEFAULT_WORDS)],
+            &[(0, b"hello  ", red)],
+            &[(0, b"ab", red), (2, b"pq", red), (1, b"X", red)],
+            &[(0, b"ab", red), (2, b"pq", DEFAULT_WORDS)],
+            &[(3, b"gap", DEFAULT_WORDS), (1, b"y", red)],
+        ];
+        for writes in writes {
+            for wrapped in [false, true] {
+                let mut row = Row::new(10, Cell::default());
+                for &(x, bytes, words) in writes {
+                    row.write_ascii(x, bytes, words);
+                }
+                if wrapped {
+                    row.insert_flag(ferrum_scrollback::LineFlags::WRAPPED);
+                }
+                let width = if wrapped { row.len() } else { row.used_len() };
+                let (mut fast, mut slow) = (Encoded::default(), Encoded::default());
+                encode_row_prefix(&row, width, &GraphemeTable::new(), &mut fast);
+                let cells = row.cells().get(..width).unwrap_or_default();
+                encode_cells(cells, Tail::of(&row), &GraphemeTable::new(), &mut slow);
+                assert_eq!((fast.text(), &fast.runs), (slow.text(), &slow.runs), "{writes:?}");
+            }
+        }
     }
 }

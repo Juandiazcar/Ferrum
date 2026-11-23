@@ -3,6 +3,7 @@
 *.toml text eol=lf
 *.md text eol=lf
 *.in binary
+*.recording binary
 *.snap text eol=lf
 *.png binary
 *.ttf binary

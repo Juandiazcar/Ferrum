@@ -1,0 +1,49 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 139x35 history 0
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;38:2:255:0:255;4mTEST\e[0m"|
+row |TEST|
+  0-3 fg=#ff00ff strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;38:2:0:255:0:255;4mTEST\e[0m"|
+row |TEST|
+  0-3 fg=#ff00ff strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;38:5:1;4mTEST\e[0m"|
+row |TEST|
+  0-3 fg=i1 strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;48:2:255:0:255;4mTEST\e[0m"|
+row |TEST|
+  0-3 bg=#ff00ff strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;48:2:0:255:0:255;4mTEST\e[0m"|
+row |TEST|
+  0-3 bg=#ff00ff strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;48:5:1;4mTEST\e[0m"|
+row |TEST|
+  0-3 bg=i1 strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;38;2;255;0;255;4mTEST\e[0m"|
+row |TEST|
+  0-3 fg=#ff00ff strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;38;2;0;255;0;255;4mTEST\e[0m"|
+row |TEST|
+  0-3 fg=#00ff00 strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;38;5;1;4mTEST\e[0m"|
+row |TEST|
+  0-3 fg=i1 strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;48;2;255;0;255;4mTEST\e[0m"|
+row |TEST|
+  0-3 bg=#ff00ff strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;48;2;0;255;0;255;4mTEST\e[0m"|
+row |TEST|
+  0-3 bg=#00ff00 strike underline=single
+row |[undeadleech@archhq sgr]$ echo -e "\e[9;48;5;1;4mTEST\e[0m"|
+row |TEST|
+  0-3 bg=i1 strike underline=single
+row |[undeadleech@archhq sgr]$ exit|
+row |exit|
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

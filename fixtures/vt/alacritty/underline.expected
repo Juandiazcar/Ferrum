@@ -1,0 +1,72 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 134x64 history 0
+row |[undeadleech@undeadlap underline]$ echo -e "\e[4mUNDERLINED\e[0m"|
+row |UNDERLINED|
+  0-9 underline=single
+row |[undeadleech@undeadlap underline]$ echo -e "\e[4:1mUNDERLINED\e[4:0m"|
+row |UNDERLINED|
+  0-9 underline=single
+row |[undeadleech@undeadlap underline]$ echo -e "\e[4:2mUNDERLINED\e[24m"|
+row |UNDERLINED|
+  0-9 underline=double
+row |[undeadleech@undeadlap underline]$ echo -e "\e[4:3;21mUNDERLINED\e[0m"|
+row |UNDERLINED|
+  0-9 underline=curly
+row |[undeadleech@undeadlap underline]$ echo -e "\e[4;4:2mUNDERLINED\e[0m"|
+row |UNDERLINED|
+  0-9 underline=double
+row |[undeadleech@undeadlap underline]$ echo -e "\e[4:2;4:1mUNDERLINED\e[0m"|
+row |UNDERLINED|
+  0-9 underline=single
+row |[undeadleech@undeadlap underline]$|
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

@@ -153,11 +153,13 @@ impl<S: EventSink> Core<S> {
             }
             let mut alt = Screen::new(self.primary.grid.size());
             alt.cursor = self.primary.cursor;
+            alt.saved = self.alt_saved;
             alt.keyboard = std::mem::take(&mut self.alt_keyboard);
             self.alt = Some(alt);
             self.modes.insert(Mode::ALT_SCREEN);
         } else {
             if let Some(alt) = self.alt.take() {
+                self.alt_saved = alt.saved;
                 self.alt_keyboard = alt.keyboard;
             }
             self.modes.remove(Mode::ALT_SCREEN);

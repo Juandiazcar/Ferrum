@@ -1,0 +1,85 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 105x29 history 0
+row |* bdd2181 - (2 hours ago) Add support for recording/running ref tests - Joe Wilm|
+  2-8 fg=i4 bold
+  12-24 fg=i2 bold
+  70-79 fg=i2
+row | (HEAD -> ref-tests, origin/ref-tests)|
+  0-37 fg=i1 bold
+row || *   d629f72 - (2 days ago) WIP on master: d97996e Make bindings configurable f|
+  0-0 fg=i1
+  6-12 fg=i4 bold
+  16-27 fg=i2 bold
+row |rom alacritty.yml - Joe Wilm (refs/stash)|
+  18-27 fg=i2
+  28-40 fg=i1 bold
+row || |\|
+  0-0 fg=i1
+  2-2 fg=i1
+  3-3 fg=i3
+row ||/ /|
+  0-1 fg=i1
+  3-3 fg=i3
+row || * 5908bde - (2 days ago) index on master: d97996e Make bindings configurable f|
+  0-0 fg=i1
+  4-10 fg=i4 bold
+  14-25 fg=i2 bold
+row |rom alacritty.yml - Joe Wilm|
+  18-27 fg=i2
+row ||/|
+  0-1 fg=i1
+row |* d97996e - (4 days ago) Make bindings configurable from alacritty.yml - Joe Wil|
+  2-8 fg=i4 bold
+  12-23 fg=i2 bold
+  71-79 fg=i2
+row |m (origin/master, origin/bindings-v2, origin/HEAD, master, bindings-v2)|
+  0-0 fg=i2
+  1-70 fg=i1 bold
+row |* cb2bc4e - (4 days ago) Fix test for Cell layout - Joe Wilm|
+  2-8 fg=i4 bold
+  12-23 fg=i2 bold
+  50-59 fg=i2
+row |* cbb9167 - (5 days ago) Redraw screen on focus - Joe Wilm|
+  2-8 fg=i4 bold
+  12-23 fg=i2 bold
+  48-57 fg=i2
+row |* 8360ab4 - (8 days ago) Fallback to received chars when no bindings - Joe Wilm|
+  2-8 fg=i4 bold
+  12-23 fg=i2 bold
+  69-78 fg=i2
+row |* 6925daa - (8 days ago) Fix/add some keybindings - Joe Wilm|
+  2-8 fg=i4 bold
+  12-23 fg=i2 bold
+  50-59 fg=i2
+row |* e426013 - (8 days ago) Fix alacritty shutdown when shell exits on macOS - Joe |
+  2-8 fg=i4 bold
+  12-23 fg=i2 bold
+  74-79 fg=i2
+row |Wilm|
+  0-3 fg=i2
+row |* 8cbd768 - (8 days ago) Fix resize on macOS leaving screen blank - Joe Wilm|
+  2-8 fg=i4 bold
+  12-23 fg=i2 bold
+  66-75 fg=i2
+row |* a652b4a - (8 days ago) Rustup - Joe Wilm|
+  2-8 fg=i4 bold
+  12-23 fg=i2 bold
+  32-41 fg=i2
+row |* 8cbd768 - (8 days ago) Fix resize|
+  2-8 fg=i4 bold
+  12-23 fg=i2 bold
+row |                                    on macOS leaving screen blank - Joe Wilm|
+  66-75 fg=i2
+row |* a652b4a - (8 days ago) Rustup - Joe Wilm|
+  2-8 fg=i4 bold
+  12-23 fg=i2 bold
+  32-41 fg=i2
+row |:|
+row |1:git*                                                                          |
+  0-5 fg=i0 bg=i3
+  6-79 fg=i0 bg=i4
+row ||
+row ||
+row ||
+row ||
+row ||

@@ -87,6 +87,9 @@ impl<S: EventSink> Core<S> {
         if let Some(alt) = &self.alt {
             work += marks.screen(alt);
         }
+        if let Some(saved) = &self.alt_saved {
+            marks.pen(&saved.cursor.pen);
+        }
         work += self.extras.history.mark(&mut marks.extras);
         let freed = self.extras.release_unmarked(&marks.extras, marks.links);
         self.extras.sweep_done(work, freed);

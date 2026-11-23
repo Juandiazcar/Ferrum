@@ -1,0 +1,9 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 105x29 history 0
+row |This line should be the one above the bottom of the screen. Push <RETURN>|
+row |Origin mode test. This line should be at the bottom of the screen.|
+row ||
+row ||
+row ||
+row ||
+row ||

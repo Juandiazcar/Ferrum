@@ -1,0 +1,31 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 105x29 history 0
+row |Push <RETURN>|
+row |Jump scroll down region [1..24] size 24 Line 29|
+row |Jump scroll down region [1..24] size 24 Line 28|
+row |Jump scroll down region [1..24] size 24 Line 27|
+row |Jump scroll down region [1..24] size 24 Line 26|
+row |Jump scroll down region [1..24] size 24 Line 25|
+row |Jump scroll down region [1..24] size 24 Line 24|
+row |Jump scroll down region [1..24] size 24 Line 23|
+row |Jump scroll down region [1..24] size 24 Line 22|
+row |Jump scroll down region [1..24] size 24 Line 21|
+row |Jump scroll down region [1..24] size 24 Line 20|
+row |Jump scroll down region [1..24] size 24 Line 19|
+row |Jump scroll down region [1..24] size 24 Line 18|
+row |Jump scroll down region [1..24] size 24 Line 17|
+row |Jump scroll down region [1..24] size 24 Line 16|
+row |Jump scroll down region [1..24] size 24 Line 15|
+row |Jump scroll down region [1..24] size 24 Line 14|
+row |Jump scroll down region [1..24] size 24 Line 13|
+row |Jump scroll down region [1..24] size 24 Line 12|
+row |Jump scroll down region [1..24] size 24 Line 11|
+row |Jump scroll down region [1..24] size 24 Line 10|
+row |Jump scroll down region [1..24] size 24 Line 9|
+row |Jump scroll down region [1..24] size 24 Line 8|
+row |Jump scroll down region [1..24] size 24 Line 7|
+row ||
+row ||
+row ||
+row ||
+row ||

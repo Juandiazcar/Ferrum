@@ -1,0 +1,33 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 116x31 history 0
+row |-rw-r--r--  1 undeadleech undeadleech   10 Nov 15 20:33 .agignore|
+row |drwxr-xr-x  3 undeadleech undeadleech  100 Nov 15 20:33 alacritty|
+row |-rw-r--r--  1 undeadleech undeadleech   41 Nov 15 21:10 alacritty.recording|
+row |drwxr-xr-x  4 undeadleech undeadleech  120 Nov 15 20:33 alacritty_terminal|
+row |-rw-r--r--  1 undeadleech undeadleech  17K Nov 15 20:33 alacritty.yml|
+row |-rw-r--r--  1 undeadleech undeadleech 128K Nov 15 20:33 Cargo.lock|
+row |-rw-r--r--  1 undeadleech undeadleech  245 Nov 15 20:33 Cargo.toml|
+row |-rw-r--r--  1 undeadleech undeadleech  22K Nov 15 20:38 CHANGELOG.md|
+row |drwxr-xr-x  4 undeadleech undeadleech  140 Nov 15 20:33 ci|
+row |-rw-r--r--  1 undeadleech undeadleech 5.5K Nov 15 20:33 CONTRIBUTING.md|
+row |[undeadleech@archhq alacritty]$ echo -e "\e[1000M"20:33 .copr|
+row ||
+row |[undeadleech@archhq alacritty]$|
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

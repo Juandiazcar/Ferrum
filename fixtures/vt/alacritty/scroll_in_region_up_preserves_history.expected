@@ -1,0 +1,36 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 80x30 history 10
+row |[undeadleech@archhq alacritty]$ ls -lah|
+row |total 464K|
+row |drwxr-xr-x 13 undeadleech undeadleech 4.0K Feb 12 20:50 .|
+row |drwxr-xr-x 15 undeadleech undeadleech 4.0K Dec  9 18:42 ..|
+row |drwxr-xr-x  5 undeadleech undeadleech 4.0K Feb 10 09:04 alacritty|
+row |[undeadleech@archhq alacritty]$ ls|
+row |alacritty                Cargo.toml       grid.json       rustfmt.toml|
+row |alacritty_config         CHANGELOG.md     INSTALL.md      scripts|
+row |alacritty_config_derive  config.json      LICENSE-APACHE  size.json|
+row |alacritty.recording      CONTRIBUTING.md  LICENSE-MIT     target|
+row |alacritty_terminal       docs             Makefile        TODO|
+row |Cargo.lock               extra            README.md|
+row |[undeadleech@archhq alacritty]$ ls|
+row |alacritty                Cargo.toml       grid.json       rustfmt.toml|
+row |alacritty_config         CHANGELOG.md     INSTALL.md      scripts|
+row |alacritty_config_derive  config.json      LICENSE-APACHE  size.json|
+row |alacritty.recording      CONTRIBUTING.md  LICENSE-MIT     target|
+row |alacritty_terminal       docs             Makefile        TODO|
+row |Cargo.lock               extra            README.md|
+row |[undeadleech@archhq alacritty]$ ls|
+row |alacritty                Cargo.toml       grid.json       rustfmt.toml|
+row |alacritty_config         CHANGELOG.md     INSTALL.md      scripts|
+row |alacritty_config_derive  config.json      LICENSE-APACHE  size.json|
+row |alacritty.recording      CONTRIBUTING.md  LICENSE-MIT     target|
+row |alacritty_terminal       docs             Makefile        TODO|
+row |Cargo.lock               extra            README.md|
+row |[undeadleech@archhq alacritty]$ ls|
+row |alacritty                Cargo.toml       grid.json       rustfmt.toml|
+row |alacritty_config         CHANGELOG.md     INSTALL.md      scripts|
+row |alacritty_config_derive  config.json      LICENSE-APACHE  size.json|
+row |alacritty.recording      CONTRIBUTING.md  LICENSE-MIT     target|
+row |alacritty_terminal       docs             Makefile        TODO|
+row |Cargo.lock               extra            README.md|
+row |[undeadleech@archhq alacritty]$|

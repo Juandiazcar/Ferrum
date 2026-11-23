@@ -2,7 +2,7 @@
 source: crates/ferrum-vt/tests/fixtures.rs
 ---
 size 20x6 primary
-cursor row=0 col=0 wrap_pending=false
+cursor row=1 col=3 wrap_pending=false
 modes AUTOWRAP|CURSOR_VISIBLE
 00 |EEEEEEEEEEEEEEEEEEEE|
 01 |EEEEEEEEEEEEEEEEEEEE|

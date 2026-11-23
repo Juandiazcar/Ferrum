@@ -1,4 +1,5 @@
-//! Criterion benches of `ferrum-scrollback` (`docs/08` §2): push, read (RAM, spilled) and search,
+//! Criterion benches of `ferrum-scrollback` (`docs/08` §2): push, seal, read (RAM, spilled) and
+//! search,
 //! over the seeded product fixture (`fixtures/output/`). Baselines live in `benches/baselines/`
 //! and are compared by `cargo xtask bench`.
 
@@ -12,8 +13,8 @@ use std::path::PathBuf;
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use ferrum_scrollback::{
-    CaseMode, Direction, FileSpill, LineCursor, LiteralMatcher, MemorySpill, Scrollback,
-    ScrollbackConfig, SpillStore,
+    CaseMode, ChunkSealer, Direction, FileSpill, HOT_CHUNK_LINES, LineCursor, LiteralMatcher,
+    MemorySpill, PendingChunk, Scrollback, ScrollbackConfig, SpillStore,
 };
 use fixture::{Fixture, Profile, REFERENCE_COLS, Row};
 
@@ -28,6 +29,9 @@ const SEARCH_NEEDLE: &str = "warning";
 /// Multiplier that makes consecutive reads land in different chunks (defeats the chunk cache).
 const STRIDE: usize = 7_919;
 const RANDOM_READS: usize = 1_000;
+/// Encoded bytes of the full chunks of the fixture rows; the `scrollback_seal` ceiling in
+/// `xtask/src/bench/baseline.rs` is derived from it.
+const SEAL_RAW_BYTES: usize = 857_466;
 
 fn rows() -> Vec<Row> {
     Fixture::rows(SEED, Profile::Mixed, REFERENCE_COLS, LOGICAL_LINES).0
@@ -56,6 +60,41 @@ fn bench_push(c: &mut Criterion) {
     group.throughput(Throughput::Elements(u64::try_from(rows.len()).expect("fits")));
     group.bench_function("fixture_rows_retain_10k", |b| {
         b.iter(|| black_box(filled(&rows, RETAINED_LINES, RAM_THRESHOLD_LINES, None)));
+    });
+    group.finish();
+}
+
+/// Every full chunk of the fixture rows, each from its own store, pending (nobody sealed them).
+fn pending_chunks(rows: &[Row]) -> Vec<PendingChunk> {
+    rows.as_chunks::<HOT_CHUNK_LINES>()
+        .0
+        .iter()
+        .map(|chunk| {
+            let mut store = filled(chunk, RETAINED_LINES, RAM_THRESHOLD_LINES, None);
+            store.take_pending().expect("a full chunk is pending")
+        })
+        .collect()
+}
+
+/// The compression the daemon worker does for the push path (Q-21 amendment, ADR 0028): it
+/// must keep up with the parser, so `cargo xtask bench` gates it with an absolute ceiling.
+fn bench_seal(c: &mut Criterion) {
+    let rows = rows();
+    let raw: usize = pending_chunks(&rows).iter().map(PendingChunk::raw_bytes).sum();
+    assert_eq!(raw, SEAL_RAW_BYTES, "the fixture changed: update the xtask ceiling with it");
+    let mut group = c.benchmark_group("scrollback_seal");
+    group.throughput(Throughput::Bytes(u64::try_from(raw).expect("fits")));
+    let mut sealer = ChunkSealer::new();
+    group.bench_function("fixture_chunks", |b| {
+        b.iter_batched(
+            || pending_chunks(&rows),
+            |chunks| {
+                for pending in chunks {
+                    black_box(sealer.seal(pending).expect("seal"));
+                }
+            },
+            criterion::BatchSize::LargeInput,
+        );
     });
     group.finish();
 }
@@ -99,7 +138,7 @@ fn bench_read_spilled(c: &mut Criterion, rows: &[Row]) {
     let mut group = c.benchmark_group("scrollback_read");
     for (name, backend) in backends {
         let store = filled(&history, SPILLED_HISTORY_LINES, SPILL_THRESHOLD_LINES, Some(backend));
-        let cold = store.spilled_chunks() * ferrum_scrollback::HOT_CHUNK_LINES;
+        let cold = store.spilled_chunks() * HOT_CHUNK_LINES;
         assert!(cold > 0, "the history must reach the spill store");
         group.throughput(Throughput::Elements(u64::try_from(cold).expect("fits")));
         group.bench_function(name, |b| b.iter(|| black_box(read_all(&store, 0..cold))));
@@ -126,5 +165,5 @@ fn bench_search(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_push, bench_read, bench_search);
+criterion_group!(benches, bench_push, bench_seal, bench_read, bench_search);
 criterion_main!(benches);

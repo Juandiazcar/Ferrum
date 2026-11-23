@@ -6,7 +6,8 @@
 //! - `<sequence>__<variant>.in`: raw bytes; `<sequence>__<variant>.md`: hex annotation;
 //!   `<sequence>__<variant>.snap`: the snapshot; optional `<sequence>__<variant>.size`: `COLSxROWS`
 //!   (default 20x6).
-//! - every sequence has at least one positive variant and one variant starting with `malformed`.
+//! - every sequence listed in `fixtures/vt/implemented.txt` has at least one positive variant and
+//!   one variant starting with `malformed`.
 
 #![allow(clippy::expect_used, reason = "test code: a failed expectation is a failed test")]
 
@@ -112,8 +113,17 @@ fn every_fixture_has_a_hex_annotation() {
     }
 }
 
+/// `<topic>/<sequence>` names of the implemented sequences (`fixtures/vt/implemented.txt`).
+fn implemented_sequences() -> BTreeSet<String> {
+    let text = fs::read_to_string(fixtures_root().join("implemented.txt")).expect("list");
+    text.lines()
+        .filter(|line| !line.starts_with('#') && !line.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
 #[test]
-fn every_sequence_has_a_positive_and_a_malformed_case() {
+fn every_implemented_sequence_has_a_positive_and_a_malformed_case() {
     let mut variants: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for case in cases() {
         let stem = case.file_stem().and_then(|stem| stem.to_str()).expect("file name");
@@ -124,7 +134,9 @@ fn every_sequence_has_a_positive_and_a_malformed_case() {
             .or_default()
             .insert(variant.to_owned());
     }
-    for (sequence, names) in &variants {
+    let implemented = implemented_sequences();
+    for sequence in &implemented {
+        let names = variants.get(sequence).unwrap_or_else(|| panic!("{sequence}: no fixture"));
         assert!(
             names.iter().any(|name| name.starts_with("malformed")),
             "{sequence}: no malformed case"
@@ -133,5 +145,8 @@ fn every_sequence_has_a_positive_and_a_malformed_case() {
             names.iter().any(|name| !name.starts_with("malformed")),
             "{sequence}: no positive case"
         );
+    }
+    for sequence in variants.keys() {
+        assert!(implemented.contains(sequence), "{sequence}: fixture for an unlisted sequence");
     }
 }

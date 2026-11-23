@@ -4,7 +4,7 @@ Handoff document so a new AI session (or a human) can pick up the work exactly w
 It is updated at every milestone (merge, WP state change, agent launch) and before a session's
 context runs out. `PROGRESS.md` remains the per-WP record; this file is the "how to resume" view.
 
-Last update: 2026-11-23: WP-02 rebuilt as PR stack #36–#53 (round-2 fixes in progress); audit process changed to one audit + one verification; subagents on Opus.
+Last update: 2026-11-23 (end of session): WP-02 stack #36–#53 + #55 verified except x86 ASCII perf; perf rework in progress.
 
 ## 1. How to resume (paste into a new Claude Code session, working directory `Ferrum/`)
 
@@ -77,24 +77,35 @@ macOS · S3 repaint ~1.0 ms typical / ~2.6–2.8 ms dense (i5-9400) · S4 direct
 
 ## 5. Exact resume point
 
-- **WP-02 `ferrum-vt` is stack #36 → #53** (18 stacked PRs; #36 `build(deps)` is based on `main`, each next
-  PR on the previous branch, #53 `docs(vt)` carries ADR 0028). The old stack #18–#33 is closed (superseded).
-- History: round-1 audit (44 blockers, 2026-11-23) → rework → round-2 audit (38 blockers; both lists are posted
-  as comments on PR #53) → round-2 fixes **in progress** by an Opus subagent in worktree `Ferrum-wt-rework`
-  (branch `wip/vt-stack-final`). The round-2 audit was a full re-audit; under the new rule (§3 item 3) the
-  next step is ONLY the verification of the round-2 list + gates, then merge.
-- Maintainer decisions on WP-02 (docs/14 §2): Q-21 NFR-PERF-02 measured WITH scrollback push, amended:
-  LZ4 sealing of full chunks runs on the worker thread (docs/02 §5) · Q-22 reflow 10k lines ≤ 40 ms now ·
-  Q-23 Alacritty ref-tests win everywhere · Q-24 extras table refuses when full + releases unreferenced ids ·
-  Q-25 Alacritty literally, `selective_erasure` imported (DECSCA/DECSED/DECSEL removed) ·
-  Q-26 `MAX_PENDING_CHUNKS = 1` with a docs/03 line keeping the session ≤ 1.0 MB · Q-27 the maintainer
-  runs `cargo xtask bench` on the i5-9400 and saves the vt + `scrollback_seal` baselines before merge.
-- Measured on Apple M2 (not the reference machine) at 9451268: `vt_parse/ascii_8mib` with push 510 MB/s,
-  `sgr_heavy_8mib` 233 MB/s, reflow 10k lines 2.57 ms. 30-min CI fuzz of `parse`: clean on 2f0f7b8
-  (run 45172536805); must be re-run on the final tip (temporary branch `ci/vt-fuzz-30min-*` with the
-  workflow from commit 47d5652; delete those branches and `wip/*` after the merge).
-- Next steps: verify the round-2 fixes → fuzz 30 min on the tip → maintainer i5 run (Q-27) → merge the
-  stack one PR at a time with the stacked-PR procedure in §3 → WP-03.
+- **WP-02 `ferrum-vt` is stack #36 → … → #52 → #55 → #53** (19 stacked PRs, CI green on all at tip `fba16a0`).
+  Round-2 fixes are done and verified: `cargo xtask check` green (302 tests), memory_budget ok, 30-min CI fuzz
+  clean on `fba16a0` (run 45252441193).
+- Maintainer decisions Q-21..Q-27 are in docs/14 §2. Q-26: `MAX_PENDING_CHUNKS = 2`, the sealed allowance
+  shrinks 0.45 → 0.36 MB (session still 1.00 MB). Q-27 amended by the maintainer: Opus measures itself on
+  GitHub-hosted x86 runners (temporary workflow `bench-vt-temporary.yml`, branch `ci/vt-bench-runners`);
+  `windows.json` keeps no vt baselines.
+- **Single open blocker: NFR-PERF-02 ASCII with push ≥ 400 MB/s fails on x86** (run 45261582684):
+  Windows AMD EPYC 9V74 313 MB/s, Linux Xeon 6975P-C 373 MB/s (M2: 426 MB/s). SGR-heavy (≥120) passes
+  (167/176 MiB/s), reflow 3.4 ms passes. The bottleneck is the push path (encode + `push_line`), not the
+  worker (inline seals are rare).
+- An Opus subagent was optimizing that push path in worktree `Ferrum-wt-rework`, branch
+  `wip/vt-stack-final` (WIP pushed to origin at session end). Resume: read that branch's log, re-measure
+  on the hosted runners, continue optimizing until ≥ 400 MB/s with margin on both; if impossible after
+  serious effort, bring profile + numbers to the maintainer (new Q-28). Never loosen the gate.
+- Perf WIP at session end: commit `49e7960` on `wip/vt-stack-final` (ring index without division = only clear
+  win; style cache, ASCII char count, 8-cell copy, 16-byte `Cell`; not yet run through full xtask check/dhat).
+  Xeon 6975P 345 → 364 MiB/s. Hosted runners land on varied CPUs (EPYC 7763/9V74/9V45, Xeon 8573C/6975P):
+  untouched baseline ranges 248–408 MiB/s and `_no_history` is only ~440 on 7763/8573C, so ≥ 400 with push
+  may be unreachable there. **Ask the maintainer (Q-28) how Q-27 judges a pass across runner CPUs.** A/B runs
+  on `ci/vt-bench-x86-1..4` (delete afterwards).
+- Final A/B (3 rounds): best WIP 292 MiB/s on EPYC 9V74 (Windows), 369 on Xeon 6975P-C (Linux); gate is
+  381.5 MiB/s. Keep ring-index + style-cache/ASCII-count (+4–7%); drop the 8-cell copy (neutral/negative);
+  alignment and direct return are neutral. Push costs ~84 ns/line on the parse thread, the worker only 5–8%,
+  no single big hotspot left. `ci/vt-bench-x86-*` already deleted; local worktrees Ferrum-wt-x86 and
+  Ferrum-wt-pushx86 can be removed.
+- Then: single verification (only the perf commits + gates: xtask check, x86 bench, 30-min fuzz, CI) →
+  merge the stack one PR at a time with the §3 stacked-PR procedure (#36 first, #53 last) → delete
+  `ci/vt-fuzz-30min*`, `ci/vt-bench-runners`, `wip/*` → WP-03 `ferrum-proto`.
 
 ## 6. What remains (21 WPs total; 19 left including WP-02)
 

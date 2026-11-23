@@ -178,3 +178,40 @@ fn a_dcs_string_ended_by_the_esc_of_an_osc_is_answered_however_the_bytes_are_cut
         assert_eq!(*expected.get_or_insert_with(|| events.clone()), events, "cut {cut}");
     }
 }
+
+#[test]
+fn the_plain_sgr_shortcut_gives_the_same_cells_as_the_generic_path() {
+    let sequences = [
+        "\x1b[m",
+        "\x1b[0m",
+        "\x1b[;m",
+        "\x1b[1;m",
+        "\x1b[31m",
+        "\x1b[1;32;44m",
+        "\x1b[38;5;208m",
+        "\x1b[38;2;10;120;250m",
+        "\x1b[48;5;300m",
+        "\x1b[4m",
+        "\x1b[22;24m",
+        "\x1b[38;2;1;2m",
+        "\x1b[0001m",
+        "\x1b[12345m",
+        "\x1b[1;2;3;4;5;6;7;8;9;1;2;3;4;5;6;7;8m",
+        "\x1b[1;2;3;4;5;6;7;8;9;1;2;3;4;5;6;7m",
+        "\x1b[1:2m",
+        "\x1b[?1m",
+        "\x1b[1 m",
+    ];
+    for sequence in sequences {
+        let text = format!("a{sequence}b\x1b[0mc");
+        let mut whole = terminal();
+        whole.parse(text.as_bytes());
+        let mut single = terminal();
+        for byte in text.as_bytes() {
+            single.parse(std::slice::from_ref(byte));
+        }
+        let cells = |term: &Terminal<Log>| format!("{:?}", term.grid().row(0));
+        assert_eq!(cells(&whole), cells(&single), "{sequence:?}");
+        assert_eq!(state(&whole), state(&single), "{sequence:?}");
+    }
+}

@@ -25,6 +25,8 @@ use memchr::memmem::Finder;
 use crate::core::Core;
 use crate::events::EventSink;
 use crate::limits::{MAX_OSC_BYTES, MAX_SEQUENCE_BYTES, OSC_BUFFER_KEEP_BYTES};
+use crate::sgr_fast;
+
 mod sequence;
 
 use sequence::{ESC, OSC_INTRODUCER, Seq};
@@ -189,7 +191,13 @@ impl Input {
             return run;
         }
         match first {
-            ESC => self.feed_sequence(core, Seq::Escape, slice),
+            ESC => match sgr_fast::parse(slice) {
+                Some(sgr) => {
+                    core.sgr_codes(sgr.codes.get(..sgr.count).unwrap_or_default());
+                    sgr.len
+                }
+                None => self.feed_sequence(core, Seq::Escape, slice),
+            },
             DEL => 1,
             FIRST_NON_ASCII..=u8::MAX => self.feed_text(core, slice),
             _ => {

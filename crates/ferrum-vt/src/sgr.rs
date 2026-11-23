@@ -216,6 +216,11 @@ impl<S: EventSink> Core<S> {
         self.sgr_params(args.iter());
     }
 
+    /// `CSI Pm m` for plain parameters without sub-parameters (the front end's fast path).
+    pub(crate) fn sgr_codes(&mut self, codes: &[u16]) {
+        self.sgr_params(codes.iter().map(std::slice::from_ref));
+    }
+
     fn sgr_params<'a>(&mut self, mut params: impl Iterator<Item = &'a [u16]>) {
         let mut pen = self.screen().cursor.pen;
         let mut seen = false;

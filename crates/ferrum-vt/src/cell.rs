@@ -194,12 +194,7 @@ impl Cell {
 
     /// The hyperlink and underline-color record of this cell, `ExtraId::NONE` when there is none.
     pub const fn extra(&self) -> ExtraId {
-        let high = (self.fg & EXTRA_MASK) >> EXTRA_SHIFT;
-        let low = (self.bg & EXTRA_MASK) >> EXTRA_SHIFT;
-        // INVARIANT: each half is at most 6 bits, so the 12-bit result fits a u16.
-        #[allow(clippy::cast_possible_truncation)]
-        let bits = (high << EXTRA_HALF_BITS | low) as u16;
-        ExtraId::from_bits(bits)
+        extra_of(self.fg_word(), self.bg_word())
     }
 
     /// Stores the extra id in the spare color bits.
@@ -238,6 +233,16 @@ impl Cell {
             1
         }
     }
+}
+
+/// The extra id carried by a pair of color words (a cell's, or a scrollback `Style`'s).
+pub(crate) const fn extra_of(fg: u32, bg: u32) -> ExtraId {
+    let high = (fg & EXTRA_MASK) >> EXTRA_SHIFT;
+    let low = (bg & EXTRA_MASK) >> EXTRA_SHIFT;
+    // INVARIANT: each half is at most 6 bits, so the 12-bit result fits a u16.
+    #[allow(clippy::cast_possible_truncation, reason = "12 bits, see the invariant")]
+    let bits = (high << EXTRA_HALF_BITS | low) as u16;
+    ExtraId::from_bits(bits)
 }
 
 #[cfg(test)]

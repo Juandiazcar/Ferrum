@@ -67,10 +67,10 @@ pub const DEFAULT_TAB_WIDTH: u16 = 8;
 /// Largest `REP`, `ICH`-style repeat count that is honored (a hostile `CSI 65535 b` is bounded by
 /// the grid anyway; this bounds the work of `REP`).
 pub const MAX_REPEAT: u16 = 8_192;
-/// Cells scanned that one refused entry pays for after a compaction of the grapheme table: a
-/// compaction that scanned `w` cells and freed `f` entries is not repeated for
-/// `w / WORK_PER_REFUSAL - f` refusals. 64 cells cost about as much as parsing one short escape
-/// sequence, so a hostile stream that forces a full table to be compacted again and again is
-/// slowed by a constant factor, independent of the grid size, while legitimate reuse is rarely
-/// refused.
+/// Work units (cells scanned, or 64-bit summary words OR-ed) that one refused entry pays for
+/// after a sweep of the extras table or a compaction of the grapheme table: a table operation
+/// that did `w` units and freed `f` entries is not repeated for `w / WORK_PER_REFUSAL - f`
+/// refusals. 64 cells cost about as much as parsing one short escape sequence, so a hostile
+/// stream that forces a full table to be swept again and again is slowed by a constant factor,
+/// independent of the grid and history sizes, while legitimate reuse is rarely refused.
 pub const WORK_PER_REFUSAL: usize = 64;

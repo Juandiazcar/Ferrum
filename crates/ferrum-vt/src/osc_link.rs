@@ -44,7 +44,7 @@ impl<S: EventSink> Core<S> {
         let (Ok(id), Ok(uri)) = (std::str::from_utf8(id), std::str::from_utf8(uri)) else {
             return LinkId::NONE;
         };
-        self.extras.intern_link(id, uri, &mut self.scratch.short).unwrap_or(LinkId::NONE)
+        self.intern_link_swept(id, uri)
     }
 }
 

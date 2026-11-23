@@ -10,7 +10,7 @@ const SLOT_CAPACITY: usize = 4_096;
 const _: () = assert!(MAX_GRAPHEMES <= SLOT_CAPACITY && MAX_EXTRAS < SLOT_CAPACITY);
 
 /// Words of a [`SlotSet`].
-const SET_WORDS: usize = SLOT_CAPACITY.div_ceil(u64::BITS as usize);
+pub(crate) const SET_WORDS: usize = SLOT_CAPACITY.div_ceil(u64::BITS as usize);
 
 /// Which slots something uses: a fixed bitset, so that compaction never allocates.
 pub(crate) struct SlotSet {
@@ -33,6 +33,13 @@ impl SlotSet {
                 true
             }
             None => false,
+        }
+    }
+
+    /// Marks every slot set in `words` (a bitset of the same layout).
+    pub(crate) fn insert_all(&mut self, words: &[u64; SET_WORDS]) {
+        for (word, other) in self.words.iter_mut().zip(words) {
+            *word |= other;
         }
     }
 

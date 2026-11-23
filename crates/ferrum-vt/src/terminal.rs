@@ -6,6 +6,7 @@ use crate::core::Core;
 use crate::cursor::{Cursor, CursorStyle};
 use crate::damage::Damage;
 use crate::events::EventSink;
+use crate::extras::Extras;
 use crate::grid::Grid;
 use crate::input::Input;
 use crate::modes::Mode;
@@ -102,6 +103,11 @@ impl<S: EventSink> Terminal<S> {
     /// request is simply never answered.
     pub fn answer_clipboard_request(&mut self, selection: &str, clipboard: &[u8]) {
         self.core.answer_clipboard(selection, clipboard);
+    }
+
+    /// The hyperlink and underline-color tables that cells and history styles refer to.
+    pub fn extras(&self) -> &Extras {
+        &self.core.extras
     }
 
     /// The event sink.

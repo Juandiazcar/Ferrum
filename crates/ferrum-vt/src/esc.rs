@@ -86,6 +86,7 @@ impl<S: EventSink> Core<S> {
     pub(crate) fn reset(&mut self) {
         let size = self.primary.grid.size();
         self.alt = None;
+        self.extras.clear();
         self.modes = Mode::default();
         self.tabs.reset();
         self.primary = Screen::new(size);

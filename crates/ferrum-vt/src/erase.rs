@@ -93,5 +93,8 @@ impl<S: EventSink> Core<S> {
     /// `CSI 3 J`: drops the saved lines without decoding them.
     fn clear_scrollback(&mut self) {
         self.scrollback.clear();
+        self.extras.history.prune(&self.scrollback);
+        // The ids that only the dropped lines used are free again.
+        self.sweep_extras(crate::extras::LinkId::NONE);
     }
 }

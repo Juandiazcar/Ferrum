@@ -1,0 +1,19 @@
+---
+source: crates/ferrum-vt/tests/fixtures.rs
+---
+size 20x6 primary
+cursor row=0 col=0 wrap_pending=false
+modes AUTOWRAP|CURSOR_VISIBLE
+00 |                    |
+01 |                    |
+02 |                    |
+03 |                    |
+04 |                    |
+05 |                    |
+history 0
+events
+  Progress { state: Normal, value: 25 }
+  Progress { state: Error, value: 80 }
+  Progress { state: Indeterminate, value: 0 }
+  Progress { state: Warning, value: 10 }
+  Progress { state: Remove, value: 0 }

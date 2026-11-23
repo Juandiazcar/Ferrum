@@ -1,0 +1,16 @@
+---
+source: crates/ferrum-vt/tests/fixtures.rs
+---
+size 20x6 primary
+cursor row=0 col=4 wrap_pending=false
+modes AUTOWRAP|CURSOR_VISIBLE
+pen underline=single ul=#ff0000
+00 |abcd                |
+01 |                    |
+02 |                    |
+03 |                    |
+04 |                    |
+05 |                    |
+  r0 c0-1 underline=single ul=#ff0000 link=https://example.test/
+  r0 c2-3 underline=single ul=#ff0000
+history 0

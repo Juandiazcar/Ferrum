@@ -1,6 +1,6 @@
 //! Style interning: a per-session table of `(fg, bg, attrs)` triples (`docs/02` §3.2).
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use crate::limits::MAX_STYLES;
 
@@ -39,7 +39,13 @@ impl StyleId {
 #[derive(Debug)]
 pub struct StyleTable {
     styles: Vec<Style>,
-    ids: HashMap<Style, StyleId>,
+    // perf: Fx hashing; a style is hashed once per run of every pushed line (bench
+    // vt_parse/sgr_heavy_8mib). Fx is not keyed, so a program can craft styles whose hashes
+    // share their low bits. The table is capped at MAX_STYLES, so the worst probe of a lookup
+    // is bounded: every probe group of the map holds 16 entries, so at most MAX_STYLES / 16 =
+    // 512 group checks (a few microseconds), whatever the keys (test
+    // `crafted_colliding_styles_stay_correct_and_bounded`).
+    ids: FxHashMap<Style, StyleId>,
     overflowed: u64,
 }
 
@@ -52,7 +58,7 @@ impl Default for StyleTable {
 impl StyleTable {
     /// A table holding only the default style.
     pub fn new() -> Self {
-        let mut table = Self { styles: Vec::new(), ids: HashMap::new(), overflowed: 0 };
+        let mut table = Self { styles: Vec::new(), ids: FxHashMap::default(), overflowed: 0 };
         table.styles.push(Style::default());
         table.ids.insert(Style::default(), StyleId::DEFAULT);
         table
@@ -120,6 +126,42 @@ mod tests {
         assert_eq!(table.intern(red), first);
         assert_eq!(table.get(first), Some(red));
         assert_eq!(table.len(), 2);
+    }
+
+    /// Styles whose Fx hashes share their low `bits` bits, found by search as an attacker would.
+    fn colliding_styles(count: usize, bits: u32) -> Vec<Style> {
+        use std::hash::BuildHasher;
+        let hasher = rustc_hash::FxBuildHasher;
+        let mask = (1u64 << bits) - 1;
+        let mut found = Vec::new();
+        let mut fg = 1u32;
+        while found.len() < count {
+            let style = Style { fg, bg: fg.rotate_left(7), attrs: 0 };
+            if hasher.hash_one(style) & mask == 0 {
+                found.push(style);
+            }
+            fg += 1;
+        }
+        found
+    }
+
+    #[test]
+    fn crafted_colliding_styles_stay_correct_and_bounded() {
+        const COLLIDING: usize = 1_024;
+        const LOOKUPS: usize = 100;
+        let styles = colliding_styles(COLLIDING, 12);
+        let mut table = StyleTable::new();
+        let ids: Vec<StyleId> = styles.iter().map(|&style| table.intern(style)).collect();
+        let started = std::time::Instant::now();
+        for _ in 0..LOOKUPS {
+            for (style, id) in styles.iter().zip(&ids) {
+                assert_eq!(table.intern(*style), *id);
+            }
+        }
+        assert_eq!(table.len(), COLLIDING + 1);
+        // 102 400 lookups in one probe chain: microseconds each at worst, far below a second;
+        // the bound is loose so a slow CI machine never flakes.
+        assert!(started.elapsed() < std::time::Duration::from_secs(5), "{:?}", started.elapsed());
     }
 
     #[test]

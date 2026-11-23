@@ -4,8 +4,6 @@
 //! `38:2::r:g:b` (colons, with or without the color space id), the same for 48 and 58, and
 //! `4:n` underline styles. Anything malformed is ignored without disturbing the rest.
 
-use vte::ParamsIter;
-
 use crate::args::Args;
 use crate::cell::{Attrs, Underline};
 use crate::color::Color;
@@ -84,7 +82,7 @@ fn byte(value: Option<&u16>) -> Option<u8> {
 }
 
 /// The color after `38`, `48` or `58`, in either separator style.
-fn extended_color(param: &[u16], rest: &mut ParamsIter<'_>) -> Option<Color> {
+fn extended_color<'a>(param: &[u16], rest: &mut impl Iterator<Item = &'a [u16]>) -> Option<Color> {
     if param.len() > 1 {
         return colon_color(param.get(1..)?);
     }
@@ -183,7 +181,7 @@ fn apply_color_code(pen: &mut Pen, code: u16) -> bool {
 }
 
 /// Applies one SGR parameter (with its sub-parameters) to `pen`.
-fn apply(pen: &mut Pen, param: &[u16], rest: &mut ParamsIter<'_>) {
+fn apply<'a>(pen: &mut Pen, param: &[u16], rest: &mut impl Iterator<Item = &'a [u16]>) {
     let code = param.first().copied().unwrap_or(0);
     if apply_attribute(pen, code) || apply_color_code(pen, code) {
         return;
@@ -215,8 +213,11 @@ fn apply(pen: &mut Pen, param: &[u16], rest: &mut ParamsIter<'_>) {
 impl<S: EventSink> Core<S> {
     /// `CSI Pm m`.
     pub(crate) fn sgr(&mut self, args: Args<'_>) {
+        self.sgr_params(args.iter());
+    }
+
+    fn sgr_params<'a>(&mut self, mut params: impl Iterator<Item = &'a [u16]>) {
         let mut pen = self.screen().cursor.pen;
-        let mut params = args.iter();
         let mut seen = false;
         while let Some(param) = params.next() {
             seen = true;

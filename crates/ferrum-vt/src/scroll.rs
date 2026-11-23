@@ -29,7 +29,7 @@ impl<S: EventSink> Core<S> {
         let cells = row.cells().get(..width).unwrap_or_default();
         let encoded = &mut self.scratch.line;
         encode_cells(cells, Tail::of(row), self.primary.grid.graphemes(), encoded);
-        let line = LineRef { flags: row.flags(), text: &encoded.text, runs: &encoded.runs };
+        let line = LineRef { flags: row.flags(), text: encoded.text(), runs: &encoded.runs };
         Self::store_history_line(&mut self.scrollback, &mut self.extras, &mut self.sink, &line);
     }
 

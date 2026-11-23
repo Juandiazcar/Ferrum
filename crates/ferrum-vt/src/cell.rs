@@ -85,6 +85,17 @@ bitflags! {
     }
 }
 
+/// Bits of a scalar that are set in ASCII.
+const ASCII_MASK: u32 = 0x7F;
+
+/// The style words of a plain ASCII cell (see [`Cell::differs_from`]).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AsciiStyle {
+    fg: u32,
+    bg: u32,
+    attrs: u32,
+}
+
 /// One terminal cell: 16 bytes, as `docs/02` §3.1 says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
@@ -142,15 +153,30 @@ impl Cell {
         self.ch = raw;
     }
 
-    /// The structural flag bits (0 for a plain cell).
-    pub(crate) const fn flag_bits(&self) -> u16 {
-        self.flags
-    }
-
     /// The low byte of the character word: the character of a plain ASCII cell.
     #[allow(clippy::cast_possible_truncation, reason = "callers check that the word is below 0x80")]
     pub(crate) const fn ascii_byte(&self) -> u8 {
         self.ch as u8
+    }
+
+    /// Zero when this cell is a plain ASCII cell (no flags) with the same style as `key`; nonzero
+    /// otherwise. Branch-free so that a run of cells is checked with one test per block.
+    pub(crate) const fn differs_from(&self, key: &AsciiStyle) -> u32 {
+        (self.fg ^ key.fg)
+            | (self.bg ^ key.bg)
+            | (self.attrs as u32 ^ key.attrs)
+            | self.flags as u32
+            | (self.ch & !ASCII_MASK)
+    }
+
+    /// The style of a plain ASCII cell, to find the cells that share it.
+    pub(crate) const fn ascii_style(&self) -> AsciiStyle {
+        AsciiStyle { fg: self.fg, bg: self.bg, attrs: self.attrs as u32 }
+    }
+
+    /// True for a cell without flags whose scalar is ASCII.
+    pub(crate) const fn is_plain_ascii(&self) -> bool {
+        self.flags == 0 && self.ch & !ASCII_MASK == 0
     }
 
     /// Structural flags.

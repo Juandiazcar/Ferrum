@@ -7,16 +7,13 @@
 
 use ferrum_scrollback::{Style, StyledRun};
 
-use crate::cell::{Cell, CellFlags};
+use crate::cell::{AsciiStyle, Cell, CellFlags};
 use crate::graphemes::GraphemeTable;
 use crate::row::Row;
 
 /// Attribute bit that marks trailing blanks of a wrapped row so they survive trimming. Never
 /// present in a grid cell: it is removed when a line is decoded.
 pub(crate) const WRAP_PAD: u16 = 1 << 15;
-
-/// Scalars below this are ASCII.
-const ASCII_LIMIT: u32 = 0x80;
 
 /// Builds the runs of a row: consecutive cells with the same style words share a run.
 struct RunBuilder<'a> {
@@ -50,8 +47,18 @@ impl RunBuilder<'_> {
 /// The encoded form of one row: text plus style runs, reused between rows.
 #[derive(Debug, Default)]
 pub(crate) struct Encoded {
-    pub(crate) text: String,
+    /// UTF-8 text, built as bytes so that ASCII runs are appended without per-character work.
+    bytes: Vec<u8>,
     pub(crate) runs: Vec<StyledRun>,
+}
+
+impl Encoded {
+    /// The encoded text.
+    pub(crate) fn text(&self) -> &str {
+        // INVARIANT: only whole ASCII bytes and UTF-8 encoded scalars or clusters are appended,
+        // so the bytes are always valid UTF-8 and the check (one fast pass) cannot fail.
+        std::str::from_utf8(&self.bytes).unwrap_or_default()
+    }
 }
 
 /// What happens to the default blanks at the end of an encoded row.
@@ -83,41 +90,79 @@ pub(crate) fn encode_cells(
     graphemes: &GraphemeTable,
     out: &mut Encoded,
 ) {
-    let Encoded { text, runs } = out;
-    text.clear();
+    let Encoded { bytes, runs } = out;
+    bytes.clear();
     runs.clear();
     let mut builder = RunBuilder { runs, current: (0, 0, 0), len: 0 };
-    for cell in cells {
+    let mut rest = cells;
+    while let Some((cell, tail_cells)) = rest.split_first() {
         let words = (cell.fg_word(), cell.bg_word(), cell.attr_word());
-        // perf: a plain ASCII cell is the common case; it skips the flag and cluster handling
-        // (bench vt_parse/ascii_8mib).
-        if cell.flag_bits() == 0 && cell.raw_char() < ASCII_LIMIT {
-            text.push(char::from(cell.ascii_byte()));
-            builder.add(words, 1);
+        if cell.is_plain_ascii() {
+            // perf: a run of plain ASCII cells in one style is copied in one pass
+            // (bench vt_parse/ascii_8mib).
+            let run = push_ascii_run(bytes, rest, &cell.ascii_style());
+            builder.add(words, run);
+            rest = rest.get(run..).unwrap_or_default();
             continue;
         }
+        rest = tail_cells;
         if cell.flags().intersects(CellFlags::SPACER | CellFlags::LEADING_SPACER) {
             continue;
         }
         let scalars = if cell.flags().contains(CellFlags::GRAPHEME) {
             let cluster = graphemes.get(cell.raw_char()).unwrap_or(" ");
-            text.push_str(cluster);
+            bytes.extend_from_slice(cluster.as_bytes());
             cluster.chars().count()
         } else {
-            text.push(cell.scalar());
+            bytes.extend_from_slice(cell.scalar().encode_utf8(&mut [0; 4]).as_bytes());
             1
         };
         builder.add(words, scalars);
     }
     builder.finish();
     if tail == Tail::Keep {
-        pad_trailing_blanks(text, runs);
+        pad_blank_bytes(&out.bytes, &mut out.runs);
     }
+}
+
+/// Cells per step of [`push_ascii_run`].
+const BLOCK: usize = 8;
+
+/// Appends the characters of the leading run of plain ASCII cells that have the style `key` to
+/// `bytes` and returns the run length.
+///
+/// perf: the style check and the character gather share one pass over 8-cell blocks, and each
+/// block is appended with one copy (bench `vt_parse/ascii_8mib`).
+fn push_ascii_run(bytes: &mut Vec<u8>, cells: &[Cell], key: &AsciiStyle) -> usize {
+    let mut run = 0;
+    let (blocks, _) = cells.as_chunks::<BLOCK>();
+    for block in blocks {
+        let mut gathered = [0u8; BLOCK];
+        let mut diff = 0;
+        for (byte, cell) in gathered.iter_mut().zip(block) {
+            diff |= cell.differs_from(key);
+            *byte = cell.ascii_byte();
+        }
+        if diff != 0 {
+            break;
+        }
+        bytes.extend_from_slice(&gathered);
+        run += BLOCK;
+    }
+    for cell in cells.iter().skip(run).take_while(|cell| cell.differs_from(key) == 0) {
+        bytes.push(cell.ascii_byte());
+        run += 1;
+    }
+    run
 }
 
 /// Retags the default-styled trailing spaces of a wrapped row.
 pub(crate) fn pad_trailing_blanks(text: &str, runs: &mut Vec<StyledRun>) {
-    let mut remaining = text.bytes().rev().take_while(|&byte| byte == b' ').count();
+    pad_blank_bytes(text.as_bytes(), runs);
+}
+
+fn pad_blank_bytes(text: &[u8], runs: &mut Vec<StyledRun>) {
+    let mut remaining = text.iter().rev().copied().take_while(|&byte| byte == b' ').count();
     let mut padded = 0;
     while remaining > 0 {
         let Some(last) = runs.last_mut().filter(|run| run.style == Style::default()) else {
@@ -158,7 +203,7 @@ mod tests {
     fn plain_rows_encode_as_one_default_run() {
         let mut out = Encoded::default();
         encode_row(&row_of("abc ", false), &GraphemeTable::new(), &mut out);
-        assert_eq!(out.text, "abc ");
+        assert_eq!(out.text(), "abc ");
         assert_eq!(out.runs, vec![StyledRun { style: Style::default(), len: 4 }]);
     }
 
@@ -168,7 +213,7 @@ mod tests {
         encode_row(&row_of("ab  ", true), &GraphemeTable::new(), &mut out);
         assert_eq!(out.runs.len(), 2);
         assert_eq!(out.runs.last().map(|run| (run.len, run.style.attrs)), Some((2, WRAP_PAD)));
-        assert_eq!(out.text.chars().filter(|&c| c == BLANK_CHAR).count(), 2);
+        assert_eq!(out.text().chars().filter(|&c| c == BLANK_CHAR).count(), 2);
     }
 
     #[test]
@@ -189,7 +234,7 @@ mod tests {
         }
         let mut out = Encoded::default();
         encode_row(&row, &graphemes, &mut out);
-        assert_eq!(out.text, "漢e\u{0301} ");
-        assert_eq!(out.runs.iter().map(|run| run.len).sum::<usize>(), out.text.chars().count());
+        assert_eq!(out.text(), "漢e\u{0301} ");
+        assert_eq!(out.runs.iter().map(|run| run.len).sum::<usize>(), out.text().chars().count());
     }
 }

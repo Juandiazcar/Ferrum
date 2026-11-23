@@ -119,3 +119,33 @@ fn zero_max_lines_keeps_nothing_and_never_fails() {
     assert!(store.is_empty());
     assert_eq!(store.pushed_lines(), 3_000);
 }
+
+#[test]
+fn a_line_over_the_limits_is_kept_clipped_and_counted() {
+    let mut scrollback = Scrollback::new(ScrollbackConfig::default());
+    scrollback
+        .push_line(&ferrum_scrollback::LineRef {
+            flags: LineFlags::NONE,
+            text: "before",
+            runs: &[],
+        })
+        .expect("push");
+    let long = "é".repeat(ferrum_scrollback::MAX_LINE_TEXT_BYTES);
+    let runs = [ferrum_scrollback::StyledRun {
+        style: Style { fg: 1, bg: 0, attrs: 0 },
+        len: long.chars().count(),
+    }];
+    let line = ferrum_scrollback::LineRef { flags: LineFlags::WRAPPED, text: &long, runs: &runs };
+    assert!(scrollback.push_line(&line).is_err(), "the loss is reported");
+    let mismatched =
+        ferrum_scrollback::LineRef { flags: LineFlags::NONE, text: "abc", runs: &runs };
+    assert!(scrollback.push_line(&mismatched).is_err(), "the loss is reported");
+    assert_eq!((scrollback.len(), scrollback.pushed_lines()), (3, 3), "every line counts");
+    let mut cursor = LineCursor::new();
+    let clipped = scrollback.read_line(1, &mut cursor).expect("read").expect("line");
+    assert_eq!(clipped.flags, LineFlags::WRAPPED);
+    assert!(clipped.text.len() <= ferrum_scrollback::MAX_LINE_TEXT_BYTES);
+    assert!(long.starts_with(clipped.text.as_str()) && !clipped.text.is_empty());
+    let plain = scrollback.read_line(2, &mut cursor).expect("read").expect("line");
+    assert_eq!(plain.text, "abc");
+}

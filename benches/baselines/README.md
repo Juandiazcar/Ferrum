@@ -33,6 +33,12 @@ docs/08 §8: "full-precision numbers are taken on the maintainer's machines").
   Q-21 amendment in ADR 0028) has **no baseline yet** for the same reason; its absolute ceiling
   (4.29 ms: 2x the time to seal the 857 466 encoded bytes at NFR-PERF-02's 400 MB/s) gates it.
 
+- `vt_parse/ascii_8mib_inline_seal` and `vt_parse/sgr_heavy_8mib_inline_seal` compress on the
+  parse thread instead of the worker; they are informational (they show the gap the worker
+  closes) and have no absolute ceiling. Like the other `vt_*` benches they get their baselines
+  in the maintainer's i5-9400 run (Q-27) and are then gated the same way (+10 %); until then
+  `cargo xtask bench` reports them as missing baselines.
+
 **Filled by:** WP-01 (`ferrum-scrollback`: push, read, spilled read, search, in `windows.json`)
 and WP-02 (`ferrum-vt`: parse and reflow; their baselines come from the maintainer's run on the
 i5-9400, maintainer decision Q-27).

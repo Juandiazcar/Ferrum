@@ -9,8 +9,10 @@ Goal: decide merge / request changes. Evidence over trust: re-run checks yoursel
 
 **Zero-exception rule (maintainer, 2026-11-21):** the audit is mandatory, strict and literal. Any non-compliance with the spec, however small, blocks the merge. Never grant an exception, never merge with a known deviation, never reclassify a spec violation as a follow-up. If the spec cannot be met as written, stop and escalate to the maintainer; only the maintainer changes the spec (ADR).
 
+**Single-pass rule (maintainer, 2026-11-23):** each change gets **one** audit, scoped to what that change adds (its diff against `main`, never the whole app), and that one audit must be exhaustive: every file of the diff read line by line, every finding reported at once. After the fixes there is **one verification**, limited to (a) the listed findings, (b) the code the fix commits add or change, and (c) the gates (`cargo xtask check`, CI on 3 OS, fuzz, benches, dhat). A verification never becomes a fresh full audit. If it finds a defect outside (a)–(c), the first audit missed it: fix it in the same batch and say so in the audit comment; do not open another round.
+
 ## Steps
-1. `git fetch && git diff main...<branch> --stat`, then read the full diff (not only summaries).
+1. `git fetch && git diff main...<branch> --stat`, then read the full diff file by file, line by line (no sampling, not only summaries). If several auditors split the diff, every file must be assigned to one of them.
 2. Re-read the WP in `docs/spec/docs/12-build-order.md`; check every exit criterion is met with evidence.
 3. Run `cargo xtask check` (or fmt/clippy -D warnings/test before WP-00 ends) on the branch. Run benches/memcheck if the WP touches hot paths or memory.
 4. Check against the spec, in precedence order (`docs/01` > `docs/03` > `docs/02` > `docs/05`/`06`):
@@ -29,5 +31,5 @@ Goal: decide merge / request changes. Evidence over trust: re-run checks yoursel
 | Honesty | `PROGRESS.md` matches reality; gates not loosened; failing tests not disabled; PROVISIONAL items marked |
 
 5. Every finding that deviates from the spec, a rule, or a WP exit criterion is a **blocker**. The only non-blocking notes are items the spec itself explicitly defers to a later WP.
-6. Any blocker → send back to the implementing subagent with exact file:line and the spec clause. Re-audit the whole change after fixes (not only the fixed lines).
+6. Any blocker → send back to the implementing subagent with exact file:line and the spec clause. After the fixes, run the single verification of the single-pass rule above (listed findings + code the fix commits add + gates), not a new full audit.
 7. Merge only when there are zero blockers and CI is green on all OS → `gh pr merge <n> --squash --delete-branch`. Record the audit result (checks run, numbers, "0 blockers") in the PR as a comment.

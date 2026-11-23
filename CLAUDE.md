@@ -19,6 +19,10 @@ The specification lives in `docs/spec/` (this package's `docs/`). Read in this o
 
 Every change is audited against the spec before merge (`ferrum-audit` skill). The audit is **mandatory, strict and literal**. If anything fails to comply, even minimally, the change does not merge. **No exceptions are ever created**: no "merge now, fix later", no downgrading a spec violation to a follow-up, no waivers by the agent. If the spec itself cannot be met, stop and bring it to the maintainer; only the maintainer can change the spec (via ADR).
 
+**One audit per change, one verification (maintainer rule, 2026-11-23).** The audit covers only what the change adds (its diff against `main`, not the whole app) and must be exhaustive in a single pass. After the fixes, a single verification checks the listed findings, the code the fixes add, and the gates; it is never a new full audit. Details in the `ferrum-audit` skill.
+
+**Subagents run on Opus 5.5 (maintainer rule, 2026-11-23)**, implementers and auditors alike (`model: "opus"`).
+
 ## Project skills (`.claude/skills/`)
 
 - `ferrum-wp` — implement one work package end to end (implementer agents).

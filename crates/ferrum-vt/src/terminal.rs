@@ -5,6 +5,7 @@ use ferrum_scrollback::Scrollback;
 use crate::core::Core;
 use crate::cursor::{Cursor, CursorStyle};
 use crate::damage::Damage;
+use crate::error::VtError;
 use crate::events::EventSink;
 use crate::extras::Extras;
 use crate::grid::Grid;
@@ -36,6 +37,24 @@ impl<S: EventSink> Terminal<S> {
     /// (`docs/10` §3 item 9).
     pub fn parse(&mut self, bytes: &[u8]) {
         self.input.advance(&mut self.core, bytes);
+    }
+
+    /// Resizes the terminal. A change of width reflows the primary screen and the scrollback
+    /// (FR-TERM-010); the alternate screen is cut or padded. The size is clamped to the supported
+    /// range, and the size that was actually applied is returned so that the caller can tell the
+    /// UI when it differs from the request.
+    ///
+    /// # Errors
+    /// [`VtError::Scrollback`] when the history cannot be read back; the terminal is consistent
+    /// afterwards but the history may be shorter.
+    pub fn resize(&mut self, size: Size) -> Result<Size, VtError> {
+        self.core.resize(size)?;
+        Ok(self.size())
+    }
+
+    /// The size of the terminal.
+    pub fn size(&self) -> Size {
+        self.core.primary.grid.size()
     }
 
     /// The visible screen (primary or alternate).

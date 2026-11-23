@@ -85,7 +85,7 @@ pub(crate) fn encode_cells(
 }
 
 /// Retags the default-styled trailing spaces of a wrapped row.
-fn pad_trailing_blanks(text: &str, runs: &mut Vec<StyledRun>) {
+pub(crate) fn pad_trailing_blanks(text: &str, runs: &mut Vec<StyledRun>) {
     let mut remaining = text.bytes().rev().take_while(|&byte| byte == b' ').count();
     let mut padded = 0;
     while remaining > 0 {

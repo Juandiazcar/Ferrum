@@ -16,6 +16,11 @@ fn break_wide_at(row: &mut Row, x: usize, blank: Cell) {
             if let Some(head) = x.checked_sub(1).and_then(|h| row.get_mut(h)) {
                 *head = blank;
             }
+            // The spacer goes too: it may be outside the range being erased or deleted, and
+            // must not outlive its head.
+            if let Some(spacer) = row.get_mut(x) {
+                *spacer = blank;
+            }
         }
         Some(flags) if flags.contains(CellFlags::WIDE) => {
             if let Some(tail) = row.get_mut(x + 1) {
@@ -36,6 +41,26 @@ impl Grid {
         let Some(row) = self.row_mut(y) else { return };
         break_wide_at(row, from, blank);
         break_wide_at(row, to - 1, blank);
+    }
+
+    /// Writes printable ASCII `bytes` at `(x, y)` in the style `words` (`fg`, `bg`, `attrs`),
+    /// blanking the partner of any double-width character it cuts. The caller keeps the text
+    /// inside the row.
+    pub(crate) fn write_ascii(&mut self, y: usize, x: usize, bytes: &[u8], words: (u32, u32, u16)) {
+        let Some(row) = self.row_mut(y) else { return };
+        let end = x + bytes.len();
+        if end > row.len() || bytes.is_empty() {
+            return;
+        }
+        // perf: one row lookup and one pass (bench vt_parse/ascii_8mib).
+        let blank = Cell::styled(' ', 0, crate::color::without_extra(words.1), 0);
+        break_wide_at(row, x, blank);
+        break_wide_at(row, end - 1, blank);
+        if let Some(span) = row.cells_mut().get_mut(x..end) {
+            for (cell, &byte) in span.iter_mut().zip(bytes) {
+                *cell = Cell::styled(char::from(byte), words.0, words.1, words.2);
+            }
+        }
     }
 
     /// Erases cells `from..to` of row `y` with `blank` (clamped to the row).
@@ -151,6 +176,25 @@ mod tests {
                 .iter()
                 .all(|cell| !cell.flags().intersects(CellFlags::WIDE | CellFlags::SPACER))
         }));
+    }
+
+    #[test]
+    fn a_spacer_never_outlives_a_deleted_or_erased_head() {
+        let all_plain = |grid: &Grid| {
+            grid.row(0).is_some_and(|row| {
+                row.cells()
+                    .iter()
+                    .all(|cell| !cell.flags().intersects(CellFlags::WIDE | CellFlags::SPACER))
+            })
+        };
+        let mut grid = grid_of("a漢b");
+        make_wide(&mut grid, 1);
+        grid.delete_cells(0, 0, 2, Cell::default());
+        assert!(all_plain(&grid), "delete: the head went, the spacer behind it must go too");
+        let mut grid = grid_of("a漢b");
+        make_wide(&mut grid, 1);
+        grid.erase_cells(0, 0, 2, Cell::default());
+        assert!(all_plain(&grid), "erase: same at the right edge of the range");
     }
 
     #[test]

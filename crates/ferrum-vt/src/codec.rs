@@ -9,25 +9,47 @@ use ferrum_scrollback::{Style, StyledRun};
 
 use crate::cell::{Cell, CellFlags};
 use crate::graphemes::GraphemeTable;
+#[cfg(test)]
 use crate::row::Row;
 
 /// Attribute bit that marks trailing blanks of a wrapped row so they survive trimming. Never
 /// present in a grid cell: it is removed when a line is decoded.
 pub(crate) const WRAP_PAD: u16 = 1 << 15;
 
-/// The scrollback style of a cell.
-pub(crate) fn style_of(cell: &Cell) -> Style {
-    Style { fg: cell.fg_word(), bg: cell.bg_word(), attrs: cell.attr_word() }
+/// Scalars below this are ASCII.
+const ASCII_LIMIT: u32 = 0x80;
+
+/// Builds the runs of a row: consecutive cells with the same style words share a run.
+struct RunBuilder<'a> {
+    runs: &'a mut Vec<StyledRun>,
+    current: (u32, u32, u16),
+    len: usize,
 }
 
-fn push_run(runs: &mut Vec<StyledRun>, style: Style, len: usize) {
-    match runs.last_mut() {
-        Some(last) if last.style == style => last.len += len,
-        _ => runs.push(StyledRun { style, len }),
+impl RunBuilder<'_> {
+    /// Adds `scalars` scalars in the style `words` (`fg`, `bg`, `attrs`).
+    fn add(&mut self, words: (u32, u32, u16), scalars: usize) {
+        if self.len > 0 && self.current == words {
+            self.len += scalars;
+            return;
+        }
+        self.finish();
+        self.current = words;
+        self.len = scalars;
+    }
+
+    /// Closes the open run.
+    fn finish(&mut self) {
+        if self.len > 0 {
+            let (fg, bg, attrs) = self.current;
+            self.runs.push(StyledRun { style: Style { fg, bg, attrs }, len: self.len });
+            self.len = 0;
+        }
     }
 }
 
 /// Encodes `row` into `text` and `runs` (both are cleared first).
+#[cfg(test)]
 pub(crate) fn encode_row(
     row: &Row,
     graphemes: &GraphemeTable,
@@ -47,7 +69,16 @@ pub(crate) fn encode_cells(
 ) {
     text.clear();
     runs.clear();
+    let mut builder = RunBuilder { runs, current: (0, 0, 0), len: 0 };
     for cell in cells {
+        let words = (cell.fg_word(), cell.bg_word(), cell.attr_word());
+        // perf: a plain ASCII cell is the common case; it skips the flag and cluster handling
+        // (bench vt_parse/ascii_8mib).
+        if cell.flag_bits() == 0 && cell.raw_char() < ASCII_LIMIT {
+            text.push(char::from(cell.ascii_byte()));
+            builder.add(words, 1);
+            continue;
+        }
         if cell.flags().intersects(CellFlags::SPACER | CellFlags::LEADING_SPACER) {
             continue;
         }
@@ -59,8 +90,9 @@ pub(crate) fn encode_cells(
             text.push(cell.scalar());
             1
         };
-        push_run(runs, style_of(cell), scalars);
+        builder.add(words, scalars);
     }
+    builder.finish();
     if wrapped {
         pad_trailing_blanks(text, runs);
     }

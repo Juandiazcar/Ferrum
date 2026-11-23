@@ -24,6 +24,11 @@ pub(crate) const EXTRA_HALF_BITS: u32 = 6;
 /// Mask of the bits that make up the color itself.
 const COLOR_MASK: u32 = !EXTRA_MASK;
 
+/// A color word without the extra-id bits of the cell it came from.
+pub(crate) const fn without_extra(word: u32) -> u32 {
+    word & COLOR_MASK
+}
+
 /// A terminal color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Color(u32);

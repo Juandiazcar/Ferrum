@@ -3,20 +3,26 @@
 
 use ferrum_scrollback::LineRef;
 
-use crate::codec::encode_row;
+use crate::codec::encode_cells;
 use crate::core::Core;
 use crate::events::{Event, EventSink};
 
 impl<S: EventSink> Core<S> {
     /// Encodes row `y` of the primary grid into the scrollback.
     pub(crate) fn push_history_row(&mut self, y: usize) {
+        if self.scrollback.config().max_lines() == 0 {
+            // No history: the row is only counted, so that line numbers stay stable.
+            let empty = LineRef { flags: ferrum_scrollback::LineFlags::NONE, text: "", runs: &[] };
+            self.scrollback.push_line(&empty).ok();
+            return;
+        }
         let Some(row) = self.primary.grid.row(y) else { return };
-        encode_row(
-            row,
-            self.primary.grid.graphemes(),
-            &mut self.scratch.text,
-            &mut self.scratch.runs,
-        );
+        // Blanks after the last character are trimmed by the scrollback anyway, so only a
+        // wrapped row (whose blanks are content) is encoded to its full width.
+        let width = if row.is_wrapped() { row.len() } else { row.used_len() };
+        let cells = row.cells().get(..width).unwrap_or_default();
+        let (text, runs) = (&mut self.scratch.text, &mut self.scratch.runs);
+        encode_cells(cells, row.is_wrapped(), self.primary.grid.graphemes(), text, runs);
         let line =
             LineRef { flags: row.flags(), text: &self.scratch.text, runs: &self.scratch.runs };
         if let Err(error) = self.scrollback.push_line(&line) {

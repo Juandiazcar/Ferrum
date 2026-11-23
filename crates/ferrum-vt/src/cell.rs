@@ -144,6 +144,17 @@ impl Cell {
         self.ch = raw;
     }
 
+    /// The structural flag bits (0 for a plain cell).
+    pub(crate) const fn flag_bits(&self) -> u16 {
+        self.flags
+    }
+
+    /// The low byte of the character word: the character of a plain ASCII cell.
+    #[allow(clippy::cast_possible_truncation, reason = "callers check that the word is below 0x80")]
+    pub(crate) const fn ascii_byte(&self) -> u8 {
+        self.ch as u8
+    }
+
     /// Structural flags.
     pub const fn flags(&self) -> CellFlags {
         CellFlags::from_bits_retain(self.flags)

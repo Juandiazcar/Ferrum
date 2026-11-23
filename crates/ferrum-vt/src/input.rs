@@ -46,9 +46,37 @@ const MAX_STALLED_STEPS: u32 = 2;
 
 type Vte = vte::Parser<VTE_OSC_BYTES>;
 
+const LANES: usize = 8;
+const HIGH_BITS: u64 = 0x8080_8080_8080_8080;
+const ONES: u64 = 0x0101_0101_0101_0101;
+/// Added to every byte to find those below 0x20 (see `printable_run`).
+const CONTROL_BIAS: u64 = 0x60;
+
 /// Length of the leading run of printable ASCII (0x20..=0x7E) in `bytes`.
+///
+/// perf: eight bytes per step with word arithmetic (bench `vt_parse/ascii_8mib`). With no byte
+/// above 0x7F, adding 0x60 sets the high bit of every byte that is at least 0x20 and adding 0x01
+/// sets it for 0x7F, without carries between the bytes.
 fn printable_run(bytes: &[u8]) -> usize {
-    bytes.iter().take_while(|&&b| (FIRST_PRINTABLE..=LAST_PRINTABLE).contains(&b)).count()
+    let mut length = 0;
+    let (words, _) = bytes.as_chunks::<LANES>();
+    for lanes in words {
+        let value = u64::from_le_bytes(*lanes);
+        let ascii = value & HIGH_BITS == 0;
+        let above_control = value.wrapping_add(ONES * CONTROL_BIAS) & HIGH_BITS == HIGH_BITS;
+        let below_del = value.wrapping_add(ONES) & HIGH_BITS == 0;
+        if !(ascii && above_control && below_del) {
+            break;
+        }
+        length += LANES;
+    }
+    length
+        + bytes
+            .get(length..)
+            .unwrap_or_default()
+            .iter()
+            .take_while(|&&b| (FIRST_PRINTABLE..=LAST_PRINTABLE).contains(&b))
+            .count()
 }
 
 /// What the front end knows about the state of `vte`.
@@ -321,5 +349,27 @@ impl std::fmt::Debug for Input {
             .field("vte_state", &self.vte_state)
             .field("osc", &self.osc)
             .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn naive(bytes: &[u8]) -> usize {
+        bytes.iter().take_while(|&&b| (FIRST_PRINTABLE..=LAST_PRINTABLE).contains(&b)).count()
+    }
+
+    #[test]
+    fn the_word_scan_agrees_with_the_byte_scan_for_every_byte_in_every_lane() {
+        for lane in 0..2 * LANES {
+            for value in 0..=u8::MAX {
+                let mut bytes = [b'a'; 2 * LANES + 3];
+                if let Some(slot) = bytes.get_mut(lane) {
+                    *slot = value;
+                }
+                assert_eq!(printable_run(&bytes), naive(&bytes), "byte {value:#04x} at {lane}");
+            }
+        }
     }
 }

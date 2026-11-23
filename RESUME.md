@@ -4,7 +4,7 @@ Handoff document so a new AI session (or a human) can pick up the work exactly w
 It is updated at every milestone (merge, WP state change, agent launch) and before a session's
 context runs out. `PROGRESS.md` remains the per-WP record; this file is the "how to resume" view.
 
-Last update: 2026-11-22.
+Last update: 2026-11-22 (night): WP-02 PR stack #18–#33 open, pending audit.
 
 ## 1. How to resume (paste into a new Claude Code session, working directory `Ferrum/`)
 
@@ -63,7 +63,7 @@ merge run `git rebase --onto origin/main <old tip of N>`, push, wait for CI, mer
 
 ## 4. Status (2026-11-22)
 
-Done and on `main` (CI green): WP-00 bootstrap, spikes S1–S4, WP-01 `ferrum-scrollback`
+Done and on `main` (CI green): WP-00 bootstrap, spikes S1–S4, RESUME.md (#17), WP-01 `ferrum-scrollback`
 (PRs #9, #10, #14, #15, #16 — commit `98eb763`).
 
 Measured: S1 0.68 MB/session (WP-01 crate side ~0.43 MB) · S2 system allocator on Linux/Windows, mimalloc on
@@ -72,10 +72,20 @@ macOS · S3 repaint ~1.0 ms typical / ~2.6–2.8 ms dense (i5-9400) · S4 direct
 
 ## 5. Exact resume point
 
-- **WP-02 `ferrum-vt` in progress** by a Sonnet subagent on branch `worktree-agent-a97aa3a26c3bb442e`
-  (local worktree under `.claude/worktrees/`). If that session is lost: inspect the branch/worktree and open
-  PRs (`gh pr list`), then launch a new Sonnet subagent to continue from there.
-- When WP-02 is reported done, audit: parse throughput (NFR-PERF-02: ≥ 400 MB/s ASCII, ≥ 120 MB/s SGR-heavy),
+- **WP-02 `ferrum-vt` implemented, NOT yet audited.** The Sonnet subagent opened a stack of 16 PRs,
+  **#18 → #33** (each based on the previous one; #18 is `feat(scrollback): add pop_front`, #33 is
+  `docs(vt): add compat notes, ADR 0028, crate README and progress`). Local worktree:
+  `.claude/worktrees/agent-a97aa3a26c3bb442e` (branch `worktree-agent-a97aa3a26c3bb442e`). At the last
+  check (2026-11-22 ~21:30) it still had uncommitted edits in `crates/ferrum-vt/src/grid.rs` and
+  `tests/fuzz_seeds.rs` — the subagent session may have ended; check `git status` there and, if work is
+  pending, launch a new Sonnet subagent to finish it on the matching PR branch.
+- **ADR 0028 (`docs/adr/0028-vt-design-and-parse-throughput.md`, status proposed)** says some spec points
+  "could not be followed to the letter" and that NFR-PERF-02 is met by the state machine alone, not the
+  product configuration. Under the zero-exception rule this needs the **maintainer's decision** before any
+  merge: audit it first, then bring each deviation to the maintainer with options.
+- Next step: run the full strict audit on #18–#33 (the whole stack, not only summaries); send blockers
+  back; merge one at a time with the stacked-PR procedure in §3.
+- Audit checklist for WP-02: parse throughput (NFR-PERF-02: ≥ 400 MB/s ASCII, ≥ 120 MB/s SGR-heavy),
   dhat zero-alloc test, `vt::parse` fuzz 30 min clean and the target added to the nightly matrix with a locked
   lockfile, Alacritty ref-tests with attribution (`fixtures/vt/THIRD_PARTY.md`), per-sequence fixtures + insta
   snapshots, Unicode vectors, reflow property tests (AC-TERM-02), `docs/user/compat.md`.

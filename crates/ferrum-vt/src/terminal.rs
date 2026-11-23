@@ -1,6 +1,6 @@
 //! The public terminal: bytes in, grid and events out.
 
-use ferrum_scrollback::Scrollback;
+use ferrum_scrollback::{PendingChunk, Scrollback, SealedBlob};
 
 use crate::core::Core;
 use crate::cursor::{Cursor, CursorStyle};
@@ -80,6 +80,24 @@ impl<S: EventSink> Terminal<S> {
     /// The history of rows that scrolled off the primary screen.
     pub fn scrollback(&self) -> &Scrollback {
         &self.core.scrollback
+    }
+
+    /// The oldest full history chunk that waits to be compressed and was not handed out yet
+    /// ([`Scrollback::take_pending`]). The daemon I/O thread passes it to the worker between
+    /// reads, the worker seals it with [`ferrum_scrollback::ChunkSealer`], and the result comes
+    /// back through [`install_sealed_chunk`](Self::install_sealed_chunk) (`docs/02` §5).
+    pub fn take_pending_chunk(&mut self) -> Option<PendingChunk> {
+        self.core.scrollback.take_pending()
+    }
+
+    /// Puts a chunk sealed by the worker in place of its pending chunk ([`Scrollback::install`]).
+    /// A blob whose chunk was dropped meanwhile (eviction, CSI 3 J, RIS, reflow) is ignored.
+    ///
+    /// # Errors
+    /// [`VtError::Scrollback`] with [`ferrum_scrollback::ScrollbackError::ForeignBlob`] when the
+    /// blob came from another session's history; it is dropped.
+    pub fn install_sealed_chunk(&mut self, sealed: SealedBlob) -> Result<(), VtError> {
+        Ok(self.core.scrollback.install(sealed)?)
     }
 
     /// The damage of the visible screen since the last [`take_damage`](Self::take_damage).

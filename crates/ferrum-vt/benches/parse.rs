@@ -13,6 +13,10 @@ use std::hint::black_box;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use ferrum_scrollback::{Scrollback, ScrollbackConfig};
 use ferrum_vt::{NullSink, Size, Terminal};
+use fixture::{Fixture, Profile};
+
+#[path = "../../../fixtures/output/output.rs"]
+mod fixture;
 
 const COLS: u16 = 200;
 const ROWS: u16 = 55;
@@ -21,6 +25,9 @@ const INPUT_BYTES: usize = 8 * 1_024 * 1_024;
 const HISTORY_LINES: usize = 10_000;
 const SPILL_THRESHOLD_LINES: usize = 50_000;
 const REFLOW_LINES: usize = 12_000;
+/// Seed of the product fixture and logical lines generated from it (enough for 8 MiB).
+const SEED: u64 = 1;
+const FIXTURE_LINES: usize = 40_000;
 
 fn terminal() -> Terminal<NullSink> {
     with_history(HISTORY_LINES)
@@ -31,26 +38,43 @@ fn with_history(lines: usize) -> Terminal<NullSink> {
     Terminal::new(Size::new(COLS, ROWS), Scrollback::new(config), NullSink)
 }
 
-/// Lines of printable ASCII (a log-like mix, 120 columns on average), `\r\n` terminated.
+/// Logical lines (a soft-wrapped line is several rows) of the seeded product fixture
+/// (`fixtures/output/`, `docs/08` §4), ASCII only, until `INPUT_BYTES` of text.
+fn fixture_lines() -> Vec<Vec<String>> {
+    let (rows, _) = Fixture::rows(SEED, Profile::Mixed, usize::from(COLS), FIXTURE_LINES);
+    let mut lines: Vec<Vec<String>> = Vec::new();
+    let mut open: Vec<String> = Vec::new();
+    for row in rows {
+        let wrapped = row.flags.contains(ferrum_scrollback::LineFlags::WRAPPED);
+        open.push(row.text);
+        if !wrapped {
+            let line = std::mem::take(&mut open);
+            if line.iter().all(|row| row.is_ascii()) {
+                lines.push(line);
+            }
+        }
+    }
+    lines
+}
+
+/// The fixture lines as plain text (`\r\n` after each logical line; a wrapped row continues in
+/// the next one through the terminal's own auto-wrap), repeated up to `INPUT_BYTES`.
 fn ascii() -> Vec<u8> {
-    let words = ["error", "warning", "compiling", "src/main.rs", "finished", "test", "ok", "0.42s"];
-    let mut out = Vec::with_capacity(INPUT_BYTES + 256);
-    let mut n = 0usize;
-    while out.len() < INPUT_BYTES {
-        let mut column = 0;
-        while column < 118 {
-            let word = words[(n * 7 + column) % words.len()];
-            out.extend_from_slice(word.as_bytes());
-            out.push(b' ');
-            column += word.len() + 1;
+    let lines = fixture_lines();
+    let mut out = Vec::with_capacity(INPUT_BYTES + 1_024);
+    for line in lines.iter().cycle() {
+        if out.len() >= INPUT_BYTES {
+            break;
+        }
+        for row in line {
+            out.extend_from_slice(row.as_bytes());
         }
         out.extend_from_slice(b"\r\n");
-        n += 1;
     }
     out
 }
 
-/// The same text with an SGR change every few words (colored build and test output).
+/// The same fixture text with an SGR change before every word (colored build and test output).
 fn sgr_heavy() -> Vec<u8> {
     let colors = [
         &b"\x1b[31m"[..],
@@ -60,17 +84,21 @@ fn sgr_heavy() -> Vec<u8> {
         b"\x1b[38;2;10;120;250m",
         b"\x1b[4m",
     ];
-    let words = ["error:", "warning:", "-->", "src/lib.rs:42:7", "help:", "note:", "ok", "FAILED"];
-    let mut out = Vec::with_capacity(INPUT_BYTES + 256);
+    let lines = fixture_lines();
+    let mut out = Vec::with_capacity(INPUT_BYTES + 1_024);
     let mut n = 0usize;
-    while out.len() < INPUT_BYTES {
-        for i in 0..14 {
-            out.extend_from_slice(colors[(n + i) % colors.len()]);
-            out.extend_from_slice(words[(n * 3 + i) % words.len()].as_bytes());
-            out.push(b' ');
+    for line in lines.iter().cycle() {
+        if out.len() >= INPUT_BYTES {
+            break;
+        }
+        for row in line {
+            for word in row.split_inclusive(' ') {
+                out.extend_from_slice(colors[n % colors.len()]);
+                out.extend_from_slice(word.as_bytes());
+                n += 1;
+            }
         }
         out.extend_from_slice(b"\x1b[0m\r\n");
-        n += 1;
     }
     out
 }

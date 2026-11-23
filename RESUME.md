@@ -4,14 +4,14 @@ Handoff document so a new AI session (or a human) can pick up the work exactly w
 It is updated at every milestone (merge, WP state change, agent launch) and before a session's
 context runs out. `PROGRESS.md` remains the per-WP record; this file is the "how to resume" view.
 
-Last update: 2026-11-22 (night): WP-02 PR stack #18–#33 open, fuzz crash under rework, pending audit.
+Last update: 2026-11-23: WP-02 rebuilt as PR stack #36–#53 (round-2 fixes in progress); audit process changed to one audit + one verification; subagents on Opus.
 
 ## 1. How to resume (paste into a new Claude Code session, working directory `Ferrum/`)
 
 ```
 Read RESUME.md, CLAUDE.md, PROGRESS.md and docs/spec/ (README → docs/00 → 01 → 03 → 02 → 05 → 06 → 12).
 Follow the workflow in RESUME.md §3 from the point in §5. You (Opus) audit and merge;
-Sonnet subagents implement. Ask the maintainer only on real doubts.
+Opus subagents implement. Ask the maintainer only on real doubts.
 ```
 
 ## 2. Project
@@ -22,16 +22,21 @@ Sonnet subagents implement. Ask the maintainer only on real doubts.
 - Spec: `docs/spec/`. Work order: `docs/spec/docs/12-build-order.md`.
 - Agent manual: `CLAUDE.md`. Project skills: `.claude/skills/ferrum-{wp,audit,git,deps}`.
 - ADRs: `docs/adr/` (0001, 0016, 0022–0027). Resolved decisions: `docs/spec/docs/14-risks-and-decisions.md` §2
-  (next free open-question number: Q-21).
+  (next free open-question number: Q-28).
 
 ## 3. Workflow (agreed with the maintainer)
 
-1. **Sonnet subagents implement** each WP/spike in `docs/12` order (Agent tool, `model: "sonnet"`,
-   `isolation: "worktree"`, background). Parallel only when WPs are independent.
+1. **Opus 5.5 subagents implement** each WP/spike in `docs/12` order (Agent tool, `model: "opus"`,
+   background, in a git worktree of this repo). Parallel only when WPs are independent. Auditor subagents
+   also run on Opus. (Maintainer decision 2026-11-23; before that implementers ran on Sonnet.)
 2. **Opus audits** every PR against the spec (`ferrum-audit` skill): reads the full diff, re-runs
    `cargo xtask check`, the MSRV check (1.97), benches/memcheck/dhat when relevant, checks commits and CI.
    Never accepts a number it did not see produced.
-3. Blockers go back to the subagent with file:line and the spec clause; the whole change is re-audited.
+3. **One audit per change, one verification** (maintainer rule 2026-11-23, `ferrum-audit` skill): the audit
+   covers only the change's diff against `main` (never the whole app) and is exhaustive in one pass (every file,
+   line by line, all findings at once). Blockers go back to the subagent with file:line and the spec clause.
+   After the fixes, ONE verification checks only the listed findings, the code the fix commits add, and the
+   gates. It is never a new full audit; something it finds outside that scope is fixed in the same batch.
 4. Zero blockers and CI green on all three OS → Opus squash-merges and posts the audit result on the PR.
 5. Continue WP after WP autonomously. Stop and ask only for real doubts, spec conflicts,
    maintainer decisions, or irreversible actions.
@@ -72,28 +77,24 @@ macOS · S3 repaint ~1.0 ms typical / ~2.6–2.8 ms dense (i5-9400) · S4 direct
 
 ## 5. Exact resume point
 
-- **WP-02 `ferrum-vt` implemented, NOT yet audited.** The Sonnet subagent opened a stack of 16 PRs,
-  **#18 → #33** (each based on the previous one; #18 is `feat(scrollback): add pop_front`, #33 is
-  `docs(vt): add compat notes, ADR 0028, crate README and progress`). Local worktree:
-  `.claude/worktrees/agent-a97aa3a26c3bb442e`.
-- **The stack is mid-rework.** The subagent was stopped at shutdown (2026-11-22 ~21:40) while rewriting
-  the stack: its `vt::parse` fuzz run **failed after 6m43s** (crash cause not yet known, no artifact
-  saved) and it was folding a `grid.rs` fix into the early commits. Its rewritten local stack is backed up
-  as branch **`wip/vt-rework`** (tip `2f0f7b8`, pushed with `--no-verify`, never merged as-is). The PR
-  branches #18–#33 on GitHub still hold the older version. First step tomorrow: compare `wip/vt-rework`
-  with the PR branches, launch a Sonnet subagent to finish the rework (reproduce the fuzz crash, add a
-  regression test, fix, run fuzz 30 min clean), force-push-with-lease the PR branches, then delete
-  `wip/vt-rework`.
-- **ADR 0028 (`docs/adr/0028-vt-design-and-parse-throughput.md`, status proposed)** says some spec points
-  "could not be followed to the letter" and that NFR-PERF-02 is met by the state machine alone, not the
-  product configuration. Under the zero-exception rule this needs the **maintainer's decision** before any
-  merge: audit it first, then bring each deviation to the maintainer with options.
-- Next step: run the full strict audit on #18–#33 (the whole stack, not only summaries); send blockers
-  back; merge one at a time with the stacked-PR procedure in §3.
-- Audit checklist for WP-02: parse throughput (NFR-PERF-02: ≥ 400 MB/s ASCII, ≥ 120 MB/s SGR-heavy),
-  dhat zero-alloc test, `vt::parse` fuzz 30 min clean and the target added to the nightly matrix with a locked
-  lockfile, Alacritty ref-tests with attribution (`fixtures/vt/THIRD_PARTY.md`), per-sequence fixtures + insta
-  snapshots, Unicode vectors, reflow property tests (AC-TERM-02), `docs/user/compat.md`.
+- **WP-02 `ferrum-vt` is stack #36 → #53** (18 stacked PRs; #36 `build(deps)` is based on `main`, each next
+  PR on the previous branch, #53 `docs(vt)` carries ADR 0028). The old stack #18–#33 is closed (superseded).
+- History: round-1 audit (44 blockers, 2026-11-23) → rework → round-2 audit (38 blockers; both lists are posted
+  as comments on PR #53) → round-2 fixes **in progress** by an Opus subagent in worktree `Ferrum-wt-rework`
+  (branch `wip/vt-stack-final`). The round-2 audit was a full re-audit; under the new rule (§3 item 3) the
+  next step is ONLY the verification of the round-2 list + gates, then merge.
+- Maintainer decisions on WP-02 (docs/14 §2): Q-21 NFR-PERF-02 measured WITH scrollback push, amended:
+  LZ4 sealing of full chunks runs on the worker thread (docs/02 §5) · Q-22 reflow 10k lines ≤ 40 ms now ·
+  Q-23 Alacritty ref-tests win everywhere · Q-24 extras table refuses when full + releases unreferenced ids ·
+  Q-25 Alacritty literally, `selective_erasure` imported (DECSCA/DECSED/DECSEL removed) ·
+  Q-26 `MAX_PENDING_CHUNKS = 1` with a docs/03 line keeping the session ≤ 1.0 MB · Q-27 the maintainer
+  runs `cargo xtask bench` on the i5-9400 and saves the vt + `scrollback_seal` baselines before merge.
+- Measured on Apple M2 (not the reference machine) at 9451268: `vt_parse/ascii_8mib` with push 510 MB/s,
+  `sgr_heavy_8mib` 233 MB/s, reflow 10k lines 2.57 ms. 30-min CI fuzz of `parse`: clean on 2f0f7b8
+  (run 45172536805); must be re-run on the final tip (temporary branch `ci/vt-fuzz-30min-*` with the
+  workflow from commit 47d5652; delete those branches and `wip/*` after the merge).
+- Next steps: verify the round-2 fixes → fuzz 30 min on the tip → maintainer i5 run (Q-27) → merge the
+  stack one PR at a time with the stacked-PR procedure in §3 → WP-03.
 
 ## 6. What remains (21 WPs total; 19 left including WP-02)
 
@@ -112,13 +113,16 @@ reads +9–14% from machine state, not code).
 
 - Read the full Ferrum spec first, then clone https://github.com/Juandiazcar/Ferrum.git.
 - Initialize `main` once; after that, work on branches. Read the whole spec, including binaries and templates.
-- Develop with subagents running Sonnet; Opus audits everything they do against the spec.
+- Develop with subagents running Sonnet; Opus audits everything they do against the spec. (Changed
+  2026-11-23: all subagents run on Opus 5.5.)
 - Opus merges; in every PR and commit it is forbidden to add itself as co-author.
 - Create the project skills before starting development.
 - General rule: the spec audit is 100% mandatory and strict; if anything fails even minimally, no exception is
   ever made — everything must comply to the letter.
-- Keep going with this workflow, in parallel with Sonnet subagents where possible; notify the maintainer only
+- Keep going with this workflow, in parallel with subagents where possible; notify the maintainer only
   when there are doubts.
+- 2026-11-23: one audit per change, scoped to what was uploaded (not the whole app), exhaustive; fix
+  everything; one verification of the fixes that must not surface new findings.
 
 Maintainer decisions already taken: CI jobs arrive with their WP (ADR 0022) · branch protection · daemon→platform
 edge (ADR 0023) · Q-17 keep and re-measure · S4 direct windows-sys (ADR 0026) · S3 goal intact on worst case,

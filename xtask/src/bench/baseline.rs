@@ -18,6 +18,14 @@ pub(crate) const CEILINGS_NS: &[(&str, f64)] = &[
     // "Scrollback search over 10 000 lines: <= 15 ms", so the ceiling is 30 ms.
     ("scrollback_search/literal_10k_lines", 30_000_000.0),
     ("scrollback_search/literal_insensitive_10k_lines", 30_000_000.0),
+    // NFR-PERF-02 (8 MiB inputs): 400 MB/s on plain ASCII is 20.97 ms, so the ceiling is 41.94 ms;
+    // 120 MB/s on SGR-heavy output is 69.9 ms, so 139.81 ms. Gated without the scrollback push
+    // (the state machine itself); the with-history benches have the relative gate only and the
+    // gap is explained in ADR 0028.
+    ("vt_parse/ascii_8mib_no_history", 41_943_040.0),
+    ("vt_parse/sgr_heavy_8mib_no_history", 139_810_133.0),
+    // "Reflow of 10 000 lines on resize <= 40 ms", so the ceiling is 80 ms.
+    ("vt_reflow/10k_lines_200_to_100_columns", 80_000_000.0),
 ];
 
 /// `benches/baselines/{os}.json`: median time per bench id, measured on one runner class.

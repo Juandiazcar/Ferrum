@@ -33,6 +33,29 @@ CI covered X11 under Xvfb, headless Wayland (weston) and a virtual macOS runner 
 | MV-S3-3 | Folder dialog resident cost (`--dialog`, a person selects a folder once and cancels once): xdg-portal under GNOME and KDE, `NSOpenPanel` on macOS; on Windows a selection instead of Cancel | pending | pending | Cancel verified 2026-11-22 (+5.0 to +5.1 MiB after closing) |
 | MV-S3-4 | Full repaint of 200×60 dense text on a second Windows machine and on Apple silicon hardware, to compare with the SIMD blitter target (Q-19) | pending | pending | pending |
 
+## Terminal state machine (WP-02, ADR 0028)
+
+The author machine is an Apple M2; NFR-PERF-02, the reflow budget and the worker seal are judged on
+the reference machine (maintainer decision Q-27). Run on the i5-9400 (Windows 11), on a quiet
+machine, from the repository root at the tip of the WP-02 stack:
+
+```
+cargo xtask bench --quick
+cargo xtask bench --save-baseline
+git diff --stat benches/baselines/windows.json
+```
+
+The first run reports the `vt_*` and `scrollback_seal/*` benches as missing baselines (expected)
+and fails if one is above its absolute ceiling (`xtask/src/bench/baseline.rs`: 2x the target).
+The second writes the medians into `benches/baselines/windows.json`; commit that file in its own
+PR with the printed numbers (MiB/s of `vt_parse/ascii_8mib` and `vt_parse/sgr_heavy_8mib` with the
+push on, `vt_reflow/10k_lines_200_to_100_columns`, `scrollback_seal/fixture_chunks`, and the
+"inline seals" lines the parse bench prints on stderr).
+
+| ID | Check | Linux | macOS | Windows |
+|---|---|---|---|---|
+| MV-WP02-1 | NFR-PERF-02 with the scrollback push on (400 MB/s ASCII, 120 MB/s SGR-heavy), the reflow of 10 000 lines (40 ms) and the worker seal ceiling, measured with the commands above; baselines saved | not required | not required | pending maintainer run |
+
 ## Later work packages
 
 Rows for IME, HiDPI, compositor behavior, OS drag and drop, installers and signing are added with

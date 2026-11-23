@@ -25,9 +25,9 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Fonts: shaping + raster | `swash` | 0.2.10 | render | one crate for shaping and rasterization incl. color glyphs; avoids `cosmic-text` weight |
 | Font discovery | `fontdb` | 0.24.0 | render | scans system fonts lazily; memory-maps files |
 | Font parsing | `ttf-parser` | 0.25.1 | render | transitive via fontdb |
-| VT parsing | `vte` | 0.15.0 | vt | state machine only; Ferrum owns the grid/handlers |
-| Unicode widths | `unicode-width` | 0.2.3 | vt | |
-| Grapheme clusters | `unicode-segmentation` | 1.13.3 | vt | |
+| VT parsing | `vte` | 0.15.0 (2026-11-22, latest stable) | vt | state machine only; Ferrum owns the grid/handlers. `default-features = false`: the `no_std` buffer mode with a 1-byte OSC buffer, because `ferrum-vt` captures OSC strings itself with a 1 MiB cap (ADR 0028) |
+| Unicode widths | `unicode-width` | 0.2.3 (2026-11-22, latest stable) | vt | `default-features = false` (no `cjk` context widths) |
+| Grapheme clusters | `unicode-segmentation` | 1.13.3 (2026-11-22, latest stable) | vt | `default-features = false` |
 | PTY | `portable-pty` | 0.9.0 | pty | Linux and macOS PTY only (ADR 0026); last release Feb 2025 → wrapped behind `PtyBackend` so it can be replaced. Windows uses `windows-sys` directly |
 | Windows APIs | `windows-sys` | 0.61.2 | pty, platform | required by the direct ConPTY backend in `ferrum-pty` (`portable-pty` was insufficient on Windows: ADR 0026); prefer `-sys` (no bloat) |
 | Unix syscalls | `rustix` | 1.1.6 | pty, platform, daemon | safe wrappers; avoids hand-written `libc` unsafe |
@@ -39,15 +39,15 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Config format | `toml` | 1.2.2 (re-verified 2026-11-21) | config, xtask | serde-based; atomic writes by us |
 | Compression (scrollback) | `lz4_flex` | 0.14.2 | scrollback | pure Rust, `default-features = false`, `safe-encode`/`safe-decode` |
 | mmap | `memmap2` | 0.9.12 | render | fonts only. The scrollback spill file uses plain positional reads and writes from `std` (ADR 0027), because mapping needs `unsafe` |
-| Byte search | `memchr` | 2.8.3 | vt, scrollback | |
+| Byte search | `memchr` | 2.8.3 (2026-11-22, latest stable) | vt, scrollback | `default-features = false`, `std`; `vt` uses `memmem` for `ESC ]` and `memchr` for ESC |
 | POD casts | `bytemuck` | 1.25.2 | render, vt | `Cell` ↔ bytes where needed |
 | Small vectors | `smallvec` | 1.16.6 | vt | only where profiling justifies |
-| Fast hashing | `rustc-hash` | 2.1.3 | vt, scrollback, render | interning tables (the scrollback style table too) |
-| Bit flags | `bitflags` | 2.13.2 | vt | cell attrs, modes |
+| Fast hashing | `rustc-hash` | 2.1.3 (2026-11-22, latest stable) | vt, scrollback, render | interning tables (the scrollback style table too); `default-features = false`, `std` |
+| Bit flags | `bitflags` | 2.13.2 (2026-11-22, latest stable) | vt | cell attrs, modes; `default-features = false` |
 | Clipboard | `arboard` | 3.7.0 | platform | text + image; Wayland/X11 handled; features trimmed |
 | Image decode | `image` | 0.25.10 | render | `default-features = false`, features: `png`, `jpeg`, `gif`, `webp` only |
 | PNG (direct) | `png` | 0.18.1 | render | for kitty graphics PNG path if `image` is too heavy |
-| Base64 | `base64` | 0.23.1 | vt | OSC 52, kitty graphics |
+| Base64 | `base64` | 0.23.1 (2026-11-22, latest stable) | vt | OSC 52, kitty graphics; `default-features = false`, `std` (no `simd-unsafe`) |
 | Directories | `directories` | 6.0.0 | platform | XDG / Library / AppData paths |
 | Native menus (macOS) | `muda` | 0.21.2 | app (macOS only) | standard app menu so Cmd+Q/H/M and Edit actions work |
 | File dialogs | `rfd` | 0.18.0 | app | folder picker for projects, export/import; evaluate memory/size (S3); fallback = in-app path input + drag & drop |
@@ -128,8 +128,8 @@ Used only by throwaway packages under `spikes/` (own workspace and lockfile, exc
 | `libfuzzer-sys` | 0.4.13 (2026-11-22, latest stable) | fuzz targets only: the `fuzz/` package of a crate (own workspace, nightly in the fuzz job only), `default-features = false` + `link_libfuzzer`; never in product crates |
 | `cargo-bloat` | 0.12.1 | binary size attribution (last release 2024-05; still works) |
 | `criterion` | 0.8.2 | benchmarks |
-| `proptest` | 1.12.0 (2026-11-23, latest stable) | property tests (`default-features = false`, `std`) |
-| `insta` | 1.49.0 (2026-11-23, latest stable) | snapshot/golden tests (`default-features = false`) |
+| `proptest` | 1.12.0 (2026-11-23, latest stable) | property tests (`ferrum-scrollback`, `ferrum-vt`; `default-features = false`, `std`) |
+| `insta` | 1.49.0 (2026-11-23, latest stable) | snapshot/golden tests (`default-features = false`; `ferrum-vt` fixtures) |
 | `dhat` | 0.3.3 (2026-11-23, latest stable) | allocation counting in tests (`default-features = false`) |
 | `git-cliff` | 2.14.2 | changelog |
 | `typos-cli` | 1.52.2 | typo check |

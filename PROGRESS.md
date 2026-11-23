@@ -2,6 +2,52 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## WP-02 `ferrum-vt` (stack of PRs rebuilt on `main` after the audits of 2026-11-23)
+
+Done: `ferrum-scrollback::{pop_front, skip_front, clear}`, a line over the size limits kept clipped
+and counted, pending chunks sealed on the worker (`take_pending`, `ChunkSealer::seal`, `install`;
+Q-21 amendment, `MAX_PENDING_CHUNKS` = 2 per Q-26 as amended, ADR 0028 decision 8); the crate (cell/color/
+row/extras/graphemes, ring grid, modes, charsets, tabs, SGR with underline styles and colors,
+ED/EL/ECH/ICH/DCH/IL/DL/SU/SD/REP, scroll regions, alternate screen, OSC 0/1/2/4/7/8/10/11/12/52/
+104/110-112/133/9;4, DA/DSR/CPR/XTVERSION, DECRQM, DECRQSS safe subset, kitty keyboard stack per
+screen, mouse/focus/paste/sync mode state, hyperlinks with released ids (history summarized at
+push time, amortized sweeps), shell marks, damage tracking, event sink, selection model, resize
+with streaming reflow); the sequence watchdog (cap at the exact byte, discard to the
+terminator); `xtask import-alacritty-refs`; `docs/user/compat.md`; ADR 0028 (accepted, Q-21 to
+Q-27 recorded in `docs/14`); README.
+
+Audit rounds 1 (44 items) and 2 (38 items) are addressed in this rebuild; the maintainer
+decisions Q-21 to Q-27 are in `docs/14` §2 and ADR 0028. Q-25: protected erase removed, all 45
+Alacritty reference tests imported and passing. Q-26: one pending chunk missed the ASCII target on
+the M2 (353 MB/s, 48 % inline seals) and was reported back; the amended decision is two
+(0.18 MB, the sealed allowance lowered to 0.36 MB), which meets it there (below). Q-27: the
+reference-machine run is the maintainer's (MV-WP02-1), pending.
+
+Evidence, Apple M2 (not the reference machine; shared with other builds, load average 5 to 11;
+criterion medians, fixture inputs; the table is in ADR 0028):
+
+| Criterion | Result |
+|---|---|
+| Q-21 NFR-PERF-02 with the scrollback push on, `MAX_PENDING_CHUNKS` = 2 | `vt_parse/ascii_8mib` 418.5 MiB/s (439 MB/s, target 400) with 5 286 of 64 550 chunks (8.2 %) sealed inline, `vt_parse/sgr_heavy_8mib` 211.5 MiB/s (222 MB/s, target 120): **met on the M2** (with one pending chunk ASCII was 336.5 MiB/s, 48 % inline: missed, Q-26 amended). Memory: `memory_report` sealed 0.338-0.343 MB, pending 0.086 MB, within the 0.36 / 0.18 MB allowances. i5-9400: **pending maintainer run** (Q-27) |
+| Q-22 reflow of 10 000 lines (`vt_reflow/10k_lines_200_to_100_columns`) | 36.8 ms after the streaming rewrite, **3.44 ms** at the round-3 tip on the M2 (target 40 ms); i5-9400: pending maintainer run |
+| Worker seal | `scrollback_seal/fixture_chunks` 1.81 ms (451.7 MiB/s), ceiling 4.29 ms |
+| Ceilings | `xtask/src/bench/baseline.rs` covers the with-push parse benches (2x target), the worker seal and the reflow; the vt and `scrollback_seal` baselines are **not** in `windows.json` (the maintainer saves them on the i5-9400, MV-WP02-1) |
+| Alacritty ref-tests | 45 of 45 imported and passing (Q-25: `selective_erasure` included, protected erase not implemented) |
+| vt fixtures | `tests/fixtures.rs` checks every sequence of `fixtures/vt/implemented.txt` has a positive and a real malformed-input case; boundary cases are named `edge_` |
+| Unicode vectors | official `GraphemeBreakTest.txt`, `emoji-sequences.txt`, `emoji-zwj-sequences.txt` (Unicode 17.0.0, `fixtures/unicode/`) plus `tests/unicode_vectors.rs` |
+| Property tests | `tests/reflow.rs`, `tests/chunking.rs`, `tests/fuzz_seeds.rs`, `ferrum-scrollback/tests/{pending,roundtrip}.rs`: failing seeds are saved under `proptest-regressions/` |
+| dhat | `tests/alloc_parse.rs` (64 KiB reads like the daemon): 0 blocks per pass in steady state without history, with the push on, and with a worker that holds the handles while a 64-line history evicts them; sealing allocates exactly the blob; `tests/alloc_extras.rs`: a full extras table under new colors and refused links allocates nothing; the first use of a new cluster or link allocates once, bounded by the table caps |
+| Fuzz | `crates/ferrum-vt/fuzz` target `parse`; the 30-minute CI run on 9451268 (the round-2 tip, run 45201563547) was clean, evidence for that commit only; the local run on the round-3 tip is in the PR |
+
+Open items / not verified:
+- The i5-9400 run and its baselines (Q-27, MV-WP02-1). The daemon wiring of the worker seal is
+  WP-06 (ADR 0028 consequences).
+- Linux and Windows runs of the benches; `vttest` (manual list is WP-17/WP-20); Miri and ASan on
+  the new code run in the nightly workflow only.
+- Behavior notes: a shell mark on a continuation row stays with the row open when it is fed
+  (streaming reflow); RIS also empties the hyperlink table.
+- Next: WP-03 `ferrum-proto`.
+
 ## WP-01 `ferrum-scrollback` (stack of PRs from `docs/adr-spill-without-mmap`)
 
 Done: ADR 0027 (spill without mmap), the crate (encoding, style table, chunks, spill ring, search,
@@ -62,8 +108,10 @@ Deviations / notes:
   version. `cargo hack` runs `--locked`, without `--no-dev-deps`.
 - The fuzz package has its own committed `Cargo.lock`; `cargo fuzz run` has no `--locked`, so the nightly job
   runs `cargo fetch --locked` before it and `git diff --exit-code` on the lock after it.
-- Sealing and spill I/O run inline on the pushing thread; `docs/02` §5 puts compression on the
-  worker, which is a WP-06 wiring decision (`Scrollback` is `Send`).
+- Spill I/O runs on the pushing thread; compression of full chunks runs wherever the owner calls
+  `ChunkSealer::seal` (the worker in WP-06; ADR 0028 decision 8). The pending chunk costs at most
+  two chunk buffers per session (`MAX_PENDING_CHUNKS` = 2, maintainer decision Q-26: 0.172 MB
+  at most, 0.086 MB measured, 0.18 MB allowance in `docs/03` §2), reported as `MemoryReport::pending_bytes`.
 - Search matches per row (a match spanning a soft wrap is not found here); regex is a
   `LineMatcher` implemented by the daemon (no regex dependency added).
 - Column widths of wide characters are derived by the consumer from the stored scalars.

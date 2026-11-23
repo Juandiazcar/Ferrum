@@ -9,6 +9,7 @@ use crate::events::EventSink;
 use crate::extras::Extras;
 use crate::grid::Grid;
 use crate::input::Input;
+use crate::keyboard::KeyboardFlags;
 use crate::modes::Mode;
 use crate::palette::Palette;
 use crate::screen::Screen;
@@ -85,6 +86,11 @@ impl<S: EventSink> Terminal<S> {
     /// The cursor style a program chose with DECSCUSR; `None` until it chooses one.
     pub fn cursor_style(&self) -> Option<CursorStyle> {
         self.core.cursor_style
+    }
+
+    /// The active kitty keyboard flags of the visible screen (0 when none were pushed).
+    pub fn keyboard_flags(&self) -> KeyboardFlags {
+        self.core.screen().keyboard.current()
     }
 
     /// The color palette and default colors.

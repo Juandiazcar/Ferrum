@@ -80,17 +80,19 @@ impl<S: EventSink> Core<S> {
         }
     }
 
-    /// RIS: back to the power-on state, the title included (Alacritty's `Term::reset_state`,
-    /// maintainer decisions Q-23 and Q-25; like Alacritty no event is sent for it). The palette,
-    /// the working directory and the history are kept.
+    /// RIS: back to the power-on state, the cursor style and the title included (Alacritty's
+    /// `Term::reset_state`, maintainer decisions Q-23 and Q-25; like Alacritty no event is sent
+    /// for the title). The palette, the working directory and the history are kept.
     pub(crate) fn reset(&mut self) {
         let size = self.primary.grid.size();
         self.alt = None;
         self.extras.clear();
+        self.alt_keyboard = crate::keyboard::KeyboardStack::default();
         self.modes = Mode::default();
         self.tabs.reset();
         self.primary = Screen::new(size);
         self.last_char = None;
         self.title.clear();
+        self.cursor_style = None;
     }
 }

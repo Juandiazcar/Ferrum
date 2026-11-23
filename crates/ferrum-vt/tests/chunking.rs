@@ -45,6 +45,10 @@ fn piece() -> impl Strategy<Value = Vec<u8>> {
         2 => prop::sample::select(vec![
             "\x1b]0;title\x07", "\x1b]2;t\x1b\\", "\x1b]1;i\x07", "\x1b]2;cut", "\x1b]x;y\x07",
         ]).prop_map(|s: &str| s.as_bytes().to_vec()),
+        2 => prop::sample::select(vec![
+            "\x1bP+q544e\x1b\\", "\x1bP$qm\x1b\\", "\x1bP$qr", "\x1bP+q", "\x1bPq#0;2~~", "\x1b_Gf=1;AAAA",
+            "\x1b^pm", "\x1bXsos", "\u{9c}", "\x1b[1?h", "\x1b[1;2$~",
+        ]).prop_map(|s: &str| s.as_bytes().to_vec()),
         2 => prop::sample::select(vec!["é", "漢字", "e\u{301}", "👨‍👩‍👧", "🇺🇸", "\u{2764}\u{fe0f}", "ｱ"])
             .prop_map(|s: &str| s.as_bytes().to_vec()),
         1 => prop::collection::vec(any::<u8>(), 1..8),
@@ -159,4 +163,18 @@ fn an_empty_read_between_an_esc_and_its_bracket_changes_nothing() {
     term.parse(b"");
     term.parse(b"]2;splitb");
     assert_eq!(term.sink().0, vec![String::from("Title(\"split\")")]);
+}
+
+#[test]
+fn a_dcs_string_ended_by_the_esc_of_an_osc_is_answered_however_the_bytes_are_cut() {
+    let input = b"\x1bP+q544e\x1b]0;t\x07";
+    let mut expected = None;
+    for cut in 0..=input.len() {
+        let mut term = terminal();
+        term.parse(input.get(..cut).unwrap_or_default());
+        term.parse(input.get(cut..).unwrap_or_default());
+        let events = term.sink().0.clone();
+        assert!(events.iter().any(|e| e.starts_with("Reply")), "cut {cut}: {events:?}");
+        assert_eq!(*expected.get_or_insert_with(|| events.clone()), events, "cut {cut}");
+    }
 }

@@ -62,3 +62,17 @@ fn a_row_of_long_clusters_still_counts_as_one_history_line() {
     assert_eq!(term.scrollback().pushed_lines(), 1);
     assert_eq!(term.scrollback().len(), 1);
 }
+
+#[test]
+fn each_screen_keeps_its_kitty_keyboard_stack_across_screen_switches() {
+    let mut term = terminal(20, 4);
+    term.parse(b"\x1b[>1u");
+    let primary = term.keyboard_flags();
+    term.parse(b"\x1b[?1049h\x1b[>5u");
+    let alt = term.keyboard_flags();
+    assert_ne!(alt, primary);
+    term.parse(b"\x1b[?1049l");
+    assert_eq!(term.keyboard_flags(), primary);
+    term.parse(b"\x1b[?1049h");
+    assert_eq!(term.keyboard_flags(), alt);
+}

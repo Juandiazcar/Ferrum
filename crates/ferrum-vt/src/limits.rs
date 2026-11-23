@@ -24,6 +24,10 @@ pub const MAX_OSC_BYTES: usize = 1_024 * 1_024;
 /// An OSC buffer larger than this is released after the sequence, so one big OSC 52 does not keep
 /// a megabyte for the life of the session.
 pub const OSC_BUFFER_KEEP_BYTES: usize = 4 * 1_024;
+/// Most bytes of one escape sequence or string (CSI, DCS, APC, PM, SOS) that `vte` may swallow
+/// before the front end resets it (`docs/10` §3 item 9: an unterminated sequence never keeps
+/// eating the output).
+pub const MAX_SEQUENCE_BYTES: usize = MAX_OSC_BYTES;
 /// Largest OSC 52 clipboard payload in bytes before decoding: 1 MB, decimal, exactly as
 /// `docs/10` §3 item 4 says. It is below [`MAX_OSC_BYTES`], so the check is reachable.
 pub const MAX_CLIPBOARD_BYTES: usize = 1_000_000;

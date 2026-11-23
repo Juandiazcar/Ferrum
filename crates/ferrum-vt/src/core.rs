@@ -5,6 +5,7 @@ use ferrum_scrollback::Scrollback;
 use crate::codec::Encoded;
 
 use crate::cursor::CursorStyle;
+use crate::dcs::Dcs;
 use crate::events::EventSink;
 use crate::extras::Extras;
 use crate::modes::Mode;
@@ -31,6 +32,9 @@ pub(crate) struct Core<S> {
     pub(crate) sink: S,
     pub(crate) primary: Screen,
     pub(crate) alt: Option<Screen>,
+    /// The alternate screen's kitty keyboard stack, kept while the screen itself is freed: the
+    /// protocol gives each screen its own stack and it survives switching away and back.
+    pub(crate) alt_keyboard: crate::keyboard::KeyboardStack,
     pub(crate) modes: Mode,
     pub(crate) tabs: TabStops,
     pub(crate) scrollback: Scrollback,
@@ -42,8 +46,13 @@ pub(crate) struct Core<S> {
     pub(crate) scratch: Scratch,
     /// The last graphic character printed (REP repeats it).
     pub(crate) last_char: Option<char>,
+    /// Raised by `unhook`: the DCS string left `vte`. A CAN or SUB right after it cancels the
+    /// string (`perform.rs`); otherwise the front end answers it (`input.rs`).
+    pub(crate) dcs_end: bool,
     /// DECSCUSR; `None` until a program sets it (the UI default applies).
     pub(crate) cursor_style: Option<CursorStyle>,
+    /// The DCS string in progress.
+    pub(crate) dcs: Dcs,
 }
 
 impl<S: EventSink> Core<S> {
@@ -52,6 +61,7 @@ impl<S: EventSink> Core<S> {
             sink,
             primary: Screen::new(size),
             alt: None,
+            alt_keyboard: crate::keyboard::KeyboardStack::default(),
             modes: Mode::default(),
             tabs: TabStops::new(size.cols()),
             scrollback,
@@ -61,7 +71,9 @@ impl<S: EventSink> Core<S> {
             cwd: String::new(),
             scratch: Scratch::default(),
             last_char: None,
+            dcs_end: false,
             cursor_style: None,
+            dcs: Dcs::Ignore,
         }
     }
 

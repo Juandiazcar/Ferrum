@@ -3,6 +3,7 @@
 use crate::charset::Charsets;
 use crate::cursor::{Cursor, SavedCursor};
 use crate::grid::Grid;
+use crate::keyboard::KeyboardStack;
 use crate::size::Size;
 
 /// The scroll region, rows `top..=bottom` (DECSTBM). `top <= bottom` always holds: the fields
@@ -53,6 +54,7 @@ pub struct Screen {
     pub(crate) saved: Option<SavedCursor>,
     pub(crate) region: Region,
     pub(crate) charsets: Charsets,
+    pub(crate) keyboard: KeyboardStack,
 }
 
 impl Screen {
@@ -64,6 +66,7 @@ impl Screen {
             saved: None,
             region: Region::full(size.rows()),
             charsets: Charsets::default(),
+            keyboard: KeyboardStack::default(),
         }
     }
 
@@ -80,6 +83,11 @@ impl Screen {
     /// The scroll region.
     pub fn region(&self) -> Region {
         self.region
+    }
+
+    /// The kitty keyboard protocol stack of this screen.
+    pub fn keyboard(&self) -> &KeyboardStack {
+        &self.keyboard
     }
 }
 

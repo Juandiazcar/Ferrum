@@ -86,25 +86,51 @@ bitflags! {
 }
 
 /// Bits of a scalar that are set in ASCII.
-const ASCII_MASK: u32 = 0x7F;
+const ASCII_MASK: u64 = 0x7F;
+/// Bits of the first word: the character (low 32), the attributes (next 16), the flags (top 16).
+const CH_MASK: u64 = 0xFFFF_FFFF;
+const ATTRS_SHIFT: u32 = 32;
+/// A 16-bit field (attributes, flags) before it is shifted into its place.
+const FIELD16_MASK: u64 = 0xFFFF;
+const FLAGS_SHIFT: u32 = 48;
+/// Bits of the second word: the foreground (low 32), the background (high 32).
+const BG_SHIFT: u32 = 32;
 
 /// The style words of a plain ASCII cell (see [`Cell::differs_from`]).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct AsciiStyle {
-    fg: u32,
-    bg: u32,
-    attrs: u32,
+    /// The first word of a cell of this style with the character and the flags at zero.
+    lo: u64,
+    hi: u64,
+}
+
+/// A 16-bit field of a word.
+#[allow(clippy::cast_possible_truncation, reason = "the value is shifted and masked to 16 bits")]
+const fn field16(word: u64, shift: u32) -> u16 {
+    (word >> shift) as u16
+}
+
+/// The low 32 bits of a word.
+#[allow(clippy::cast_possible_truncation, reason = "the value is masked to 32 bits")]
+const fn low32(word: u64) -> u32 {
+    (word & CH_MASK) as u32
+}
+
+/// Joins two 32-bit halves.
+const fn join32(low: u32, high: u32) -> u64 {
+    low as u64 | (high as u64) << BG_SHIFT
 }
 
 /// One terminal cell: 16 bytes, as `docs/02` §3.1 says.
+///
+/// perf: the cell is two machine words, so that printing a character or blanking a row is one
+/// 16-byte store pair per cell (bench `vt_parse/ascii_8mib`). `lo` holds the character, the
+/// attribute bits and the structural flags; `hi` the foreground and the background words.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct Cell {
-    ch: u32,
-    fg: u32,
-    bg: u32,
-    attrs: u16,
-    flags: u16,
+    lo: u64,
+    hi: u64,
 }
 
 const _: () = assert!(size_of::<Cell>() == 16);
@@ -119,19 +145,26 @@ impl Default for Cell {
 }
 
 impl Cell {
+    // perf: the five words of a cell as plain arguments, so the constructors compile to a few
+    // shifts and ors (bench vt_parse/ascii_8mib).
+    const fn pack(ch: u32, fg: u32, bg: u32, attrs: u16, flags: u16) -> Self {
+        let lo = ch as u64 | (attrs as u64) << ATTRS_SHIFT | (flags as u64) << FLAGS_SHIFT;
+        Self { lo, hi: join32(fg, bg) }
+    }
+
     /// A blank cell with background `bg` (background color erase).
     pub const fn blank(bg: Color) -> Self {
-        Self { ch: BLANK_CHAR as u32, fg: 0, bg: bg.bits(), attrs: 0, flags: 0 }
+        Self::pack(BLANK_CHAR as u32, 0, bg.bits(), 0, 0)
     }
 
     /// A cell showing `ch` with the given style words (extras included).
     pub(crate) const fn styled(ch: char, fg: u32, bg: u32, attrs: u16) -> Self {
-        Self { ch: ch as u32, fg, bg, attrs, flags: 0 }
+        Self::pack(ch as u32, fg, bg, attrs, 0)
     }
 
     /// The scalar, or the grapheme table index when [`CellFlags::GRAPHEME`] is set.
     pub const fn raw_char(&self) -> u32 {
-        self.ch
+        low32(self.lo)
     }
 
     /// The scalar of a plain cell; [`BLANK_CHAR`] for spacers and grapheme cells.
@@ -139,94 +172,92 @@ impl Cell {
         if self.flags().intersects(CellFlags::GRAPHEME.union(CellFlags::SPACER)) {
             return BLANK_CHAR;
         }
-        char::from_u32(self.ch).unwrap_or(BLANK_CHAR)
+        char::from_u32(self.raw_char()).unwrap_or(BLANK_CHAR)
     }
 
     /// Sets a plain scalar, clearing any grapheme or spacer state.
     pub fn set_scalar(&mut self, ch: char) {
-        self.ch = ch as u32;
-        self.flags &= !(CellFlags::GRAPHEME | CellFlags::SPACER | CellFlags::LEADING_SPACER).bits();
+        self.set_raw_char(ch as u32);
+        self.remove_flags(CellFlags::GRAPHEME | CellFlags::SPACER | CellFlags::LEADING_SPACER);
     }
 
     /// Replaces the raw character word (a scalar, or a grapheme index for `GRAPHEME` cells).
     pub(crate) fn set_raw_char(&mut self, raw: u32) {
-        self.ch = raw;
+        self.lo = (self.lo & !CH_MASK) | u64::from(raw);
     }
 
     /// The low byte of the character word: the character of a plain ASCII cell.
     #[allow(clippy::cast_possible_truncation, reason = "callers check that the word is below 0x80")]
     pub(crate) const fn ascii_byte(&self) -> u8 {
-        self.ch as u8
+        self.lo as u8
     }
 
     /// Zero when this cell is a plain ASCII cell (no flags) with the same style as `key`; nonzero
     /// otherwise. Branch-free so that a run of cells is checked with one test per block.
-    pub(crate) const fn differs_from(&self, key: &AsciiStyle) -> u32 {
-        (self.fg ^ key.fg)
-            | (self.bg ^ key.bg)
-            | (self.attrs as u32 ^ key.attrs)
-            | self.flags as u32
-            | (self.ch & !ASCII_MASK)
+    pub(crate) const fn differs_from(&self, key: &AsciiStyle) -> u64 {
+        // The character bits above ASCII, the flags and the attributes must equal the key's
+        // (zero, zero and its attributes).
+        ((self.lo & !ASCII_MASK) ^ key.lo) | (self.hi ^ key.hi)
     }
 
     /// The style of a plain ASCII cell, to find the cells that share it.
     pub(crate) const fn ascii_style(&self) -> AsciiStyle {
-        AsciiStyle { fg: self.fg, bg: self.bg, attrs: self.attrs as u32 }
+        AsciiStyle { lo: self.lo & !CH_MASK, hi: self.hi }
     }
 
     /// True for a cell without flags whose scalar is ASCII.
     pub(crate) const fn is_plain_ascii(&self) -> bool {
-        self.flags == 0 && self.ch & !ASCII_MASK == 0
+        self.lo & !(ASCII_MASK | (FIELD16_MASK << ATTRS_SHIFT)) == 0
     }
 
     /// Structural flags.
     pub const fn flags(&self) -> CellFlags {
-        CellFlags::from_bits_retain(self.flags)
+        CellFlags::from_bits_retain(field16(self.lo, FLAGS_SHIFT))
     }
 
     /// Sets structural flags.
     pub fn insert_flags(&mut self, flags: CellFlags) {
-        self.flags |= flags.bits();
+        self.lo |= u64::from(flags.bits()) << FLAGS_SHIFT;
     }
 
     /// Clears structural flags.
     pub fn remove_flags(&mut self, flags: CellFlags) {
-        self.flags &= !flags.bits();
+        self.lo &= !(u64::from(flags.bits()) << FLAGS_SHIFT);
     }
 
     /// Foreground color.
     pub const fn fg(&self) -> Color {
-        Color::from_raw(self.fg)
+        Color::from_raw(self.fg_word())
     }
 
     /// Background color.
     pub const fn bg(&self) -> Color {
-        Color::from_raw(self.bg)
+        Color::from_raw(self.bg_word())
     }
 
     /// Foreground word with the extra bits, as the scrollback `Style` stores it.
     pub const fn fg_word(&self) -> u32 {
-        self.fg
+        low32(self.hi)
     }
 
     /// Background word with the extra bits, as the scrollback `Style` stores it.
     pub const fn bg_word(&self) -> u32 {
-        self.bg
+        low32(self.hi >> BG_SHIFT)
     }
 
     /// Attribute bits as the scrollback `Style` stores them (underline style included).
     pub const fn attr_word(&self) -> u16 {
-        self.attrs
+        field16(self.lo, ATTRS_SHIFT)
     }
 
     /// Text attributes without the underline style.
     pub const fn attrs(&self) -> Attrs {
-        Attrs::from_bits_truncate(self.attrs)
+        Attrs::from_bits_truncate(self.attr_word())
     }
 
     /// The underline style.
     pub const fn underline(&self) -> Underline {
-        Underline::from_bits(self.attrs)
+        Underline::from_bits(self.attr_word())
     }
 
     /// The hyperlink and underline-color record of this cell, `ExtraId::NONE` when there is none.
@@ -238,24 +269,20 @@ impl Cell {
     pub fn set_extra(&mut self, id: ExtraId) {
         let bits = u32::from(id.bits());
         let low_mask = (1 << EXTRA_HALF_BITS) - 1;
-        self.fg = (self.fg & !EXTRA_MASK) | (bits >> EXTRA_HALF_BITS) << EXTRA_SHIFT;
-        self.bg = (self.bg & !EXTRA_MASK) | (bits & low_mask) << EXTRA_SHIFT;
+        let fg = (self.fg_word() & !EXTRA_MASK) | (bits >> EXTRA_HALF_BITS) << EXTRA_SHIFT;
+        let bg = (self.bg_word() & !EXTRA_MASK) | (bits & low_mask) << EXTRA_SHIFT;
+        self.hi = join32(fg, bg);
     }
 
     /// Overwrites the style of the cell, keeping its character and structure.
     pub fn set_style(&mut self, fg: u32, bg: u32, attrs: u16) {
-        self.fg = fg;
-        self.bg = bg;
-        self.attrs = attrs;
+        self.hi = join32(fg, bg);
+        self.lo = (self.lo & !(FIELD16_MASK << ATTRS_SHIFT)) | u64::from(attrs) << ATTRS_SHIFT;
     }
 
     /// True for a plain blank in the default style: what the scrollback trims.
     pub fn is_default_blank(&self) -> bool {
-        self.ch == BLANK_CHAR as u32
-            && self.fg == 0
-            && self.bg == 0
-            && self.attrs == 0
-            && self.flags == 0
+        self.lo == BLANK_CHAR as u64 && self.hi == 0
     }
 
     /// Display columns the cell occupies: 2 for the first half of a wide character, 0 for its

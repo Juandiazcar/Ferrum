@@ -1,0 +1,13 @@
+# alt1049 / basic
+
+Mode 1049 switches to a blank alternate screen and back; the primary screen is untouched.
+
+Reference: xterm ctlseqs: alternate screen. Terminal size: 20x6.
+
+| hex | bytes | meaning |
+|---|---|---|
+| 70 72 69 6d 61 72 79 | p r i m a r y | text on the primary screen |
+| 1b 5b 3f 31 30 34 39 68 | ESC [ ? 1 0 4 9 h | enter alternate screen |
+| 61 6c 74 | a l t | text on the alternate screen |
+| 1b 5b 3f 31 30 34 39 6c | ESC [ ? 1 0 4 9 l | leave |
+| 21 | ! | back on the primary screen |

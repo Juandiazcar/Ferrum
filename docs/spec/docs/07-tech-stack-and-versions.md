@@ -79,6 +79,7 @@ Used only by throwaway packages under `spikes/` (own workspace and lockfile, exc
 |---|---|---|---|
 | `alacritty_terminal` | 0.26.0 (2026-11-21) | S1 | Measure its per-session scrollback memory against Ferrum's encoder (ADR 0024). Rejected for the product (§3) |
 | `dhat` | 0.3.3 (2026-11-21, latest stable) | S1 | Safe heap accounting (`HeapStats`) instead of a hand-written allocator; no `unsafe` in the spike (§4 lists it for tests) |
+| `terminal_size` | 0.4.4 (2026-11-24, latest stable; released 2026-03-23) | `ferrum-testkit` only: the `ferrum-pty-helper` child of the `PtyBackend` contract suite reports the terminal size it sees (PT-15) without `unsafe`; depends only on `rustix` (Unix) and `windows-sys` 0.61 (Windows), both already in this table (`default-features = false`) |
 | `portable-pty` | 0.9.0 (2026-11-21, latest stable; released 2025-02-11) | S4 | Measure ConPTY and Unix PTY behavior and decide keep vs direct `windows-sys` (ADR 0026). Same version as the product table above |
 | `mimalloc` | 0.1.52 (2026-11-21, latest stable; released 2026-05-22; bundles mimalloc 2.3.2 through `libmimalloc-sys` 0.1.49) | S2 | Allocator candidate measured against the system allocator and jemalloc on the S1 workload (ADR 0016). Also in the product table above (macOS only) |
 | `tikv-jemallocator` | 0.7.0 (2026-11-21, latest stable; released 2026-05-25) | S2 | Allocator candidate (ADR 0016); not applicable on Windows MSVC, so the spike resolves it on non-MSVC targets only. Not chosen for the product |

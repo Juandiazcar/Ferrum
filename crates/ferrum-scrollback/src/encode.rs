@@ -40,7 +40,9 @@ impl Encoder {
                 max: MAX_LINE_TEXT_BYTES,
             });
         }
-        let chars = line.text.chars().count();
+        // perf: an ASCII check is cheaper than counting scalars, and most lines are ASCII
+        // (bench vt_parse/ascii_8mib).
+        let chars = if line.text.is_ascii() { line.text.len() } else { line.text.chars().count() };
         check_coverage(line.runs, chars)?;
         let blanks = trailing_blanks(line.text, line.runs);
         let text = line.text.get(..line.text.len() - blanks).unwrap_or(line.text);

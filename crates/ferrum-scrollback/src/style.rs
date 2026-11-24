@@ -46,6 +46,9 @@ pub struct StyleTable {
     // 512 group checks (a few microseconds), whatever the keys (test
     // `crafted_colliding_styles_stay_correct_and_bounded`).
     ids: FxHashMap<Style, StyleId>,
+    /// The last style looked up and its id. perf: consecutive runs and lines mostly share a
+    /// style, so most lookups skip the hash (bench `vt_parse/ascii_8mib`).
+    last: (Style, StyleId),
     overflowed: u64,
 }
 
@@ -58,7 +61,12 @@ impl Default for StyleTable {
 impl StyleTable {
     /// A table holding only the default style.
     pub fn new() -> Self {
-        let mut table = Self { styles: Vec::new(), ids: FxHashMap::default(), overflowed: 0 };
+        let mut table = Self {
+            styles: Vec::new(),
+            ids: FxHashMap::default(),
+            last: (Style::default(), StyleId::DEFAULT),
+            overflowed: 0,
+        };
         table.styles.push(Style::default());
         table.ids.insert(Style::default(), StyleId::DEFAULT);
         table
@@ -68,7 +76,11 @@ impl StyleTable {
     /// [`MAX_STYLES`] entries a new style is stored as the default style and counted in
     /// [`overflowed`](Self::overflowed): bounded memory beats unbounded color fidelity.
     pub fn intern(&mut self, style: Style) -> StyleId {
+        if style == self.last.0 {
+            return self.last.1;
+        }
         if let Some(&id) = self.ids.get(&style) {
+            self.last = (style, id);
             return id;
         }
         let Ok(raw) = u32::try_from(self.styles.len()) else {
@@ -82,6 +94,7 @@ impl StyleTable {
         let id = StyleId(raw);
         self.styles.push(style);
         self.ids.insert(style, id);
+        self.last = (style, id);
         id
     }
 

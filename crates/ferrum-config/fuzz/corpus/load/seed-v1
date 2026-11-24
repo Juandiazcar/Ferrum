@@ -1,0 +1,13 @@
+# Schema version 1 of settings.toml. Also the expected migration of ../v0/settings.toml.
+schema_version = 1
+
+[appearance]
+theme = "Nord"
+font_family = "Iosevka"
+font_size = 14.5
+cursor_style = "bar"
+
+[terminal]
+scrollback_lines = 20000
+copy_on_select = true
+bell = "off"

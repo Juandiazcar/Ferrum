@@ -3,7 +3,7 @@
 **Responsibility:** the IPC protocol between the UI (`ferrum`) and the daemon (`ferrumd`):
 message types, framing, protocol versioning and the row encoding of damage (`docs/02` §4).
 
-**Status:** WP-03 in progress: everything but the fuzz target is implemented.
+**Status:** implemented (WP-03).
 
 | | |
 |---|---|
@@ -75,5 +75,7 @@ Golden bytes for every message variant and every nested enum variant (`tests/gol
 round-trip properties of rows and of both message enums (`tests/row_roundtrip.rs`,
 `tests/message_roundtrip.rs`), the worst-case screen in frames under the cap
 (`tests/frame_budget.rs`), `Debug` redaction (`tests/redaction.rs`), zero allocation in steady
-state (`tests/alloc_row.rs`). Benches `proto_encode/row_200_cols` and
-`proto_encode/damage_200x60` (no baseline yet: `benches/baselines/README.md`).
+state (`tests/alloc_row.rs`), the fuzz body on the corpus and random bytes
+(`tests/fuzz_seeds.rs`). Fuzz target `decode` in `fuzz/` (nightly job). Benches
+`proto_encode/row_200_cols` and `proto_encode/damage_200x60` (no baseline yet:
+`benches/baselines/README.md`).

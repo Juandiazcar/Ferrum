@@ -1,7 +1,9 @@
 //! `ferrum-testkit`: dev-only helpers: fixtures, golden harness, `PTY` test driver, fake clock,
 //! and shared contract suites.
 //!
-//! Contents so far: [`spill_contract`], the suite every `SpillStore` implementation must pass.
+//! Contents so far: [`spill_contract`], the suite every `SpillStore` implementation must pass;
+//! [`pty_contract`], the suite every `PtyBackend` implementation must pass (PT-01 to PT-25), with
+//! its helper child `ferrum-pty-helper`; and [`fake_pty`], the deterministic fake `PtyBackend`.
 //! The rest arrives with the work packages that need it (see `docs/spec/docs/12-build-order.md`).
 //!
 //! Allowed internal dependencies: any (from dev-dependencies only).
@@ -9,4 +11,6 @@
 
 #![forbid(unsafe_code)]
 
+pub mod fake_pty;
+pub mod pty_contract;
 pub mod spill_contract;

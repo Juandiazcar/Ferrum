@@ -1,0 +1,6 @@
+# nextest configuration (docs/08). The PTY contract cases that record measurements (PT-18
+# throughput, PT-23 memory, the ConPTY startup bytes) print them; show that output on success
+# too, so every CI run records the numbers.
+[[profile.default.overrides]]
+filter = 'test(=large_output_integrity) | test(=ten_sessions_memory) | test(=startup_output_has_no_query_or_repaint)'
+success-output = "immediate"

@@ -62,6 +62,7 @@
 |---|---|---|---|
 | Q-13 | Start code signing (Apple Developer ID, Windows certificate or OSS signing service) | Unsigned until the maintainer supplies accounts | WP-18 |
 | Q-14 | Website/domain | None; the README is the landing page | after v1.0 |
+| Q-31 | WP-05: on Windows, one blocking reader thread per ConPTY session (`docs/11` §4) does not fit the 0.11 MB "per session misc" allowance of `docs/03` §2 | Maintainer decision 2026-11-24: **one I/O thread for all ConPTY sessions**, with overlapped I/O (ConPTY over named pipes opened with `FILE_FLAG_OVERLAPPED`, serviced by an I/O completion port or equivalent, waking the daemon loop through the `PtyBackend` readiness model); no per-session reader thread on Windows. The `docs/03` §2 allowance (0.11 MB) stays and PT-23 must pass on all three OS at that gate. The `PtyBackend` contract stays identical across OS. |
 
 ## 3. Decision log (ADR index)
 
@@ -76,7 +77,7 @@ ADR files live in `docs/adr/NNNN-title.md` (status: proposed / accepted / supers
 | 0005 | Scrollback stored as encoded text + style runs, chunk-compressed, optional disk spill | accepted (validated by S1) |
 | 0006 | CPU rendering via `softbuffer` + custom blitter; `tiny-skia` for chrome only | accepted (validated by S3) |
 | 0007 | Custom minimal UI toolkit; no egui/iced/slint/webview | accepted |
-| 0008 | No async runtime in v1.0; `mio` loop on Unix, reader threads on Windows | accepted (validated by S4) |
+| 0008 | No async runtime in v1.0; `mio` loop on Unix, reader threads on Windows (Windows part superseded by Q-31: one overlapped-I/O thread for all ConPTY sessions) | accepted (validated by S4) |
 | 0009 | IPC via local socket/named pipe, `postcard` frames, versioned protocol | accepted |
 | 0010 | Config/projects in TOML with schema versions; export as tar+zstd | accepted |
 | 0011 | Trunk-based Git, Conventional Commits, squash merges, DCO sign-off | accepted |

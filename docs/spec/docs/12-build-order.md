@@ -46,7 +46,7 @@ Settings model, defaults, TOML load/save atomic, schema versions + migration fra
 **Exit:** contract suite green on Linux and (CI) macOS/Windows.
 
 ### WP-06 `ferrum-daemon` (XL)
-Session manager, `mio` loop (+ Windows reader threads), per-session fairness and backpressure, damage coalescing, attach/detach/snapshot, search worker, reflow worker, project/layout authority + persistence, client server (UDS/pipe) with security (`docs/10` §2), idle shutdown, panic isolation per session, `ferrumd` binary, structured logging.
+Session manager, `mio` loop (Windows: woken by the `PtyBackend`'s single overlapped-I/O thread, Q-31), per-session fairness and backpressure, damage coalescing, attach/detach/snapshot, search worker, reflow worker, project/layout authority + persistence, client server (UDS/pipe) with security (`docs/10` §2), idle shutdown, panic isolation per session, `ferrumd` binary, structured logging.
 **Exit:** integration tests: AC-SESS-01/02, flood isolation (daemon-level), 20-session scenario without UI; `memcheck --daemon-only` within the daemon allowance.
 
 ## Stage 3 — Rendering and UI

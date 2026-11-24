@@ -27,7 +27,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Font parsing | `ttf-parser` | 0.25.1 | render | transitive via fontdb |
 | VT parsing | `vte` | 0.15.0 (2026-11-22, latest stable) | vt | state machine only; Ferrum owns the grid/handlers. `default-features = false`: the `no_std` buffer mode with a 1-byte OSC buffer, because `ferrum-vt` captures OSC strings itself with a 1 MiB cap (ADR 0028) |
 | Unicode widths | `unicode-width` | 0.2.3 (2026-11-22, latest stable) | vt | `default-features = false` (no `cjk` context widths) |
-| Grapheme clusters | `unicode-segmentation` | 1.13.3 (2026-11-22, latest stable) | vt | `default-features = false` |
+| Grapheme clusters | `unicode-segmentation` | 1.13.3 (2026-11-22, latest stable) | vt, project | `default-features = false`; project: a project icon is one grapheme cluster (`FR-PROJ-001`) |
 | Unicode normalization | `unicode-normalization` | 0.1.26 (verified 2026-11-24, latest stable) | config | NFC of `.ferrum` entry names, so names equal on APFS/NTFS are refused at export (`AC-DATA-01`); `default-features = false`; pulls `tinyvec`; MSRV 1.36; license (MIT OR Apache-2.0) AND Unicode-3.0 |
 | PTY | `portable-pty` | 0.9.0 | pty | Linux and macOS PTY only (ADR 0026); last release Feb 2025 → wrapped behind `PtyBackend` so it can be replaced. Windows uses `windows-sys` directly |
 | Windows APIs | `windows-sys` | 0.61.2 | pty, platform | required by the direct ConPTY backend in `ferrum-pty` (`portable-pty` was insufficient on Windows: ADR 0026); prefer `-sys` (no bloat) |
@@ -60,6 +60,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | xtask CLI | `clap` | 4.6.9 (verified 2026-11-21) | xtask only | derive parser for `cargo xtask`; never in shipped binaries |
 | xtask graph check | `cargo_metadata` | 0.23.1 (verified 2026-11-21) | xtask only | typed `cargo metadata` for `check-deps`; brings `serde_json`, build tooling only |
 | xtask bench baselines | `serde_json` | 1.0.154 (verified 2026-11-22, latest stable) | xtask only | reads criterion `estimates.json` and reads/writes `benches/baselines/*.json`; already compiled as a dependency of `cargo_metadata`, never in shipped binaries |
+| Unique ids | `uuid` | 1.29.3 (verified 2026-11-24, latest stable; MSRV 1.89) | project, proto | One row for both uses: project ids (`ProjectId`, a random UUID so imported projects never collide, maintainer decision Q-29, `docs/04` §4; WP-04) and protocol ids (WP-03). The workspace entry is `default-features = false` without features; each crate enables what it uses (`ferrum-project`: `v4` + `serde`, which pulls `getrandom` 0.4 for OS randomness). Phase 2 uses the same crate |
 | Error types | `thiserror` | 2.0.21 (2026-11-23, latest stable) | libs | `default-features = false`, `std` |
 | Error context (bins) | `anyhow` | 1.0.104 | app, daemon, xtask | |
 | Logging | `tracing` | 0.1.44 (2026-11-23, latest stable) | all | `default-features = false`, `std` and `release_max_level_warn` (the `max_level_*` features compile out debug/trace in release) |
@@ -93,7 +94,6 @@ Used only by throwaway packages under `spikes/` (own workspace and lockfile, exc
 | Zeroing | `zeroize` | 1.9.2 | secrets in memory |
 | Time | `jiff` | 1.0.1 | usage windows/resets |
 | JSON | `serde_json` | 1.0.154 | provider APIs, MCP |
-| IDs | `uuid` | 1.29.3 | |
 | Async runtime | `tokio` 1.54.1 **or** blocking threads + `ureq` | — | decided in an ADR at P2-01; **banned in v1.0** (`deny.toml`) |
 
 ## 3. Evaluated and rejected

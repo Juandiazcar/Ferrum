@@ -2,7 +2,10 @@
 //!
 //! Every section and field has a default, so a partial file (or none) is valid; unknown keys are
 //! ignored (forward compatibility, `docs/02` §8). Keybindings and themes live in their own files
-//! (`keybindings.toml`, `themes/*.toml`) and are modeled with the settings UI (WP-13).
+//! (`keybindings.toml`, `themes/*.toml`), modeled in [`crate::Keybindings`] and [`crate::Theme`].
+//!
+//! Values the spec does not fix are user settings whose default and bounds are explained on each
+//! type (maintainer decision Q-30, `docs/14` §2).
 
 mod appearance;
 mod performance;
@@ -21,14 +24,19 @@ pub use appearance::{
     LineHeight, PaddingX, PaddingY, SidebarWidth, UiScale,
 };
 pub use performance::{
-    Channel, GlyphCacheMib, ImageCacheMib, MaxFps, Performance, SpillThresholdLines, Updates,
+    Channel, GlyphCacheMib, ImageCacheMib, MaxFps, Performance, SpillDiskCapMib,
+    SpillThresholdLines, Updates,
 };
 pub use shells::{Profile, Shells};
 pub use terminal::{
-    Bell, DEFAULT_URL_SCHEMES, DEFAULT_WORD_CHARACTERS, OptionAsAlt, Osc52Policy, ScrollSpeed,
-    ScrollbackLines, Terminal,
+    Bell, COLUMN_PLACEHOLDER, DEFAULT_URL_SCHEMES, DEFAULT_WORD_CHARACTERS, EDITOR_PLACEHOLDER,
+    EditorCommand, FILE_PLACEHOLDER, LINE_PLACEHOLDER, OptionAsAlt, Osc52Policy, ScrollSpeed,
+    ScrollbackLines, Terminal, TitleReporting,
 };
-pub use window::{KeepSessions, Projects, SidebarState, StatusBar, Titlebar, Window};
+pub use window::{
+    KeepSessions, NewSessionRoot, OpenProjectIn, Projects, RecentProjects, SidebarState, StatusBar,
+    Titlebar, Window,
+};
 
 use crate::error::ConfigError;
 use crate::schema::Schema;

@@ -1,0 +1,18 @@
+---
+source: crates/ferrum-vt/tests/fixtures.rs
+---
+size 20x6 primary
+cursor row=0 col=0 wrap_pending=false
+modes AUTOWRAP|CURSOR_VISIBLE|BRACKETED_PASTE
+00 |                    |
+01 |                    |
+02 |                    |
+03 |                    |
+04 |                    |
+05 |                    |
+history 0
+events
+  Reply \x1b[?2004;1$y
+  Reply \x1b[?25;1$y
+  Reply \x1b[?1;2$y
+  Reply \x1b[4;2$y

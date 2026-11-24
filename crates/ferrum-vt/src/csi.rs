@@ -3,6 +3,7 @@
 use crate::args::Args;
 use crate::core::Core;
 use crate::events::EventSink;
+use crate::modes::{Scope, Switch};
 
 /// TBC parameter that clears the tab stop at the cursor (the default).
 const TBC_CURRENT: u16 = 0;
@@ -12,8 +13,14 @@ const TBC_ALL: u16 = 3;
 impl<S: EventSink> Core<S> {
     /// Routes a CSI sequence. Unknown sequences are ignored (and never reported back).
     pub(crate) fn csi(&mut self, args: Args<'_>, intermediates: &[u8], action: char) {
-        if intermediates.is_empty() {
-            self.csi_plain(args, action);
+        match (intermediates, action) {
+            ([], _) => self.csi_plain(args, action),
+            ([b'?'], _) => self.csi_private(args, action),
+            ([b' '], 'q') => self.set_cursor_style(args.mode(0)),
+            ([b'!'], 'p') => self.soft_reset(),
+            ([b'$'], 'p') => self.report_mode(args, Scope::Ansi),
+            ([b'?', b'$'], 'p') => self.report_mode(args, Scope::Private),
+            _ => {}
         }
     }
 
@@ -22,6 +29,9 @@ impl<S: EventSink> Core<S> {
             return;
         }
         match action {
+            'm' => self.sgr(args),
+            'h' => self.set_modes(args, Scope::Ansi, Switch::Set),
+            'l' => self.set_modes(args, Scope::Ansi, Switch::Reset),
             'g' => self.clear_tab_stops(args.mode(0)),
             'r' => self.set_scroll_region(args),
             's' => self.save_cursor(),
@@ -73,6 +83,14 @@ impl<S: EventSink> Core<S> {
             _ => return false,
         }
         true
+    }
+
+    fn csi_private(&mut self, args: Args<'_>, action: char) {
+        match action {
+            'h' => self.set_modes(args, Scope::Private, Switch::Set),
+            'l' => self.set_modes(args, Scope::Private, Switch::Reset),
+            _ => {}
+        }
     }
 
     /// TBC.

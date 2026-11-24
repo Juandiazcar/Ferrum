@@ -18,6 +18,9 @@ pub(crate) mod control {
     pub(crate) const CR: u8 = 0x0D;
     pub(crate) const SO: u8 = 0x0E;
     pub(crate) const SI: u8 = 0x0F;
+    /// First and last C1 control.
+    pub(crate) const C1_FIRST: u8 = 0x80;
+    pub(crate) const C1_LAST: u8 = 0x9F;
     pub(crate) const IND: u8 = 0x84;
     pub(crate) const NEL: u8 = 0x85;
     pub(crate) const HTS: u8 = 0x88;

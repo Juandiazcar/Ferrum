@@ -1,0 +1,15 @@
+---
+source: crates/ferrum-vt/tests/fixtures.rs
+---
+size 20x6 primary
+cursor row=0 col=1 wrap_pending=false
+modes AUTOWRAP|CURSOR_VISIBLE
+pen bg=i1
+00 |x                   |
+01 |                    |
+02 |                    |
+03 |                    |
+04 |                    |
+05 |                    |
+  r0 c0-19 bg=i1
+history 0

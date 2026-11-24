@@ -3,6 +3,7 @@
 use super::{Place, Scrollback, ScrollbackEvent, SealedChunk, SpillDisableCause, SpillState};
 use crate::error::{ScrollbackError, SpillError};
 use crate::spill::SpillHandle;
+use crate::style::StyleTable;
 
 impl Scrollback {
     /// Seals the full hot chunk, then moves cold chunks out of RAM if the threshold is crossed.
@@ -86,17 +87,37 @@ impl Scrollback {
     pub(super) fn evict(&mut self) {
         let limit = self.effective_max_lines();
         while self.retained > limit {
-            self.retained -= 1;
-            self.dropped_lines += 1;
-            let Some(front) = self.chunks.front() else {
-                self.hot_skip += 1;
-                continue;
-            };
-            self.head_skip += 1;
-            if self.head_skip >= front.lines {
-                self.pop_front_chunk();
-            }
+            self.drop_front_line();
         }
+    }
+
+    /// Drops the oldest retained line; does nothing when there is none.
+    pub(super) fn drop_front_line(&mut self) {
+        let Some(retained) = self.retained.checked_sub(1) else { return };
+        self.retained = retained;
+        self.dropped_lines += 1;
+        let Some(front) = self.chunks.front() else {
+            self.hot_skip += 1;
+            return;
+        };
+        self.head_skip += 1;
+        if self.head_skip >= front.lines {
+            self.pop_front_chunk();
+        }
+    }
+
+    /// Drops every retained line without decoding it: chunks and spilled records are released
+    /// as they are. Lines already pushed still count in [`pushed_lines`](Self::pushed_lines).
+    pub fn clear(&mut self) {
+        while !self.chunks.is_empty() {
+            self.pop_front_chunk();
+        }
+        self.hot.clear();
+        self.head_skip = 0;
+        self.hot_skip = 0;
+        self.dropped_lines += u64::try_from(self.retained).unwrap_or(u64::MAX);
+        self.retained = 0;
+        self.styles = StyleTable::new();
     }
 
     /// Drops the whole oldest chunk (the rest of it counts as dropped).

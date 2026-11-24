@@ -17,6 +17,7 @@ use crate::chunk::{HotChunk, Sealer};
 use crate::config::ScrollbackConfig;
 use crate::encode::Encoder;
 use crate::error::ScrollbackError;
+use crate::limits::MAX_LINE_TEXT_BYTES;
 use crate::line::LineRef;
 use crate::memory::MemoryReport;
 use crate::spill::{SpillHandle, SpillStore};
@@ -128,8 +129,11 @@ impl Scrollback {
     /// sealed blob (the retained data itself).
     ///
     /// # Errors
-    /// A line over the size limits or with runs that do not cover its text is rejected and
-    /// stores nothing; a compression failure keeps the line (and retries sealing on the next push).
+    /// A line over the size limits, or with runs that do not cover its text, is still stored and
+    /// counted, so that line numbers stay stable: as its text cut to
+    /// [`MAX_LINE_TEXT_BYTES`](crate::MAX_LINE_TEXT_BYTES) at a character boundary, without
+    /// styles; the error says what was lost. A compression failure keeps the line (and retries
+    /// sealing on the next push).
     pub fn push_line(&mut self, line: &LineRef<'_>) -> Result<(), ScrollbackError> {
         if self.config.max_lines() == 0 {
             self.pushed_lines += 1;
@@ -138,15 +142,31 @@ impl Scrollback {
         if self.hot.is_full() {
             self.seal_hot()?;
         }
-        let planned = self.encoder.plan(&mut self.styles, line)?;
-        self.hot.append(&self.encoder, &planned);
+        let stored = self.append(line);
         self.pushed_lines += 1;
         self.retained += 1;
         if self.hot.is_full() {
             self.seal_hot()?;
         }
         self.evict();
-        Ok(())
+        stored
+    }
+
+    /// Appends `line` to the hot chunk, or its clipped plain text when it cannot be stored as is.
+    fn append(&mut self, line: &LineRef<'_>) -> Result<(), ScrollbackError> {
+        let error = match self.encoder.plan(&mut self.styles, line) {
+            Ok(planned) => {
+                self.hot.append(&self.encoder, &planned);
+                return Ok(());
+            }
+            Err(error) => error,
+        };
+        let text = line.text.get(..line.text.floor_char_boundary(MAX_LINE_TEXT_BYTES));
+        let plain = LineRef { flags: line.flags, text: text.unwrap_or_default(), runs: &[] };
+        // A text within the limit and no runs always plans.
+        let planned = self.encoder.plan(&mut self.styles, &plain)?;
+        self.hot.append(&self.encoder, &planned);
+        Err(error)
     }
 
     /// Number of retained lines.

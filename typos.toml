@@ -8,6 +8,7 @@ extend-exclude = [
   "crates/*/fuzz/corpus/",  # raw bytes of terminal sessions and fixtures
   "*.in",  # raw bytes of fixtures
   "fixtures/vt/alacritty/", # recordings of real shells (third-party, byte exact)
+  "fixtures/unicode/", # official Unicode data files, committed unmodified
 ]
 
 [default.extend-words]

@@ -4,7 +4,7 @@ Handoff document so a new AI session (or a human) can pick up the work exactly w
 It is updated at every milestone (merge, WP state change, agent launch) and before a session's
 context runs out. `PROGRESS.md` remains the per-WP record; this file is the "how to resume" view.
 
-Last update: 2026-11-23 (end of session): WP-02 stack #36–#53 + #55 verified except x86 ASCII perf; perf rework in progress.
+Last update: 2026-11-24: WP-02 merged; WP-03, WP-04 (fixing 32 audit blockers) and WP-05 in progress in parallel.
 
 ## 1. How to resume (paste into a new Claude Code session, working directory `Ferrum/`)
 
@@ -22,7 +22,7 @@ Opus subagents implement. Ask the maintainer only on real doubts.
 - Spec: `docs/spec/`. Work order: `docs/spec/docs/12-build-order.md`.
 - Agent manual: `CLAUDE.md`. Project skills: `.claude/skills/ferrum-{wp,audit,git,deps}`.
 - ADRs: `docs/adr/` (0001, 0016, 0022–0027). Resolved decisions: `docs/spec/docs/14-risks-and-decisions.md` §2
-  (next free open-question number: Q-28).
+  (next free open-question number: Q-31; Q-29/Q-30 are being recorded by the WP-04 stack).
 
 ## 3. Workflow (agreed with the maintainer)
 
@@ -66,10 +66,10 @@ GitHub closes a stacked PR when its base branch is deleted, and `gh pr merge` on
 stacked base, not `main`. Merge one at a time: before merging N run `gh pr edit <N+1> --base main`; after the
 merge run `git rebase --onto origin/main <old tip of N>`, push, wait for CI, merge. Never loop the chain blindly.
 
-## 4. Status (2026-11-22)
+## 4. Status (2026-11-24)
 
 Done and on `main` (CI green): WP-00 bootstrap, spikes S1–S4, RESUME.md (#17), WP-01 `ferrum-scrollback`
-(PRs #9, #10, #14, #15, #16 — commit `98eb763`).
+(PRs #9, #10, #14, #15, #16 — commit `98eb763`), WP-02 `ferrum-vt` (#36–#53, #55 — commit `6b54abb`).
 
 Measured: S1 0.68 MB/session (WP-01 crate side ~0.43 MB) · S2 system allocator on Linux/Windows, mimalloc on
 macOS · S3 repaint ~1.0 ms typical / ~2.6–2.8 ms dense (i5-9400) · S4 direct ConPTY via windows-sys
@@ -77,35 +77,18 @@ macOS · S3 repaint ~1.0 ms typical / ~2.6–2.8 ms dense (i5-9400) · S4 direct
 
 ## 5. Exact resume point
 
-- **WP-02 `ferrum-vt` is stack #36 → … → #52 → #55 → #53** (19 stacked PRs, CI green on all at tip `fba16a0`).
-  Round-2 fixes are done and verified: `cargo xtask check` green (302 tests), memory_budget ok, 30-min CI fuzz
-  clean on `fba16a0` (run 45252441193).
-- Maintainer decisions Q-21..Q-27 are in docs/14 §2. Q-26: `MAX_PENDING_CHUNKS = 2`, the sealed allowance
-  shrinks 0.45 → 0.36 MB (session still 1.00 MB). Q-27 amended by the maintainer: Opus measures itself on
-  GitHub-hosted x86 runners (temporary workflow `bench-vt-temporary.yml`, branch `ci/vt-bench-runners`);
-  `windows.json` keeps no vt baselines.
-- **Single open blocker: NFR-PERF-02 ASCII with push ≥ 400 MB/s fails on x86** (run 45261582684):
-  Windows AMD EPYC 9V74 313 MB/s, Linux Xeon 6975P-C 373 MB/s (M2: 426 MB/s). SGR-heavy (≥120) passes
-  (167/176 MiB/s), reflow 3.4 ms passes. The bottleneck is the push path (encode + `push_line`), not the
-  worker (inline seals are rare).
-- An Opus subagent was optimizing that push path in worktree `Ferrum-wt-rework`, branch
-  `wip/vt-stack-final` (WIP pushed to origin at session end). Resume: read that branch's log, re-measure
-  on the hosted runners, continue optimizing until ≥ 400 MB/s with margin on both; if impossible after
-  serious effort, bring profile + numbers to the maintainer (new Q-28). Never loosen the gate.
-- Perf WIP at session end: commit `49e7960` on `wip/vt-stack-final` (ring index without division = only clear
-  win; style cache, ASCII char count, 8-cell copy, 16-byte `Cell`; not yet run through full xtask check/dhat).
-  Xeon 6975P 345 → 364 MiB/s. Hosted runners land on varied CPUs (EPYC 7763/9V74/9V45, Xeon 8573C/6975P):
-  untouched baseline ranges 248–408 MiB/s and `_no_history` is only ~440 on 7763/8573C, so ≥ 400 with push
-  may be unreachable there. **Ask the maintainer (Q-28) how Q-27 judges a pass across runner CPUs.** A/B runs
-  on `ci/vt-bench-x86-1..4` (delete afterwards).
-- Final A/B (3 rounds): best WIP 292 MiB/s on EPYC 9V74 (Windows), 369 on Xeon 6975P-C (Linux); gate is
-  381.5 MiB/s. Keep ring-index + style-cache/ASCII-count (+4–7%); drop the 8-cell copy (neutral/negative);
-  alignment and direct return are neutral. Push costs ~84 ns/line on the parse thread, the worker only 5–8%,
-  no single big hotspot left. `ci/vt-bench-x86-*` already deleted; local worktrees Ferrum-wt-x86 and
-  Ferrum-wt-pushx86 can be removed.
-- Then: single verification (only the perf commits + gates: xtask check, x86 bench, 30-min fuzz, CI) →
-  merge the stack one PR at a time with the §3 stacked-PR procedure (#36 first, #53 last) → delete
-  `ci/vt-fuzz-30min*`, `ci/vt-bench-runners`, `wip/*` → WP-03 `ferrum-proto`.
+- **WP-02 `ferrum-vt` is merged** (stack #36–#53 + #55, last commit `6b54abb`, 2026-11-24). Q-28: NFR-PERF-02 ASCII
+  with push accepted as measured (hosted runners give random CPUs). Temporary branches and WP-02 worktrees deleted.
+- **WP-04** `ferrum-config` + `ferrum-project`: stack #57 → #58 → #59 → #60 (worktree `Ferrum-wt-wp04`). Single-pass
+  audit found 32 blockers (posted on #60). Maintainer decisions to record in docs/14 by that stack: **Q-29 ProjectId =
+  UUID** (uuid enters v1.0); **Q-30 every self-chosen user-facing value becomes a setting** (internal anti-hostile
+  parser caps stay constants with a documented reason). Next: the implementer fixes all 32 → ONE verification
+  (listed findings + fix code + gates) → merge with the stacked procedure.
+- **WP-03** `ferrum-proto`: Opus implementer in worktree `Ferrum-wt-wp03` (branch `feat/wp03-proto`).
+- **WP-05** `ferrum-pty`: Opus implementer in worktree `Ferrum-wt-wp05` (branch `feat/wp05-pty`).
+- Then WP-06 `ferrum-daemon` (needs WP-02..WP-05).
+- Stacked merges: track each branch's ORIGINAL tip before rebasing the next one onto `origin/main`
+  (`git rebase --onto origin/main <original tip of N> <N+1>`); `main` requires branches to be up to date.
 
 ## 6. What remains (21 WPs total; 19 left including WP-02)
 

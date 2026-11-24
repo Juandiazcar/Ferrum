@@ -2,7 +2,6 @@
 //! encoding rows, filling a `RowBlock` and framing a `Damage` allocate nothing.
 //! One test per binary: `dhat` profiles the whole process.
 
-#![cfg(not(miri))] // dhat is not supported under Miri
 #![allow(clippy::unwrap_used, reason = "test code: a failed expectation is a failed test")]
 
 use ferrum_proto::{
@@ -13,6 +12,7 @@ use ferrum_proto::{
 #[path = "support/sample.rs"]
 mod sample;
 
+#[cfg(not(miri))] // dhat is not supported under Miri
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
@@ -33,7 +33,6 @@ fn fill(damage: &mut DaemonMessage) {
     }
 }
 
-#[test]
 fn encoding_rows_allocates_nothing_in_steady_state() {
     let _profiler = dhat::Profiler::builder().testing().build();
     let cursor =
@@ -64,4 +63,11 @@ fn encoding_rows_allocates_nothing_in_steady_state() {
         encode_frame(&damage, &mut frame).unwrap();
     }
     assert_eq!(blocks() - before, 0, "steady-state row encoding allocates");
+}
+
+fn main() {
+    ferrum_testkit::single_test::single_test(
+        "encoding_rows_allocates_nothing_in_steady_state",
+        encoding_rows_allocates_nothing_in_steady_state,
+    );
 }

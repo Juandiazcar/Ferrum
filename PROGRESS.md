@@ -2,6 +2,19 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## Fix: flaky `dhat` gates (branch `fix/proto-alloc-row-flaky`)
+
+`alloc_row` failed once on ubuntu CI and passed on rerun. Cause: the libtest harness runs the
+test on a spawned thread while its main thread still allocates (bookkeeping for the spawned test,
+then the channel it waits on); `dhat` counts every thread, so a measured window that opens early
+saw 3 to 5 foreign blocks. A counting-allocator probe showed 0 blocks on the test thread in every
+failing run. The encoder never allocated. Fix: the six `dhat` test binaries (`ferrum-proto`
+`alloc_row`, `ferrum-scrollback` `alloc_push_line` and `memory_budget`, `ferrum-vt`
+`alloc_extras`, `alloc_parse` and `alloc_reflow`) are `harness = false` and run on the main
+thread through `ferrum_testkit::single_test`; `xtask/tests/dhat_harness.rs` fails if a `dhat`
+test uses the libtest harness. `alloc_row` under 48 parallel processes on an Apple M2: 4 failures
+in 5 000 runs before, 0 in 5 000 after.
+
 ## WP-05 `ferrum-pty` (stacked PRs #62 → #63 → #64)
 
 Done: the `PtyBackend` traits of ADR 0026 (`PtySession` = reader, writer, resize, child, plus a

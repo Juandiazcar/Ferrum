@@ -10,12 +10,12 @@
 //! with nobody sealing (the inline fallback). One test per binary: `dhat` profiles the whole
 //! process.
 
-#![cfg(not(miri))] // dhat is not supported under Miri
 #![allow(clippy::expect_used, reason = "test code: a failed expectation is a failed test")]
 
 use ferrum_scrollback::{ChunkSealer, HOT_CHUNK_LINES, PendingChunk, Scrollback, ScrollbackConfig};
 use ferrum_vt::{NullSink, Size, Terminal};
 
+#[cfg(not(miri))] // dhat is not supported under Miri
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
@@ -159,7 +159,6 @@ fn run(max_lines: usize, threshold: usize, sealing: Sealing) -> Pass {
     pass
 }
 
-#[test]
 fn parse_allocates_nothing_in_steady_state() {
     let _profiler = dhat::Profiler::builder().testing().build();
     // No history: every allocation would be the parser's.
@@ -182,4 +181,11 @@ fn parse_allocates_nothing_in_steady_state() {
     let pass = run(RETAINED_LINES, RETAINED_LINES, Sealing::Nobody);
     assert!(pass.inline_seals > 0, "{pass:?}");
     assert_eq!(pass.parse_blocks, pass.inline_seals, "one allocation per inline seal: {pass:?}");
+}
+
+fn main() {
+    ferrum_testkit::single_test::single_test(
+        "parse_allocates_nothing_in_steady_state",
+        parse_allocates_nothing_in_steady_state,
+    );
 }

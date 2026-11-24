@@ -53,8 +53,8 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | File dialogs | `rfd` | 0.18.0 | app | folder picker for projects, export/import; evaluate memory/size (S3); fallback = in-app path input + drag & drop |
 | Color parsing | `csscolorparser` | 0.9.2 | config | theme import (`#rrggbb`, `rgb()`, names) |
 | Plist (iTerm themes) | `plist` | 1.10.4 | config | only for `.itermcolors` import; write a minimal parser if the crate proves heavy (measure at WP-13) |
-| Archives (export) | `tar` | 0.4.46 | config | `.ferrum` = tar + zstd |
-| Zstd | `zstd` | 0.14.4 | config | export archives only |
+| Archives (export) | `tar` | 0.4.46 (re-verified 2026-11-24, latest stable) | config | `.ferrum` = tar + zstd; `default-features = false` (no `xattr`): entries carry fixed metadata only |
+| Zstd | `zstd` | 0.14.4 (re-verified 2026-11-24, latest stable; bundles zstd 1.5.7 through `zstd-sys` 2.1.3, built by its `build.rs` with `cc`, no network) | config | export archives only; `default-features = false` (no `legacy`, `arrays`, `zdict_builder`); 4 MiB window enforced on the decoder |
 | CLI args | `lexopt` | 0.3.2 | app, daemon | tiny; `clap` is only used in `xtask` |
 | xtask CLI | `clap` | 4.6.9 (verified 2026-11-21) | xtask only | derive parser for `cargo xtask`; never in shipped binaries |
 | xtask graph check | `cargo_metadata` | 0.23.1 (verified 2026-11-21) | xtask only | typed `cargo metadata` for `check-deps`; brings `serde_json`, build tooling only |

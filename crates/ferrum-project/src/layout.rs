@@ -7,11 +7,14 @@ use serde::{Deserialize, Serialize};
 use crate::error::ProjectError;
 use crate::project::SessionKey;
 
-/// Deepest nesting of splits accepted (far more panes than fit on a screen at the minimum pane
-/// size of 10×3 cells, `docs/09` §4).
+/// Deepest nesting of splits accepted. Anti-hostile cap: 32 nested splits are far more than fit
+/// on a screen at the minimum pane size of 10×3 cells (`docs/09` §4), and the balanced trees of
+/// [`Layout::equal`] need only 10 levels for 1 024 sessions.
 pub const MAX_LAYOUT_DEPTH: usize = 32;
 
-/// Split ratios are per mille of the parent's size given to the first child.
+/// Split ratios are per mille of the parent's size given to the first child. A file format choice:
+/// integers round-trip exactly through TOML, and 0.1 % of a 4K-wide window is under 4 pixels, finer
+/// than a cell.
 pub const RATIO_SCALE: u16 = 1_000;
 
 /// Direction of a split.
@@ -47,7 +50,9 @@ pub enum Layout {
 }
 
 impl Layout {
-    /// All `sessions` along `axis` with equal shares, or `None` when `sessions` is empty.
+    /// All `sessions` along `axis` with equal shares, as a balanced tree (depth ⌈log2 n⌉, so even
+    /// thousands of sessions stay far inside [`MAX_LAYOUT_DEPTH`]; every ratio is 333 to 500).
+    /// `None` when `sessions` is empty or the tree could not satisfy [`Layout::validate`].
     ///
     /// ```
     /// use ferrum_project::{Axis, Layout, SessionKey};
@@ -55,18 +60,27 @@ impl Layout {
     /// assert_eq!(layout.sessions(), [SessionKey(1), SessionKey(2)]);
     /// ```
     pub fn equal(sessions: &[SessionKey], axis: Axis) -> Option<Self> {
-        let (&last, rest) = sessions.split_last()?;
-        let mut layout = Self::Pane { session: last };
-        // Built from the end: the split holding k panes gives its first pane 1/k of the space.
-        for (k, &session) in (2_u16..).zip(rest.iter().rev()) {
-            layout = Self::Split {
-                axis,
-                ratio: RATIO_SCALE / k,
-                first: Box::new(Self::Pane { session }),
-                second: Box::new(layout),
-            };
+        Self::balanced(sessions, axis, 0)
+    }
+
+    fn balanced(sessions: &[SessionKey], axis: Axis, depth: usize) -> Option<Self> {
+        match sessions {
+            [] => None,
+            [session] => Some(Self::Pane { session: *session }),
+            _ if depth >= MAX_LAYOUT_DEPTH => None,
+            _ => {
+                let mid = sessions.len() / 2;
+                let (first, second) = sessions.split_at(mid);
+                let share = u64::try_from(mid).ok()?.checked_mul(u64::from(RATIO_SCALE))?;
+                let ratio = u16::try_from(share / u64::try_from(sessions.len()).ok()?).ok()?;
+                Some(Self::Split {
+                    axis,
+                    ratio,
+                    first: Box::new(Self::balanced(first, axis, depth.saturating_add(1))?),
+                    second: Box::new(Self::balanced(second, axis, depth.saturating_add(1))?),
+                })
+            }
         }
-        Some(layout)
     }
 
     /// Sessions shown, left to right / top to bottom.
@@ -138,6 +152,20 @@ mod tests {
     }
 
     #[test]
+    fn equal_layouts_of_many_sessions_are_valid() {
+        // Past 65 536 the old builder overflowed; Miri runs the small sizes only (an interpreted
+        // 70 000-pane tree takes about an hour there).
+        let sizes: &[u64] = if cfg!(miri) { &[34, 1_002] } else { &[34, 1_002, 70_000] };
+        for &n in sizes {
+            let all = keys(n);
+            let layout = Layout::equal(&all, Axis::Horizontal).unwrap();
+            assert_eq!(layout.sessions(), all, "{n}");
+            let known: HashSet<_> = all.into_iter().collect();
+            assert_eq!(layout.validate(&known), Ok(()), "{n}");
+        }
+    }
+
+    #[test]
     fn validation_rejects_unknown_duplicate_bad_ratio_and_deep_trees() {
         let known: HashSet<_> = keys(2).into_iter().collect();
         assert_eq!(Layout::equal(&keys(2), Axis::Horizontal).unwrap().validate(&known), Ok(()));
@@ -158,7 +186,15 @@ mod tests {
             assert_eq!(bad.validate(&known), Err(ProjectError::BadRatio(ratio)));
         }
         let deep_keys = keys(u64::try_from(MAX_LAYOUT_DEPTH).unwrap() + 2);
-        let deep = Layout::equal(&deep_keys, Axis::Vertical).unwrap();
+        let mut deep = Layout::Pane { session: SessionKey(1) };
+        for &session in deep_keys.iter().skip(1) {
+            deep = Layout::Split {
+                axis: Axis::Vertical,
+                ratio: 500,
+                first: pane(session.0),
+                second: Box::new(deep),
+            };
+        }
         let all: HashSet<_> = deep_keys.into_iter().collect();
         assert!(matches!(deep.validate(&all), Err(ProjectError::LayoutTooDeep { .. })));
     }

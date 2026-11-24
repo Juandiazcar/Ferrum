@@ -12,6 +12,7 @@ publish.workspace = true
 postcard = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

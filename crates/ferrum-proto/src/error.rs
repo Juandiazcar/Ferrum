@@ -32,9 +32,16 @@ pub enum ProtoError {
     /// An encoded row or run is longer than its `u32` length field can say.
     #[error("encoded row part of {0} bytes is too long")]
     RowTooLong(usize),
+    /// The row does not fit in the block (see
+    /// [`MAX_ROW_BLOCK_BYTES`](crate::MAX_ROW_BLOCK_BYTES)); send the block and start a new one.
+    #[error("the row does not fit in the block")]
+    BlockFull,
     /// A list holds more items than [`MAX_LIST_ITEMS`](crate::MAX_LIST_ITEMS).
     #[error("list of {0} items exceeds the limit")]
     TooManyItems(usize),
+    /// A value is outside its documented range; the text says which.
+    #[error("invalid value: {0}")]
+    InvalidValue(&'static str),
     /// An encoded row is not well formed; the text says which part.
     #[error("malformed row: {0}")]
     MalformedRow(&'static str),

@@ -112,14 +112,16 @@ fn submodules_read_their_own_head_not_the_superproject() {
 #[test]
 fn directories_outside_any_repository_have_no_head() {
     let tmp = TempDir::new("git-none").unwrap();
+    // The temporary directory itself may sit inside a repository (e.g. TMPDIR under a checkout):
+    // whatever the ambient answer is, nothing inside `tmp` may be reported.
+    let ambient = read_head(tmp.path()).unwrap();
     let plain: PathBuf = tmp.join("plain/dir");
     fs::create_dir_all(&plain).unwrap();
-    assert_eq!(read_head(&plain).unwrap(), None);
-    assert_eq!(
-        read_head(&tmp.join("missing/dir")).unwrap(),
-        None,
-        "a missing start is not an error"
-    );
+    let found = read_head(&plain).unwrap();
+    assert_eq!(found, ambient);
+    assert!(found.is_none_or(|head| !head.work_tree.starts_with(tmp.path())));
+    let missing = read_head(&tmp.join("missing/dir")).unwrap();
+    assert_eq!(missing, ambient, "a missing start is not an error");
 }
 
 #[test]
@@ -144,6 +146,18 @@ fn broken_repositories_are_errors_not_panics() {
     let padding = " ".repeat(usize::try_from(MAX_GIT_FILE_BYTES).unwrap());
     repo(&huge, &format!("ref: refs/heads/main\n{padding}"));
     assert!(matches!(read_head(&huge), Err(GitError::Malformed(_))));
+}
+
+/// A FIFO named `HEAD` would block a plain `open` forever; it must be refused without opening it.
+#[cfg(unix)]
+#[cfg_attr(miri, ignore = "Miri cannot spawn the mkfifo process")]
+#[test]
+fn a_head_that_is_not_a_regular_file_is_refused_without_blocking() {
+    let tmp = TempDir::new("git-fifo").unwrap();
+    fs::create_dir_all(tmp.join(".git")).unwrap();
+    let status = std::process::Command::new("mkfifo").arg(tmp.join(".git/HEAD")).status().unwrap();
+    assert!(status.success());
+    assert!(matches!(read_head(tmp.path()), Err(GitError::Malformed(_))));
 }
 
 #[test]

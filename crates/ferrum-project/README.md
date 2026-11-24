@@ -47,7 +47,8 @@ The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2,
   repository) or a file `gitdir: <path>` (linked worktree under `.git/worktrees/<name>`, submodule
   under `.git/modules/<name>`; relative paths are relative to the `.git` file's directory). It
   parses `HEAD` into `Head::Branch`, `Head::Detached` (40 or 64 hex digits, SHA-1 or SHA-256) or
-  `Head::OtherRef`. Files are read with a 4 KiB cap; anything git would not write is
+  `Head::OtherRef`. Only regular files are opened (a FIFO would block), with a 4 KiB cap;
+  anything git would not write (including `ref: refs/heads/` with no branch) is
   `GitError::Malformed`. Called on demand (focus or cwd change); there is no polling.
 
 ## Persistence

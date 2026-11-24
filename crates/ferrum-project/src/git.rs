@@ -18,10 +18,12 @@ use std::path::{Path, PathBuf};
 
 use crate::error::GitError;
 
-/// Largest `HEAD` or `.git` file read (both are one short line).
+/// Largest `HEAD` or `.git` file read. Anti-hostile cap: both are one line of at most a ref name
+/// or a path (git writes under 300 bytes); 4 KiB also fits a 4 096-byte `gitdir:` path.
 pub const MAX_GIT_FILE_BYTES: u64 = 4 * 1_024;
 
-/// Longest ref name accepted from `HEAD`.
+/// Longest ref name accepted from `HEAD`. Anti-hostile cap: git limits a ref path component to
+/// the 255-byte file name limit and real ref names are far shorter; 1 KiB allows nesting.
 const MAX_REF_BYTES: usize = 1_024;
 
 /// Hex digits of a SHA-1 commit id.
@@ -123,10 +125,12 @@ fn parse_head(text: &str) -> Option<Head> {
         if !valid {
             return None;
         }
-        return Some(match target.strip_prefix(BRANCH_PREFIX) {
-            Some(branch) if !branch.is_empty() => Head::Branch(branch.to_owned()),
-            _ => Head::OtherRef(target.to_owned()),
-        });
+        return match target.strip_prefix(BRANCH_PREFIX) {
+            // `ref: refs/heads/` names no branch; git never writes it.
+            Some("") => None,
+            Some(branch) => Some(Head::Branch(branch.to_owned())),
+            None => Some(Head::OtherRef(target.to_owned())),
+        };
     }
     let is_id = matches!(line.len(), SHA1_HEX_DIGITS | SHA256_HEX_DIGITS)
         && line.bytes().all(|b| b.is_ascii_hexdigit());
@@ -135,6 +139,10 @@ fn parse_head(text: &str) -> Option<Head> {
 
 fn read_small(path: &Path) -> Result<String, GitError> {
     let io_error = |source| GitError::Io { path: path.to_owned(), source };
+    // Only regular files: opening a FIFO or a device for reading can block forever.
+    if !fs::metadata(path).map_err(io_error)?.is_file() {
+        return Err(GitError::Malformed(path.to_owned()));
+    }
     let mut bytes = Vec::new();
     let _len = File::open(path)
         .and_then(|file| file.take(MAX_GIT_FILE_BYTES.saturating_add(1)).read_to_end(&mut bytes))
@@ -157,10 +165,6 @@ mod tests {
         assert_eq!(parse_head("ref:refs/heads/main"), branch("main"));
         let other = Some(Head::OtherRef("refs/remotes/origin/main".to_owned()));
         assert_eq!(parse_head("ref: refs/remotes/origin/main\n"), other);
-        assert_eq!(
-            parse_head("ref: refs/heads/\n"),
-            Some(Head::OtherRef("refs/heads/".to_owned()))
-        );
         let sha1 = "0123456789ABCDEF0123456789abcdef01234567";
         assert_eq!(parse_head(sha1), Some(Head::Detached(sha1.to_ascii_lowercase())));
         let sha256 = "a".repeat(SHA256_HEX_DIGITS);
@@ -173,6 +177,7 @@ mod tests {
         for bad in [
             "",
             "\n",
+            "ref: refs/heads/\n",
             "ref:",
             "ref: ",
             "ref: a b",

@@ -413,6 +413,8 @@ name = "ferrum-daemon"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "criterion",
+ "dhat",
  "ferrum-config",
  "ferrum-platform",
  "ferrum-project",

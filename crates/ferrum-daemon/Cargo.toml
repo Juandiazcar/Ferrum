@@ -38,4 +38,15 @@ tracing-subscriber = { workspace = true }
 mimalloc = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
+dhat = { workspace = true }
 ferrum-testkit = { workspace = true }
+
+[[bench]]
+name = "search"
+harness = false
+
+# `dhat` counts every thread: run on the main thread (ferrum-testkit `single_test`).
+[[test]]
+name = "alloc_frame"
+harness = false

@@ -18,6 +18,9 @@ pub(crate) const CEILINGS_NS: &[(&str, f64)] = &[
     // "Scrollback search over 10 000 lines: <= 15 ms", so the ceiling is 30 ms.
     ("scrollback_search/literal_10k_lines", 30_000_000.0),
     ("scrollback_search/literal_insensitive_10k_lines", 30_000_000.0),
+    // The daemon's search path (snapshot, screen copy, joined wrapped rows): the same target.
+    ("daemon_search/literal_insensitive_10k_lines", 30_000_000.0),
+    ("daemon_search/regex_insensitive_10k_lines", 30_000_000.0),
     // NFR-PERF-02 (8 MiB inputs, the product configuration: with the scrollback push on, Q-21):
     // 400 MB/s on plain ASCII is 20.97 ms, so the ceiling is 41.94 ms; 120 MB/s on SGR-heavy
     // output is 69.9 ms, so 139.81 ms. The state machine alone (no history) must stay under the

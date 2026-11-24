@@ -17,4 +17,4 @@ rules of docs/04 §2 are untouched). `tests/fixture_mix.rs` checks the achieved 
 the numbers are counted, never assumed. Colors are fixture-local values; `ferrum-vt` defines the
 real encoding.
 
-**Filled by:** WP-01 (rows for scrollback); WP-08 adds the byte-stream rendering for `memcheck`.
+**Filled by:** WP-01 (rows for scrollback); WP-06 adds `stream.rs`, the byte-stream rendering the sessions of `memcheck --daemon-only` print (SGR per style run, `\r\n` per logical line).

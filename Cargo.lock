@@ -366,6 +366,10 @@ dependencies = [
 [[package]]
 name = "ferrum-proto"
 version = "0.1.0"
+dependencies = [
+ "proptest",
+ "thiserror",
+]
 
 [[package]]
 name = "ferrum-pty"

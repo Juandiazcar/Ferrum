@@ -1,0 +1,8 @@
+# Synthetic schema version 0 of settings.toml (see ../README.md): flat and unversioned.
+theme = "Nord"
+font_family = "Iosevka"
+font_size = 14.5
+cursor_style = "bar"
+scrollback_lines = 20000
+copy_on_select = true
+bell = "off"

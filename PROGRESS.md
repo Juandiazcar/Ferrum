@@ -2,6 +2,91 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## WP-04 `ferrum-config` and `ferrum-project` (stack #57 → #58 → #59 → #60)
+
+Four stacked PRs (merge in order): #57 `feat/config-settings-store` (settings model, keybindings
+and theme models, versioned TOML store, migration framework, synthetic v0 → v1 fixtures, `load`
+fuzz target, `ferrum_testkit::temp::TempDir`), #58 `feat/config-archive` (`.ferrum` export/import,
+tar + zstd, owner-only staging through `ferrum-platform`), #59 `feat/project-model` (project
+model, layouts, startup recipes, project limit settings, UUID ids), #60 `feat/project-git-head`
+(`.git/HEAD` reader, this entry). The first audit found 32 blockers; all are fixed in the stack
+(maintainer decisions Q-29 and Q-30 recorded in `docs/14` §2).
+
+- **Settings** (`FR-UI-007`, `FR-DATA-001`): one table per `docs/09` §8 section, including the
+  ones the spec lists that were missing at first (per-font ligatures, editor command template,
+  bell urgency hint, pasted images and their directory, multi-window behavior, default root of new
+  sessions, recent projects, spill disk cap, import/export caps, project limits, and title reporting
+  fixed at off as `docs/09` §8 lists it). Unknown keys are
+  ignored; numbers are range-checked. `keybindings.toml` and `themes/*.toml` have typed models
+  and their own schemas.
+- **Store and migrations** (`FR-DATA-004`): `schema_version` in every file (missing = 0); pure
+  migration steps over the TOML table; reads capped at 1 MiB; corrupt files moved to
+  `<name>.bad-<unix secs>` by hard link (a copy only where links are unsupported; never replacing
+  a backup, non-UTF-8 names kept) and defaults loaded;
+  only the error kind is logged; files from a newer version refused and left untouched; atomic
+  saves (temporary sibling, `fsync`, rename). Version 0 of `settings.toml` is synthetic
+  (`fixtures/config/README.md`); migrating it gives exactly the v1 fixture.
+- **Archive** (`FR-DATA-002`/`003`): manifest first, then `config/`, `data/`, optional
+  `scrollback/` (entries 0600). Export never follows symbolic links, writes ustar headers with
+  fixed metadata, refuses names that collide up to case or NFC (files and every directory on the way) and paths a ustar header cannot
+  hold. Import reads entries raw (GNU long-name and PAX entries refused before their payload is
+  read), accepts only regular files with portable names in a known section, enforces entry, file,
+  total and stream caps from the settings and a 4 MiB zstd window, and extracts into a fresh
+  staging directory created through `StagingFs` (owner-only 0700/0600 functions in
+  `ferrum-platform`), removed on any error. Merge/replace and root remapping: WP-14.
+- **Projects** (`FR-PROJ-001`/`002`/`003`/`005`/`007`): `Project` is valid by construction
+  (`TryFrom<ProjectParts>`, also on deserialization): UUID id (Q-29), non-blank names without
+  control characters, single-grapheme icon, at least one distinct absolute root, sessions with
+  stable keys, valid profiles and absolute last cwd, a layout whose panes are distinct known
+  sessions (balanced `Layout::equal`, depth ≤ 32), a recipe with relative sub-directories and
+  one-line commands (presets *One terminal* and *Front + back*, names derived from the roots).
+  Files are held to hard caps; the user's limits from `[projects.limits]` apply on edit.
+  Persisted by the daemon (WP-06) as `<data_dir>/ferrum/projects/<uuid>.toml`.
+- **Git** (`FR-PROJ-004`): `read_head` walks up to the nearest `.git` (directory or `gitdir:`
+  file), handles branches, unborn branches, detached SHA-1/SHA-256, other refs, linked worktrees
+  and submodules; opens regular files only, 4 KiB cap; no polling.
+
+Exit criteria evidence: `synthetic_v0_migrates_to_the_v1_fixture`,
+`v0_file_loads_as_migrated_settings_and_saves_as_v1`, `migrating_a_migrated_table_changes_nothing`
+(property); `export_then_import_reproduces_every_file` plus the hostile-archive tests in
+`crates/ferrum-config/tests/archive.rs` (long-name and PAX bombs, zstd window, traversal, links,
+caps, collisions); `crates/ferrum-project/tests/git_head.rs` (fixture repositories built in
+temporary directories: branch, nested start, detached, linked worktree with absolute and relative
+`gitdir`, submodule, broken repositories, FIFO `HEAD`). No sleeps, no real user directories, no git
+binary.
+
+**Values the spec does not fix (maintainer decision Q-30).** Every such value is a user setting
+with its reason on its type, listed in `docs/14` Q-30: appearance (font size 13 pt 6–72, line
+height 1.0 0.8–2.0, letter spacing 0 −2–10, padding bounds 0–64, bold-is-bright off, block cursor,
+blink on, no ligature fonts, comfortable density, animations on, reduced motion off), terminal
+(scroll speed 3 1–20, word characters `-_.~/:@`, copy-on-select off, smart copy off, editor
+`{editor} {file}`, urgency hint off, Option-as-Alt none, kitty keyboard on, images on, pasted
+images on), window (sidebar expanded, all status items, current window, ask on close), projects
+(first root, 10 recent 0–50, restore layout on, limits 16 roots 1–64, 128-character names
+16–1 024, 256 sessions 1–1 024, 32 recipe sessions 1–256), performance (spill threshold
+1 024–1 000 000, spill disk cap 256 MiB 16–4 096, caches 1–64 MiB), updates (check on, stable),
+import/export (10 000 entries 100–100 000, 5 184 MiB 64–65 536). Anti-hostile constants with
+documented reasons: 1 MiB TOML read, 16 backup names, 4 KiB manifest, 4 MiB zstd window, archive
+path depth 8 / component 255 bytes / 256 characters in errors, layout depth 32, per-mille ratios,
+icon 64 bytes (longest emoji sequences are 35), 4 KiB `HEAD`/`.git` files, 1 KiB ref names, 64-character key and action names,
+4 KiB commands and paths.
+
+Dependencies (verified latest stable on crates.io 2026-11-24, `default-features = false`, docs/07
+rows): `toml` 1.2.2, `tar` 0.4.46, `zstd` 0.14.4, new `unicode-normalization` 0.1.26 (config), new
+in v1.0 `uuid` 1.29.3 (project, Q-29); `unicode-segmentation` now also used by project.
+
+Gates (macOS arm64, Rust 1.100.0, stack rebased on `main` after the WP-02 merge): `cargo xtask
+check` green; every commit of the stack passes clippy `-D warnings` and the WP-04 crates' tests
+(`git rebase -x`); MSRV 1.97.0 (`cargo +1.97.0 test --locked -p ferrum-config -p ferrum-project
+-p ferrum-platform -p ferrum-testkit`) green; Miri with the nightly job's flags green for
+`ferrum-config` and `ferrum-project` (archive tests and the FIFO test cannot run under Miri: zstd is
+C code and `mkfifo` is a process; the 70 000-pane layout case runs outside Miri only); fuzz `load`
+60 s: 2 359 649 runs, no crash. Size impact of tar + zstd (cargo bloat, probe binary, stripped,
+LTO): +728 KB, of which `zstd_sys` 216.7 KiB; it lands in the UI binary with WP-14.
+
+Not in WP-04 (spec puts them later): cwd tracking logic (WP-12), import merge/replace and path
+remapping dialogs (WP-14), built-in themes and importers (WP-13). Next: WP-05 `ferrum-pty`.
+
 ## WP-02 `ferrum-vt` (stack of PRs rebuilt on `main` after the audits of 2026-11-23)
 
 Done: `ferrum-scrollback::{pop_front, skip_front, clear}`, a line over the size limits kept clipped

@@ -61,6 +61,7 @@ bitflags          = { version = "2.13.2", default-features = false }
 base64            = { version = "0.23.1", default-features = false, features = ["std"] }
 tar               = { version = "0.4.46", default-features = false }
 zstd              = { version = "0.14.4", default-features = false }
+unicode-normalization = { version = "0.1.26", default-features = false }
 csscolorparser    = "0.9.2"
 directories       = "6.0.0"
 arboard           = { version = "3.7.0", default-features = false }

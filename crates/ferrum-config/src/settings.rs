@@ -8,6 +8,7 @@
 //! type (maintainer decision Q-30, `docs/14` §2).
 
 mod appearance;
+mod import_export;
 mod performance;
 mod shells;
 mod terminal;
@@ -23,6 +24,7 @@ pub use appearance::{
     Appearance, CursorStyle, DEFAULT_FONT_FAMILY, DEFAULT_THEME, Density, FontSize, LetterSpacing,
     LineHeight, PaddingX, PaddingY, SidebarWidth, UiScale,
 };
+pub use import_export::{ArchiveMaxEntries, ArchiveMaxTotalMib, ImportExport};
 pub use performance::{
     Channel, GlyphCacheMib, ImageCacheMib, MaxFps, Performance, SpillDiskCapMib,
     SpillThresholdLines, Updates,
@@ -69,6 +71,8 @@ pub struct Settings {
     pub performance: Performance,
     /// Updates.
     pub updates: Updates,
+    /// Import / Export caps.
+    pub import_export: ImportExport,
 }
 
 impl Settings {

@@ -4,21 +4,26 @@
 //! empty, `.` or `..` components, no hidden names, no separators or drive letters, no characters
 //! Windows rejects, no Windows device names, bounded length and depth.
 
+use unicode_normalization::UnicodeNormalization;
+
 use super::Section;
 
-/// Longest component in bytes (common file-system limit).
+/// Longest component in bytes: the name limit of ext4, APFS and NTFS.
 const MAX_COMPONENT_BYTES: usize = 255;
 
-/// Most components below the section directory.
+/// Most components below the section directory. Anti-hostile cap: Ferrum's own layout is at most
+/// two deep (`config/themes/x.toml`); 8 leaves room for user-made folders.
 pub(super) const MAX_DEPTH: usize = 8;
 
 /// Characters that are separators, drive or stream markers, or invalid on Windows.
 const FORBIDDEN_CHARS: [char; 9] = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
 
-/// Windows device names, reserved with any extension and in any case.
-const RESERVED_STEMS: [&str; 22] = [
-    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
-    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+/// Windows device names, reserved with any extension and in any case (Win32 path rules: `COM0`
+/// to `COM9`, `LPT0` to `LPT9`, the superscript digits ¹ ² ³, and the console names).
+const RESERVED_STEMS: [&str; 34] = [
+    "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$", "COM0", "COM1", "COM2", "COM3", "COM4",
+    "COM5", "COM6", "COM7", "COM8", "COM9", "COM¹", "COM²", "COM³", "LPT0", "LPT1", "LPT2", "LPT3",
+    "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "LPT¹", "LPT²", "LPT³", "CLOCK$", "$MFT",
 ];
 
 /// Whether `name` is a hidden name (temporary files of atomic writes are hidden).
@@ -28,13 +33,20 @@ pub(super) fn is_hidden(name: &str) -> bool {
 
 /// Whether `name` is allowed as one path component.
 pub(super) fn is_portable_component(name: &str) -> bool {
-    let stem = name.split('.').next().unwrap_or(name);
+    // Windows ignores trailing spaces and dots of the stem: `CON .toml` is the device CON.
+    let stem = name.split('.').next().unwrap_or(name).trim_end_matches([' ', '.']);
     !name.is_empty()
         && name.len() <= MAX_COMPONENT_BYTES
         && !is_hidden(name)
         && !name.ends_with(['.', ' '])
         && !name.chars().any(|c| c.is_control() || FORBIDDEN_CHARS.contains(&c))
         && !RESERVED_STEMS.iter().any(|reserved| reserved.eq_ignore_ascii_case(stem))
+}
+
+/// The key under which two paths are the same file on a case-insensitive, normalization-
+/// insensitive file system (APFS, NTFS): Unicode NFC, then lowercase.
+pub(super) fn collision_key(path: &str) -> String {
+    path.nfc().collect::<String>().to_lowercase()
 }
 
 /// Splits an entry path `section/a/b` into its section and checked components.
@@ -86,10 +98,24 @@ mod tests {
             "CON",
             "con.toml",
             "Lpt1.txt",
+            "CON .toml",
+            "nul. .txt",
+            "COM0",
+            "com¹.toml",
+            "LPT³",
+            "CONIN$",
+            "conout$.log",
             &long,
         ] {
             assert!(!is_portable_component(name), "{name:?}");
         }
+    }
+
+    #[test]
+    fn collision_keys_fold_case_and_normalization() {
+        assert_eq!(collision_key("Themes/Nord.toml"), collision_key("themes/NORD.toml"));
+        assert_eq!(collision_key("\u{c5}.toml"), collision_key("A\u{30a}.toml"));
+        assert_ne!(collision_key("a.toml"), collision_key("b.toml"));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # 0026. Windows PTY backend: spike S4 measurements, decision and `PtyBackend` contract tests
 
-- Status: accepted (maintainer decisions 2026-11-21: Windows backend and the `docs/11` §4 rewrite, recorded in `docs/14` §2 as Q-18)
+- Status: accepted (maintainer decisions 2026-11-21: Windows backend and the `docs/11` §4 rewrite, recorded in `docs/14` §2 as Q-18); amended 2026-11-24 by maintainer decision Q-31 (Windows I/O model: one overlapped-I/O thread for all sessions; W5, the `Readiness` shape, PT-23 and PT-24 below)
 - Date: 2026-11-21
 - Spike: S4 (`docs/spec/docs/12-build-order.md`). Requirements touched: FR-SESS-009, NFR-REL, NFR-PORT-01, AC-MEM-02 (per-session PTY buffers, `docs/03` §2).
 
@@ -184,7 +184,7 @@ Decision, the workarounds or the contract tests rests on it. It only suggests wh
 3. **Fallback if WP-05 cannot make the direct backend pass the contract suite on a supported Windows build** (Windows 10 1809 and later: not exercised here, `docs/manual-verification.md` MV-S4-1 to 3): use `portable-pty` on Windows with the workarounds W1-W8 below and record it in a new ADR.
 4. The decision rests only on reproducible results: the two measured `portable-pty` defects, the maintenance status and the measured behavior above. The maintainer accepted it on 2026-11-21; WP-05 proves the direct backend with the contract suite.
 
-ADR 0008 (Windows part): **validated as written.** One blocking reader thread per session (named `pty-read-<id>`, 256 KiB stack, 64 KiB buffer, bounded channel) works with `portable-pty`, where it is forced because the reader handle is hidden and a blocked read ends only when the master is closed (item 6), and it is affordable: 0.08-0.12 MiB working set per session, inside the 0.20 MB per-session allowance. `docs/02` §5 and `docs/11` §4 (I/O model) therefore stay unchanged. Spec text changed by this ADR (maintainer decision 2026-11-21): the PTY bullet of `docs/11` §4 (measured ConPTY behavior replaces "re-renders the screen on attach"; Q-18), and the `docs/07` rows for `portable-pty` (Linux and macOS only) and `windows-sys` (required for the direct ConPTY backend).
+ADR 0008 (Windows part): **validated as written** at the time; superseded on 2026-11-24 by maintainer decision Q-31 (one overlapped-I/O thread for all ConPTY sessions, W5). One blocking reader thread per session (named `pty-read-<id>`, 256 KiB stack, 64 KiB buffer, bounded channel) works with `portable-pty`, where it is forced because the reader handle is hidden and a blocked read ends only when the master is closed (item 6), and it is affordable: 0.08-0.12 MiB working set per session, inside the 0.20 MB per-session allowance. `docs/02` §5 and `docs/11` §4 (I/O model) therefore stay unchanged. Spec text changed by this ADR (maintainer decision 2026-11-21): the PTY bullet of `docs/11` §4 (measured ConPTY behavior replaces "re-renders the screen on attach"; Q-18), and the `docs/07` rows for `portable-pty` (Linux and macOS only) and `windows-sys` (required for the direct ConPTY backend).
 
 ## Required ConPTY workarounds (document and test each in `ferrum-pty`, `docs/11` §4)
 
@@ -194,7 +194,7 @@ ADR 0008 (Windows part): **validated as written.** One blocking reader thread pe
 | W2 | Do not wait for reader EOF to detect exit: wait on the process handle (never compare the code with 259); then drain the reader until it is quiet for a bounded time, then close the pseudoconsole, then read to EOF | item 2 |
 | W3 | Close the pseudoconsole (not only `TerminateProcess`) to end a session; it ends every attached process; `kill` alone leaves descendants | item 2 |
 | W4 | Writes run on a writer thread (or overlapped I/O) with a bounded queue; the daemon loop never blocks on `WriteFile` | item 6 |
-| W5 | Reader on a named thread `pty-read-<id>`, 256 KiB stack, 64 KiB buffer, bounded channel + `mio::Waker` (as specified) | item 6 |
+| W5 | (Q-31) One I/O thread, `pty-io`, serves the output of every session: each pseudoconsole writes to a named pipe opened with `FILE_FLAG_OVERLAPPED` on Ferrum's end, serviced by an I/O completion port (through `mio`); readers report `Readiness::Notify` and wake the daemon loop; no reader thread per session | item 6, Q-31 |
 | W6 | Treat the resize repaint (`ESC[?25l ESC[H` + rewritten rows with `ESC[K`) as a viewport rewrite that must not enter scrollback; verify against the reflowing grid of `ferrum-vt` in WP-05/WP-06 (conhost does not reflow) | item 3 |
 | W7 | Track `?9001` and `?1004` set/reset in the VT; keep sending plain VT input unless WP-02/WP-07 decide to implement win32-input-mode | item 5 |
 | W8 | Environment is explicit: remove `TERM`, set `COLORTERM=truecolor`, `TERM_PROGRAM`, `FERRUM_*`; cwd is always set; spawn errors are values, never panics | item 7 |
@@ -220,11 +220,13 @@ pub struct PtySession {
     pub resize: Box<dyn PtyResize>, pub child: Box<dyn PtyChild>,
 }
 /// How the daemon learns that `read` has data.
-pub enum Readiness { Blocking /* reader thread */, Fd(RawFd) /* Unix: register with mio */, Handle(RawHandle) /* reserved: a backend that owns its handles */ }
+pub enum Readiness { Blocking /* in-memory fake only */, Fd(RawFd) /* Unix: register with mio */, Notify /* Windows (Q-31): the backend's single I/O thread calls the reader's notification */ }
 pub trait PtyReader: Send {
     fn readiness(&self) -> Readiness;
     /// `Ok(0)` only after the session is closed. Never reports child exit.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, PtyError>;
+    fn try_read(&mut self, buf: &mut [u8]) -> Result<Option<usize>, PtyError>; // Q-31: never blocks
+    fn set_notify(&mut self, notify: Box<dyn Fn() + Send + Sync>);                // Q-31: `Notify` readers
 }
 pub trait PtyWriter: Send {
     fn write_all(&mut self, bytes: &[u8]) -> Result<(), PtyError>; // may block; caller owns the thread
@@ -270,8 +272,8 @@ pub trait PtyChild: Send {
 | PT-20 | `large_input_completes` | 4 MiB written to a child that never reads completes within 30 s while output is drained, and never blocks `read` | 6 |
 | PT-21 | `reader_blocks_until_data_or_close` | on the blocking model a silent child does not make `read` return early or error | 6 |
 | PT-22 | `no_panic_on_hostile_input` | huge environment, 32 KiB argument, closed handles, double `close`: errors only | 2, 8 |
-| PT-23 | `ten_sessions_memory` | 10 sessions: process private commit/RSS delta < 0.20 MB x 10 including threads | 6 |
-| PT-24 | `reader_thread_name_and_stack` | the reader thread is named `pty-read-<id>` with a 256 KiB stack and the 64 KiB buffer fits | 6 |
+| PT-23 | `ten_sessions_memory` | 10 sessions read as the daemon reads them: process private commit/RSS delta < 0.11 MB x 10 (`docs/03` §2 "per session misc", Q-31) | 6 |
+| PT-24 | `no_reader_thread_per_session` | (Q-31) no session needs a thread of its own: a native reader is a pollable descriptor (Unix) or is notified by the backend's single I/O thread `pty-io`, the same thread for every session (Windows) | 6, Q-31 |
 | PT-25 | `fake_backend_parity` | the deterministic fake passes PT-01, 05, 07, 08, 10, 15, 22 | n/a |
 
 ## Consequences

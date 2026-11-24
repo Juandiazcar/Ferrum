@@ -1,7 +1,9 @@
 # benches/baselines
 
-Committed criterion baselines for `cargo xtask bench` on a **maintainer's machine** (docs/03 §6,
-docs/08 §8: "full-precision numbers are taken on the maintainer's machines").
+Committed criterion baselines for `cargo xtask bench` (docs/03 §6). Policy (maintainer decision
+Q-27, amended): the agents measure them on GitHub-hosted runners, and every entry records the
+runner, the rustc version and the run id it comes from. Entries from before the amendment record
+the machine they were taken on.
 
 - One file per OS: `<os>.json` (`windows`, `linux`, `macos`), because timings are only comparable on
   the same machine class. Content: the **median** time in nanoseconds of every bench id
@@ -17,18 +19,16 @@ docs/08 §8: "full-precision numbers are taken on the maintainer's machines").
 - **CI does not use these files** (docs/08 §8: shared runners are too noisy for numbers measured
   elsewhere). The nightly job runs `cargo xtask bench --against HEAD~1`: the previous commit and the
   current one are benched in the same job on the same runner and compared (+10 %, same ceilings).
-- `windows.json` was produced locally (Intel Core i5-9400, Windows 11, rustc 1.100.0, release
-  profile). There is no `linux.json` or `macos.json` yet: a maintainer creates them on their own
-  machines. Numbers measured on another machine (for example an Apple M2 during development) are
-  never written here.
+- The seven `scrollback_*` entries of `windows.json` were taken on an Intel Core i5-9400 with
+  Windows 11 and rustc 1.100.0 (release profile), before the amendment. There is no `linux.json`
+  or `macos.json` yet. Numbers from a development machine (for example an Apple M2) are never
+  written here: an entry comes from the recorded hosted runner or reference machine only.
 - Benches in the file: the seven `scrollback_*` benches of WP-01. The six `vt_*` benches of WP-02
   (`vt_parse/{ascii_8mib, sgr_heavy_8mib, unicode_8mib, ascii_8mib_no_history,
   sgr_heavy_8mib_no_history}` and `vt_reflow/10k_lines_200_to_100_columns`) have **no baseline
-  yet**: the inputs come from the seeded `fixtures/output/` generator and the reference machine
-  (the maintainer's i5-9400, Windows 11) has not run them on this code. A maintainer saves them
-  with `cargo xtask bench --save-baseline` on that machine; until then the absolute ceilings
-  above are the gate that matters for NFR-PERF-02 and `docs/03` §4, and `cargo xtask bench` on
-  Windows reports the missing baselines instead of passing.
+  yet**: Q-27 as amended keeps no `vt_*` baselines until a reference-machine run. Until then the
+  absolute ceilings above are the gate that matters for NFR-PERF-02 and `docs/03` §4, and
+  `cargo xtask bench` on Windows reports the missing baselines instead of passing.
 - `scrollback_seal/fixture_chunks` (the compression the daemon worker does for the push path,
   Q-21 amendment in ADR 0028) has **no baseline yet** for the same reason; its absolute ceiling
   (4.29 ms: 2x the time to seal the 857 466 encoded bytes at NFR-PERF-02's 400 MB/s) gates it.
@@ -36,16 +36,21 @@ docs/08 §8: "full-precision numbers are taken on the maintainer's machines").
 - `vt_parse/ascii_8mib_inline_seal` and `vt_parse/sgr_heavy_8mib_inline_seal` compress on the
   parse thread instead of the worker; they are informational (they show the gap the worker
   closes) and have no absolute ceiling. Like the other `vt_*` benches they get their baselines
-  in the maintainer's i5-9400 run (Q-27) and are then gated the same way (+10 %); until then
-  `cargo xtask bench` reports them as missing baselines.
+  with the reference-machine run (Q-27 as amended) and are then gated the same way (+10 %);
+  until then `cargo xtask bench` reports them as missing baselines.
 
 - `proto_encode/row_200_cols` and `proto_encode/damage_200x60` (WP-03, `ferrum-proto`: encoding
   one 200-column row and a full 200x60 `Damage` frame) have **no baseline yet** and no absolute
-  ceiling (`docs/03` §4 names no target for them). A maintainer saves them with
-  `cargo xtask bench --save-baseline` on the reference machine; until then `cargo xtask bench`
-  without `--against` reports them as missing baselines, and the nightly `--against HEAD~1` job
-  gates them (+10 %).
+  ceiling (`docs/03` §4 names no target for them). An agent adds them from a recorded hosted
+  run, as for `daemon_search` below; until then `cargo xtask bench` without `--against` reports
+  them as missing baselines, and the nightly `--against HEAD~1` job gates them (+10 %).
 
-**Filled by:** WP-01 (`ferrum-scrollback`: push, read, spilled read, search, in `windows.json`)
-and WP-02 (`ferrum-vt`: parse and reflow; their baselines come from the maintainer's run on the
-i5-9400, maintainer decision Q-27).
+- `daemon_search/literal_insensitive_10k_lines` and `daemon_search/regex_insensitive_10k_lines`
+  (WP-06, `ferrum-daemon`: the daemon's search path over 10 000 lines, `docs/03` §4 15 ms, ceiling
+  30 ms) were measured on a GitHub-hosted Windows runner (Intel Xeon 6973P-C, rustc 1.100.0,
+  release profile; run 45663852806), as the agents measure under Q-27 as amended: 3.92 ms and
+  6.88 ms (medians).
+
+**Filled by:** WP-01 (`ferrum-scrollback`: push, read, spilled read, search, in `windows.json`),
+WP-02 (`ferrum-vt`: parse and reflow, no baseline until the reference-machine run, Q-27 as
+amended) and WP-06 (`ferrum-daemon`: search, from a hosted Windows runner).

@@ -113,7 +113,7 @@ jobs:
       # docs/08 §8: shared runners are too noisy to compare with numbers measured elsewhere, so the
       # previous main commit and this one are benched on this runner, in this job, and compared:
       # fails if a bench is more than 10 % slower (docs/03 §6) or above its absolute ceiling (2x the
-      # budget target). The committed benches/baselines/{os}.json are for maintainer machines.
+      # budget target). The committed benches/baselines/{os}.json record their own runs (Q-27).
       - run: cargo xtask bench --against HEAD~1
 
   audit:

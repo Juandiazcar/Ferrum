@@ -23,8 +23,12 @@
 
 mod env;
 mod error;
+#[cfg(unix)]
+mod program;
 mod spec;
 mod traits;
+#[cfg(unix)]
+mod unix;
 
 pub use env::{TERM, TERM_PROGRAM, session_env};
 pub use error::PtyError;
@@ -32,3 +36,11 @@ pub use spec::{EnvOp, ExitSource, ExitStatus, PtySize, Readiness, SpawnSpec};
 pub use traits::{
     Notify, PtyBackend, PtyChild, PtyKiller, PtyReader, PtyResize, PtySession, PtyWriter,
 };
+#[cfg(unix)]
+pub use unix::UnixBackend;
+
+/// The backend of the running OS: `UnixBackend` on Linux and macOS.
+#[cfg(unix)]
+pub fn native_backend() -> Box<dyn PtyBackend> {
+    Box::new(UnixBackend)
+}

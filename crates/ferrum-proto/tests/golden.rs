@@ -16,9 +16,10 @@ use ferrum_proto::{
     Attrs, Axis, Bytes, CellRef, CellWidth, ClientKind, ClientMessage, Cursor, CursorShape,
     DaemonMessage, Damage, Hello, Layout, LayoutNode, List, Modes, Nonce, PROTOCOL_VERSION,
     PerMille, Percent, Point, ProgressState, ProjectChange, ProjectEvent, ProjectId, ProjectInfo,
-    Refusal, RefusalReason, Rgb, RowBlock, RowRegion, SearchOptions, SelectAction, SelectionKind,
-    SessionEvent, SessionId, SessionInfo, SessionKind, SessionStatus, Snapshot, Style,
-    TerminalModes, Text, Underline, Uuid, Viewport, decode_message, encode_frame, split_frame,
+    Refusal, RefusalReason, Rgb, RowBlock, RowRegion, SearchMatch, SearchOptions, SelectAction,
+    SelectionKind, SessionEvent, SessionId, SessionInfo, SessionKind, SessionStatus, Snapshot,
+    Style, TerminalModes, Text, Underline, Uuid, Viewport, decode_message, encode_frame,
+    split_frame,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -164,7 +165,23 @@ fn daemon_screen_messages() -> Vec<(&'static str, DaemonMessage)> {
         ("snapshot", M::Snapshot(snapshot)),
         ("rows_history", M::Rows { session_id: SESSION, region: RowRegion::History, rows }),
         ("damage", M::Damage(damage)),
+        ("search_results", search_results()),
+        (
+            "file_set_aside",
+            M::FileSetAside {
+                path: text("/cfg/settings.toml"),
+                backup: text("/cfg/settings.toml.bad-1"),
+            },
+        ),
     ]
+}
+
+/// A search answer with one match that wraps from the history into the screen.
+fn search_results() -> DaemonMessage {
+    let start = Point { line: -1, col: 70 };
+    let end = Point { line: 0, col: 3 };
+    let matches = List::new(vec![SearchMatch { start, end }]).unwrap();
+    DaemonMessage::SearchResults { session_id: SESSION, matches, is_truncated: false }
 }
 
 /// Session events.
@@ -190,6 +207,8 @@ fn daemon_session_events() -> Vec<(&'static str, DaemonMessage)> {
         ("killed", SessionEvent::Killed),
         ("activity", SessionEvent::Activity),
         ("progress", progress),
+        ("failed", SessionEvent::Failed { error: text("terminal state") }),
+        ("spill_disabled", SessionEvent::SpillDisabled),
     ];
     let message =
         |(name, event)| (name, DaemonMessage::SessionEvent { session_id: SESSION, event });
@@ -318,6 +337,7 @@ fn lifecycle_values() -> Vec<Golden> {
         ("exited", SessionStatus::Exited { code: Some(-1) }),
         ("exited_unknown", SessionStatus::Exited { code: None }),
         ("killed", SessionStatus::Killed),
+        ("failed", SessionStatus::Failed { error: text("terminal state") }),
     ];
     let regions = vec![("screen", RowRegion::Screen), ("history", RowRegion::History)];
     [bare("progress_state", states), bare("session_status", statuses), bare("row_region", regions)]

@@ -63,7 +63,7 @@ message types, framing, protocol versioning and the row encoding of damage (`doc
 | Constant | Value | Why |
 |---|---|---|
 | `MAX_FRAME_LEN` | 4 MiB, header included | `docs/02` §4, `docs/10` §2 |
-| `PROTOCOL_VERSION` | 1.0 | the first protocol |
+| `PROTOCOL_VERSION` | 1.1 | 1.0 was the first protocol; 1.1 adds `SearchResults` (with `SearchMatch`), `FileSetAside`, the failed session state with its error (`SessionEvent::Failed`, `SessionStatus::Failed`) and `SessionEvent::SpillDisabled` |
 | `NONCE_LEN` | 32 bytes | 256 random bits cannot be guessed by a process that cannot read the owner-only nonce file |
 | `MAX_LIST_ITEMS` | 1 024 | bounds the memory a 4 MiB frame of tiny list items can make the decoder allocate (each list at most 1 024 items, no list nested in another); far above any real list |
 | `ROW_BLOCK_HEADROOM` | 4 KiB | room in a frame for the fields of a `Snapshot`/`Rows`/`Damage` message besides its block: under 64 bytes plus a title, which `ferrum-vt` caps at 1 024 bytes |

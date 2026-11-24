@@ -26,8 +26,8 @@ use crate::handshake::Refusal;
 use crate::list::List;
 use crate::redact::{Bytes, Text};
 use crate::types::{
-    Cursor, Layout, Percent, ProgressState, ProjectId, Rgb, RowRegion, SessionId, SessionKind,
-    SessionStatus, TerminalModes, Viewport,
+    Cursor, Layout, Percent, Point, ProgressState, ProjectId, Rgb, RowRegion, SessionId,
+    SessionKind, SessionStatus, TerminalModes, Viewport,
 };
 use crate::version::ProtocolVersion;
 
@@ -81,6 +81,35 @@ pub enum DaemonMessage {
     ReservedUsage(Bytes),
     /// Reserved for Phase 2 vault messages.
     ReservedVault(Bytes),
+    /// The matches of a `Search` (protocol 1.1, `FR-TERM-015`), in order from the oldest line;
+    /// a match spans soft-wrapped rows when the text does.
+    SearchResults {
+        /// The session.
+        session_id: SessionId,
+        /// The matches, at most [`MAX_LIST_ITEMS`](crate::MAX_LIST_ITEMS).
+        matches: List<SearchMatch>,
+        /// More matches exist than the list holds.
+        is_truncated: bool,
+    },
+    /// A configuration or project file could not be used and was set aside; defaults or the
+    /// remaining projects were loaded (protocol 1.1, `docs/02` §8 and §10: the UI notifies with
+    /// the path).
+    FileSetAside {
+        /// The file that could not be used.
+        path: Text,
+        /// Where it was moved.
+        backup: Text,
+    },
+}
+
+/// One match of a search: from `start` to `end` (exclusive column), in the line coordinates of
+/// [`Point`] at the time of the search.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SearchMatch {
+    /// First cell.
+    pub start: Point,
+    /// The cell after the last one, on the line of the last one.
+    pub end: Point,
 }
 
 /// The full screen of a session for a viewport: its metadata and the screen rows that fit one
@@ -171,6 +200,15 @@ pub enum SessionEvent {
         /// Percentage.
         value: Percent,
     },
+    /// The daemon stopped the session after an internal error in its terminal state (protocol
+    /// 1.1, `docs/02` §10: the failure is isolated to this session; the process was ended).
+    Failed {
+        /// What failed, in words fixed by the daemon (never terminal content).
+        error: Text,
+    },
+    /// Spilling history to disk stopped for this session (disk full or cap): the oldest lines
+    /// are dropped from now on (protocol 1.1, `docs/02` §10: "user notified once").
+    SpillDisabled,
 }
 
 /// A project with every field of `FR-PROJ-001`.

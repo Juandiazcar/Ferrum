@@ -35,7 +35,8 @@ mod version;
 pub use block::{MAX_ROW_BLOCK_BYTES, ROW_BLOCK_HEADROOM, RowBlock};
 pub use client::{ClientMessage, ProjectChange, SelectAction};
 pub use daemon::{
-    DaemonMessage, Damage, ProjectEvent, ProjectInfo, SessionEvent, SessionInfo, Snapshot,
+    DaemonMessage, Damage, ProjectEvent, ProjectInfo, SearchMatch, SessionEvent, SessionInfo,
+    Snapshot,
 };
 pub use error::ProtoError;
 pub use frame::{

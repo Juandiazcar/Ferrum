@@ -107,3 +107,84 @@ impl ConfigError {
         Self::Io { path: path.into(), source }
     }
 }
+
+/// Failure of exporting or importing a `.ferrum` archive.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ArchiveError {
+    /// The operating system refused an operation on a file or directory.
+    #[error("cannot access {path}")]
+    Io {
+        /// File or directory involved.
+        path: PathBuf,
+        /// Cause.
+        #[source]
+        source: io::Error,
+    },
+    /// An entry path is absolute, escapes its section, or uses a name that is not portable.
+    #[error("archive path {0:?} is not allowed")]
+    BadPath(String),
+    /// An entry is not a regular file (symlink, hard link, device, directory, …).
+    #[error("archive entry {0:?} is not a regular file")]
+    NotRegularFile(String),
+    /// The same path appears twice.
+    #[error("archive entry {0:?} appears more than once")]
+    Duplicate(String),
+    /// A file, the entry count or the total size is above the limits.
+    #[error("archive exceeds the limit: {0}")]
+    TooLarge(&'static str),
+    /// The archive does not start with a valid manifest, or its format is unsupported.
+    #[error("archive manifest is missing or invalid: {0}")]
+    BadManifest(String),
+    /// The staging directory for an import already exists.
+    #[error("staging directory {0} already exists")]
+    StagingExists(PathBuf),
+    /// The archive stream could not be read or decompressed (corrupt, truncated, or its `zstd`
+    /// window is larger than allowed).
+    #[error("cannot read the archive stream")]
+    Read(#[source] io::Error),
+    /// The archive could not be written to the output.
+    #[error("cannot write the archive")]
+    Write(#[source] io::Error),
+    /// Two files would get the same name on a case-insensitive or normalization-insensitive file
+    /// system (macOS, Windows), so the archive could not be imported there (`AC-DATA-01`).
+    #[error("{0:?} differs from another file only in letter case or Unicode normalization")]
+    NameCollision(String),
+}
+
+/// Longest path quoted in an [`ArchiveError`]; longer ones are cut, so a hostile archive cannot
+/// make error messages (and the UI or logs showing them) arbitrarily large.
+pub const MAX_SHOWN_PATH_CHARS: usize = 256;
+
+impl ArchiveError {
+    /// `path` cut to [`MAX_SHOWN_PATH_CHARS`] characters, with `…` when it was longer.
+    pub(crate) fn shown(path: &str) -> String {
+        let mut chars = path.chars();
+        let mut out: String = chars.by_ref().take(MAX_SHOWN_PATH_CHARS).collect();
+        if chars.next().is_some() {
+            out.push('…');
+        }
+        out
+    }
+
+    pub(crate) fn io(path: impl Into<PathBuf>, source: io::Error) -> Self {
+        Self::Io { path: path.into(), source }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shown_paths_are_cut_to_the_limit() {
+        let short = "config/settings.toml";
+        assert_eq!(ArchiveError::shown(short), short);
+        let exact = "x".repeat(MAX_SHOWN_PATH_CHARS);
+        assert_eq!(ArchiveError::shown(&exact), exact);
+        let long = "é".repeat(MAX_SHOWN_PATH_CHARS + 50);
+        let cut = ArchiveError::shown(&long);
+        assert_eq!(cut.chars().count(), MAX_SHOWN_PATH_CHARS + 1);
+        assert!(cut.ends_with('…'));
+    }
+}

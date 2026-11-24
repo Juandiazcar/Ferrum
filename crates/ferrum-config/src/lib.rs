@@ -12,6 +12,10 @@
 //! - [`store`] loads (capped at [`store::MAX_FILE_BYTES`], unknown keys ignored, corrupt files
 //!   set aside as `*.bad-<timestamp>`) and saves atomically (temporary file, `fsync`, rename).
 //!
+//! - [`archive`] exports the config and data directories (and optionally scrollback) as one
+//!   `.ferrum` file (`tar` + `zstd`) and imports such a file into a staging directory with path,
+//!   entry-type and size checks.
+//!
 //! Paths are always arguments: the per-user directories come from `ferrum-platform` and are
 //! wired by the composition roots.
 //!
@@ -20,6 +24,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod archive;
 mod error;
 mod keybindings;
 mod schema;
@@ -28,7 +33,7 @@ pub mod store;
 mod theme;
 mod value;
 
-pub use error::ConfigError;
+pub use error::{ArchiveError, ConfigError};
 pub use keybindings::{
     ActionName, Binding, Chord, KEYBINDINGS_FILE, KEYBINDINGS_SCHEMA, Keybindings,
 };

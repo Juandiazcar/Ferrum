@@ -28,6 +28,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | VT parsing | `vte` | 0.15.0 (2026-11-22, latest stable) | vt | state machine only; Ferrum owns the grid/handlers. `default-features = false`: the `no_std` buffer mode with a 1-byte OSC buffer, because `ferrum-vt` captures OSC strings itself with a 1 MiB cap (ADR 0028) |
 | Unicode widths | `unicode-width` | 0.2.3 (2026-11-22, latest stable) | vt | `default-features = false` (no `cjk` context widths) |
 | Grapheme clusters | `unicode-segmentation` | 1.13.3 (2026-11-22, latest stable) | vt | `default-features = false` |
+| Unicode normalization | `unicode-normalization` | 0.1.26 (verified 2026-11-24, latest stable) | config | NFC of `.ferrum` entry names, so names equal on APFS/NTFS are refused at export (`AC-DATA-01`); `default-features = false`; pulls `tinyvec`; MSRV 1.36; license (MIT OR Apache-2.0) AND Unicode-3.0 |
 | PTY | `portable-pty` | 0.9.0 | pty | Linux and macOS PTY only (ADR 0026); last release Feb 2025 → wrapped behind `PtyBackend` so it can be replaced. Windows uses `windows-sys` directly |
 | Windows APIs | `windows-sys` | 0.61.2 | pty, platform | required by the direct ConPTY backend in `ferrum-pty` (`portable-pty` was insufficient on Windows: ADR 0026); prefer `-sys` (no bloat) |
 | Unix syscalls | `rustix` | 1.1.6 | pty, platform, daemon | safe wrappers; avoids hand-written `libc` unsafe |
@@ -53,8 +54,8 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | File dialogs | `rfd` | 0.18.0 | app | folder picker for projects, export/import; evaluate memory/size (S3); fallback = in-app path input + drag & drop |
 | Color parsing | `csscolorparser` | 0.9.2 | config | theme import (`#rrggbb`, `rgb()`, names) |
 | Plist (iTerm themes) | `plist` | 1.10.4 | config | only for `.itermcolors` import; write a minimal parser if the crate proves heavy (measure at WP-13) |
-| Archives (export) | `tar` | 0.4.46 | config | `.ferrum` = tar + zstd |
-| Zstd | `zstd` | 0.14.4 | config | export archives only |
+| Archives (export) | `tar` | 0.4.46 (re-verified 2026-11-24, latest stable) | config | `.ferrum` = tar + zstd; `default-features = false` (no `xattr`): entries carry fixed metadata only |
+| Zstd | `zstd` | 0.14.4 (re-verified 2026-11-24, latest stable; bundles zstd 1.5.7 through `zstd-sys` 2.1.3, built by its `build.rs` with `cc`, no network) | config | export archives only; `default-features = false` (no `legacy`, `arrays`, `zdict_builder`); 4 MiB window enforced on the decoder |
 | CLI args | `lexopt` | 0.3.2 | app, daemon | tiny; `clap` is only used in `xtask` |
 | xtask CLI | `clap` | 4.6.9 (verified 2026-11-21) | xtask only | derive parser for `cargo xtask`; never in shipped binaries |
 | xtask graph check | `cargo_metadata` | 0.23.1 (verified 2026-11-21) | xtask only | typed `cargo metadata` for `check-deps`; brings `serde_json`, build tooling only |

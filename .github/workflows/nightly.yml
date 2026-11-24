@@ -26,6 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { package: ferrum-proto, target: decode }
           - { package: ferrum-scrollback, target: decode_chunk }
           - { package: ferrum-vt, target: parse }
           - { package: ferrum-config, target: load }
@@ -97,7 +98,7 @@ jobs:
           toolchain: nightly
           components: rust-src
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - run: cargo +nightly test --locked -Zbuild-std --target x86_64-unknown-linux-gnu -p ferrum-scrollback -p ferrum-testkit -p ferrum-vt
+      - run: cargo +nightly test --locked -Zbuild-std --target x86_64-unknown-linux-gnu -p ferrum-proto -p ferrum-scrollback -p ferrum-testkit -p ferrum-vt
 
   bench:
     name: benches vs previous commit

@@ -75,5 +75,5 @@ Golden bytes for every message variant and every nested enum variant (`tests/gol
 round-trip properties of rows and of both message enums (`tests/row_roundtrip.rs`,
 `tests/message_roundtrip.rs`), the worst-case screen in frames under the cap
 (`tests/frame_budget.rs`), `Debug` redaction (`tests/redaction.rs`), zero allocation in steady
-state (`tests/alloc_row.rs`). Bench `proto_encode/row_200_cols` (no baseline yet:
-`benches/baselines/README.md`).
+state (`tests/alloc_row.rs`). Benches `proto_encode/row_200_cols` and
+`proto_encode/damage_200x60` (no baseline yet: `benches/baselines/README.md`).

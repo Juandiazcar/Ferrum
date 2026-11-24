@@ -230,7 +230,7 @@ impl<S: EventSink> Core<S> {
 
     /// Stores `pen`, interning its hyperlink and underline color.
     pub(crate) fn set_pen(&mut self, mut pen: Pen) {
-        pen.extra = self.extras.intern(pen.link, pen.underline_color);
+        pen.extra = self.intern_extra(pen.link, pen.underline_color);
         self.screen_mut().cursor.pen = pen;
     }
 }

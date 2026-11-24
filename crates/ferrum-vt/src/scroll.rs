@@ -14,7 +14,8 @@ impl<S: EventSink> Core<S> {
         encode_row(row, self.primary.grid.graphemes(), &mut self.scratch.line);
         let encoded = &self.scratch.line;
         let line = LineRef { flags: row.flags(), text: &encoded.text, runs: &encoded.runs };
-        if let Err(error) = self.scrollback.push_line(&line) {
+        // Recording its extra ids on the way (`history_extras.rs`).
+        if let Err(error) = self.extras.history.push(&mut self.scrollback, &line) {
             // A row over the scrollback's size limits (a full-width row of long clusters) is
             // still stored and counted, its text clipped and without styles; never fatal.
             tracing::warn!(%error, "scrollback stored a row clipped");

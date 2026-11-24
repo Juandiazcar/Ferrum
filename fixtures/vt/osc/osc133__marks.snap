@@ -1,0 +1,19 @@
+---
+source: crates/ferrum-vt/tests/fixtures.rs
+---
+size 20x6 primary
+cursor row=2 col=2 wrap_pending=false
+modes AUTOWRAP|CURSOR_VISIBLE
+00 |$ ls                |PC
+01 |file                |C
+02 |$                   |PE
+03 |                    |
+04 |                    |
+05 |                    |
+history 0
+events
+  ShellMark(PromptStart)
+  ShellMark(CommandStart)
+  ShellMark(CommandExecuted)
+  ShellMark(CommandFinished { exit_code: Some(0) })
+  ShellMark(PromptStart)

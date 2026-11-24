@@ -41,6 +41,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Compression (scrollback) | `lz4_flex` | 0.14.2 | scrollback | pure Rust, `default-features = false`, `safe-encode`/`safe-decode` |
 | mmap | `memmap2` | 0.9.12 | render | fonts only. The scrollback spill file uses plain positional reads and writes from `std` (ADR 0027), because mapping needs `unsafe` |
 | Byte search | `memchr` | 2.8.3 (2026-11-22, latest stable) | vt, scrollback | `default-features = false`, `std`; `vt` uses `memmem` for `ESC ]` and `memchr` for ESC |
+| Regular expressions | `regex` | 1.13.2 (verified 2026-11-25, latest stable; MSRV 1.65; MIT OR Apache-2.0; with `regex-automata` 0.4.19 and `regex-syntax` 0.8.12, both latest) | daemon | the regex toggle of daemon search (FR-TERM-015, WP-06); `default-features = false`, `std` + `unicode-case` + `unicode-perl` (case-insensitive expressions fold Unicode as literal search does, `ferrum_scrollback::LiteralMatcher`) + `perf-dfa` (the lazy DFA: a case-insensitive Unicode expression over 10 000 lines takes 6.7 ms instead of 19 ms, `docs/03` §4 asks for 15 ms; no further crate); release `ferrumd` 2.36 MB stripped on macOS arm64 (NFR-SIZE-01: 3 MB) |
 | POD casts | `bytemuck` | 1.25.2 | render, vt | `Cell` ↔ bytes where needed |
 | Small vectors | `smallvec` | 1.16.6 | vt | only where profiling justifies |
 | Fast hashing | `rustc-hash` | 2.1.3 (2026-11-22, latest stable) | vt, scrollback, render | interning tables (the scrollback style table too); `default-features = false`, `std` |
@@ -66,12 +67,12 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Error types | `thiserror` | 2.0.21 (2026-11-23, latest stable) | libs | `default-features = false`, `std` |
 | Error context (bins) | `anyhow` | 1.0.105 (bumped 2026-11-24, latest stable; `default-features = false`, `std`) | app, daemon, xtask | `ferrumd` (`src/main.rs`) only in the daemon crate |
 | Logging | `tracing` | 0.1.44 (2026-11-23, latest stable) | all | `default-features = false`, `std` and `release_max_level_warn` (the `max_level_*` features compile out debug/trace in release) |
-| Log sink | `tracing-subscriber` | 0.3.23 | app, daemon | `default-features = false`, `fmt` only; own tiny rotating file writer |
+| Log sink | `tracing-subscriber` | 0.3.23 (re-verified 2026-11-24, latest stable) | app, daemon | `default-features = false`, `fmt` + `std`; own tiny rotating file writer (`ferrum_daemon::logging`, 1 MB x 3) |
 | Update download | `ureq` | 3.5.2 | app (updater) | blocking, small; `rustls` backend |
 | TLS | `rustls` | 0.23.46 | app (updater) | no OpenSSL |
 | Signature verify | `minisign-verify` | 0.3.0 | app (updater) | verify update manifests/artifacts |
 | Hash | `sha2` | 0.11.1 | updater | |
-| Allocator (ADR 0016) | system allocator on Linux and Windows; `mimalloc` 0.1.52 on macOS only (target dependency of app and daemon); `tikv-jemallocator` 0.7.0 evaluated, not chosen (not applicable on Windows MSVC) | — | app, daemon | decided by spike S2 per OS |
+| Allocator (ADR 0016) | system allocator on Linux and Windows; `mimalloc` 0.1.52 on macOS only (target dependency of app and daemon); re-verified 2026-11-24, `default-features = false` as in spike S2; `tikv-jemallocator` 0.7.0 evaluated, not chosen (not applicable on Windows MSVC) | — | app, daemon | decided by spike S2 per OS |
 
 ### Spike-only dependencies (never in product crates)
 

@@ -107,3 +107,42 @@ impl ConfigError {
         Self::Io { path: path.into(), source }
     }
 }
+
+/// Failure of exporting or importing a `.ferrum` archive.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ArchiveError {
+    /// The operating system refused an operation on a file or directory.
+    #[error("cannot access {path}")]
+    Io {
+        /// File or directory involved (empty for the archive stream itself).
+        path: PathBuf,
+        /// Cause.
+        #[source]
+        source: io::Error,
+    },
+    /// An entry path is absolute, escapes its section, or uses a name that is not portable.
+    #[error("archive path {0:?} is not allowed")]
+    BadPath(String),
+    /// An entry is not a regular file (symlink, hard link, device, directory, …).
+    #[error("archive entry {0:?} is not a regular file")]
+    NotRegularFile(String),
+    /// The same path appears twice.
+    #[error("archive entry {0:?} appears more than once")]
+    Duplicate(String),
+    /// A file, the entry count or the total size is above the limits.
+    #[error("archive exceeds the limit: {0}")]
+    TooLarge(&'static str),
+    /// The archive does not start with a valid manifest, or its format is unsupported.
+    #[error("archive manifest is missing or invalid: {0}")]
+    BadManifest(String),
+    /// The staging directory for an import already exists.
+    #[error("staging directory {0} already exists")]
+    StagingExists(PathBuf),
+}
+
+impl ArchiveError {
+    pub(crate) fn io(path: impl Into<PathBuf>, source: io::Error) -> Self {
+        Self::Io { path: path.into(), source }
+    }
+}

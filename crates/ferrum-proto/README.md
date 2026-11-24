@@ -12,7 +12,7 @@ messages follow.
 | Must never depend on | any other ferrum crate, fonts or rendering |
 | `unsafe` | forbidden (`#![forbid(unsafe_code)]`) |
 | Dependencies | `thiserror` |
-| Dev-dependencies | `proptest` |
+| Dev-dependencies | `proptest`, `dhat` |
 | Features | none |
 
 ## Model
@@ -21,7 +21,7 @@ messages follow.
   stream; a plain one-column scalar is its own UTF-8 bytes, any other cell is `0xFF width len
   text`. Styles carry resolved colors, attribute bits and an index into a `LinkTable`, which
   stores each hyperlink URI once (never a session-local id, ADR 0028). `encode_row` appends to
-  caller buffers and needs no scratch buffer; `decode_row` checks every byte and never allocates.
+  caller buffers and does not allocate once they have their capacity (`tests/alloc_row.rs`); `decode_row` checks every byte and never allocates.
 
 ## Public API
 
@@ -32,7 +32,8 @@ messages follow.
 
 ## Tests
 
-Row round-trip property (`tests/row_roundtrip.rs`) and unit tests of every decoder failure.
+Row round-trip property (`tests/row_roundtrip.rs`), zero allocation in steady state
+(`tests/alloc_row.rs`) and unit tests of every decoder failure.
 
 The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2, enforced by
 `cargo xtask check-deps` from `xtask/deps-rules.toml`.

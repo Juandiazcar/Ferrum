@@ -30,6 +30,7 @@ CI runs the `PtyBackend` contract suite (`cargo nextest run -p ferrum-testkit --
 |---|---|---|---|---|
 | MV-05-1 | Run `cargo nextest run -p ferrum-testkit --test pty_contract_native` on Windows 10 1809, 21H2 and 22H2; PT-12 (`close_does_not_hang_with_unread_output`) matters most: older conhost builds may block `ClosePseudoConsole` while output is unread | n/a | n/a | pending |
 | MV-05-2 | Same suite on Windows 11 24H2/25H2 retail and on Windows on ARM64 | n/a | n/a | pending |
+| MV-05-3 | Shell integration (FR-SESS-005) with fish 3.x and 4.x, PowerShell 7 (`pwsh`), Windows PowerShell 5.1 on desktop Windows 10/11 with the default execution policy (Restricted), and login shells (`bash -l`, `zsh -l`, `fish -l`): spawn through `ferrum_pty::shell_integration::inject`, check the user's startup files still load, OSC 7 and OSC 133 A/B/C/D appear, and zsh keeps its history in the user's `HISTFILE` (`echo $HISTFILE` is under the user's `ZDOTDIR` or `HOME`). CI covers bash on Linux/macOS, zsh on macOS (including `HISTFILE`), Windows PowerShell 5.1 with `PSExecutionPolicyPreference=Restricted` on Windows Server, non-login | pending | pending | pending |
 
 ## Render pipeline (spike S3, ADR 0025)
 

@@ -9,6 +9,10 @@
 //! `Project` is valid by construction: files and edits go through `TryFrom<ProjectParts>`, and
 //! the user's size limits from the settings apply through [`Project::check_limits`].
 //!
+//! [`read_head`] shows the branch of a root without a git library: it finds the nearest `.git`
+//! (directory, or a `gitdir:` file for linked worktrees and submodules) and parses `HEAD`, on demand
+//! only (`FR-PROJ-004`).
+//!
 //! Allowed internal dependencies: ferrum-config (types only: `Rgb`, `Schema`, `ProjectLimits`
 //! and its bounded limit types).
 //! Must never depend on: ferrum-daemon, ferrum-ui, OS-specific code.
@@ -16,11 +20,13 @@
 #![forbid(unsafe_code)]
 
 mod error;
+mod git;
 mod layout;
 mod project;
 mod recipe;
 
-pub use error::ProjectError;
+pub use error::{GitError, ProjectError};
+pub use git::{GitHead, Head, MAX_GIT_FILE_BYTES, read_head};
 pub use layout::{Axis, Layout, MAX_LAYOUT_DEPTH, RATIO_SCALE};
 pub use project::{
     DEFAULT_COLOR, MAX_ICON_BYTES, PROJECT_SCHEMA, PROJECTS_DIR, Project, ProjectId, ProjectParts,

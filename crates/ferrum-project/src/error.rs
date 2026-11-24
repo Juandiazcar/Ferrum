@@ -1,5 +1,8 @@
 //! Error types of the crate (`docs/05` §3: one `thiserror` enum per area).
 
+use std::io;
+use std::path::PathBuf;
+
 use crate::project::SessionKey;
 
 /// Why a project (as loaded from a file or built by the UI) is not valid.
@@ -64,4 +67,26 @@ pub enum ProjectError {
     /// too long.
     #[error("startup command must be one line without control characters")]
     BadCommand,
+}
+
+/// Failure of reading a repository's `HEAD` ([`read_head`](crate::read_head)).
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GitError {
+    /// The start directory is relative; the search needs an absolute path so it never depends
+    /// on the process working directory.
+    #[error("the start directory must be an absolute path")]
+    RelativePath,
+    /// A git file exists but could not be read (or a `gitdir:` target is missing).
+    #[error("cannot read {path}")]
+    Io {
+        /// File involved.
+        path: PathBuf,
+        /// Cause.
+        #[source]
+        source: io::Error,
+    },
+    /// A `HEAD` or `.git` file does not have the format git writes, or is too large.
+    #[error("{0} is not in git's format")]
+    Malformed(PathBuf),
 }

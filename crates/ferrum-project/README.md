@@ -2,8 +2,8 @@
 
 **Responsibility:** project model, .git/HEAD reader, cwd tracking logic and startup recipes.
 
-**Status:** project model, layouts and startup recipes implemented (WP-04). The cwd tracking logic
-arrives with shell integration (WP-12).
+**Status:** project model, layouts, startup recipes and the `.git/HEAD` reader implemented
+(WP-04). The cwd tracking logic arrives with shell integration (WP-12).
 
 | | |
 |---|---|
@@ -11,7 +11,7 @@ arrives with shell integration (WP-12).
 | Must never depend on | ferrum-daemon, ferrum-ui, OS-specific code |
 | `unsafe` | forbidden (`#![forbid(unsafe_code)]`) |
 | Dependencies | `ferrum-config` (types only: `Rgb`, `Schema`, `ProjectLimits` and its bounded types), `serde` (derive), `thiserror` (errors), `uuid` (project ids, Q-29), `unicode-segmentation` (single-glyph icons) |
-| Dev-dependencies | `ferrum-testkit` (temporary directories), `toml` (hand-built files) |
+| Dev-dependencies | `ferrum-testkit` (temporary directories for fixture repositories), `toml` (hand-built files) |
 
 The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2, enforced by
 `cargo xtask check-deps` from `xtask/deps-rules.toml`.
@@ -42,6 +42,13 @@ The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2,
   characters, at most 4 KiB) and an `Arrangement` (`single` or `side_by_side`, the two presets).
   Presets `one_terminal` and `front_and_back` name their sessions after their roots.
   `launches(roots)` resolves the start directories; `layout(keys)` builds the view.
+- **`read_head`** (`FR-PROJ-004`): the branch without a git library (`gix` rejected, `docs/07`
+  §3). From an absolute directory it walks up to the first `.git`: a directory (ordinary
+  repository) or a file `gitdir: <path>` (linked worktree under `.git/worktrees/<name>`, submodule
+  under `.git/modules/<name>`; relative paths are relative to the `.git` file's directory). It
+  parses `HEAD` into `Head::Branch`, `Head::Detached` (40 or 64 hex digits, SHA-1 or SHA-256) or
+  `Head::OtherRef`. Files are read with a 4 KiB cap; anything git would not write is
+  `GitError::Malformed`. Called on demand (focus or cwd change); there is no polling.
 
 ## Persistence
 

@@ -28,9 +28,9 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | VT parsing | `vte` | 0.15.0 (2026-11-22, latest stable) | vt | state machine only; Ferrum owns the grid/handlers. `default-features = false`: the `no_std` buffer mode with a 1-byte OSC buffer, because `ferrum-vt` captures OSC strings itself with a 1 MiB cap (ADR 0028) |
 | Unicode widths | `unicode-width` | 0.2.3 (2026-11-22, latest stable) | vt | `default-features = false` (no `cjk` context widths) |
 | Grapheme clusters | `unicode-segmentation` | 1.13.3 (2026-11-22, latest stable) | vt | `default-features = false` |
-| PTY | `portable-pty` | 0.9.0 | pty | Linux and macOS PTY only (ADR 0026); last release Feb 2025 → wrapped behind `PtyBackend` so it can be replaced. Windows uses `windows-sys` directly |
-| Windows APIs | `windows-sys` | 0.61.2 | pty, platform | required by the direct ConPTY backend in `ferrum-pty` (`portable-pty` was insufficient on Windows: ADR 0026); prefer `-sys` (no bloat) |
-| Unix syscalls | `rustix` | 1.1.6 | pty, platform, daemon | safe wrappers; avoids hand-written `libc` unsafe |
+| PTY | `portable-pty` | 0.9.0 (2026-11-24, latest stable; `default-features = false`, no default features) | pty | Linux and macOS PTY only (ADR 0026); last release Feb 2025 → wrapped behind `PtyBackend` so it can be replaced. Windows uses `windows-sys` directly |
+| Windows APIs | `windows-sys` | 0.61.2 (2026-11-24, latest stable; `default-features = false`; `ferrum-pty` enables `Win32_Foundation`, `Win32_Security`, `Win32_System_Console`, `Win32_System_SystemInformation`, `Win32_System_Threading`) | pty, platform | required by the direct ConPTY backend in `ferrum-pty` (`portable-pty` was insufficient on Windows: ADR 0026); prefer `-sys` (no bloat) |
+| Unix syscalls | `rustix` | 1.1.6 (2026-11-24, latest stable; `default-features = false`; `ferrum-pty` uses `event`, `fs`, `process`, `stdio`, `termios`) | pty, platform, daemon | safe wrappers; avoids hand-written `libc` unsafe |
 | libc (fallback) | `libc` | 0.2.191 | platform | only for what `rustix` lacks (e.g., `mallopt`, `malloc_trim`) |
 | Event loop I/O (Unix) | `mio` | 1.2.5 | daemon | no async runtime; Windows uses reader threads (see `docs/11`) |
 | IPC sockets/pipes | `interprocess` | 2.4.9 | proto/daemon/app | UDS + Windows named pipes with a uniform API |

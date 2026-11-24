@@ -1,0 +1,44 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 139x35 history 0
+row | UL  /…/tests/ref/wrapline_alt_t…  fix_newline_flag  for i in {1..$(tput cols)}; do echo -ne "a"; done && echo -ne "\e[?1049h" && echo -ne |W
+  0-3 fg=i0 bg=i9
+  4-33 fg=i7 bg=i8
+  34-51 fg=i0 bg=i9
+row |"x" && echo -ne "\e[?1049l" && echo -ne "a"|
+row |aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|W
+row |a%                                                                                                                                         |W
+  1-1 bold inverse
+row | UL  /…/tests/ref/wrapline_alt_t…  fix_newline_flag  exit|
+  0-3 fg=i0 bg=i9
+  4-33 fg=i7 bg=i8
+  34-51 fg=i0 bg=i9
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

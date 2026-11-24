@@ -1,0 +1,66 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 105x29 history 0
+row |Welcome to fish, the friendly interactive shell|
+row |Type help for instructions on how to use fish|
+  5-8 fg=i2
+row |[I] ➜  alacritty git:(master) ✗ a^C|
+  0-2 fg=i7 bg=i2 bold
+  4-6 fg=i2 bold
+  7-15 fg=i6 bold
+  16-21 fg=i4 bold
+  22-27 fg=i1 bold
+  28-28 fg=i4 bold
+  29-30 fg=i3 bold
+  32-32 fg=i1 bold
+  33-34 inverse
+row |[I] ➜  alacritty git:(master) ✗ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa^C|
+  0-2 fg=i7 bg=i2 bold
+  4-6 fg=i2 bold
+  7-15 fg=i6 bold
+  16-21 fg=i4 bold
+  22-27 fg=i1 bold
+  28-28 fg=i4 bold
+  29-30 fg=i3 bold
+  32-73 fg=i1 bold
+  74-75 inverse
+row |[I] ➜  alacritty git:(master) ✗ aaaaaaaaaaaaaaaaaaaaaaaaaaa^C|
+  0-2 fg=i7 bg=i2 bold
+  4-6 fg=i2 bold
+  7-15 fg=i6 bold
+  16-21 fg=i4 bold
+  22-27 fg=i1 bold
+  28-28 fg=i4 bold
+  29-30 fg=i3 bold
+  32-58 fg=i1 bold
+  59-60 inverse
+row |[I] ➜  alacritty git:(master) ✗|
+  0-2 fg=i7 bg=i2 bold
+  4-6 fg=i2 bold
+  7-15 fg=i6 bold
+  16-21 fg=i4 bold
+  22-27 fg=i1 bold
+  28-28 fg=i4 bold
+  29-30 fg=i3 bold
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

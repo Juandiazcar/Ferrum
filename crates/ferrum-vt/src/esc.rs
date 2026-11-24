@@ -5,7 +5,7 @@ use crate::core::Core;
 use crate::cursor::{Cursor, SavedCursor};
 use crate::events::EventSink;
 use crate::modes::Mode;
-use crate::screen::{Region, Screen};
+use crate::screen::Screen;
 
 impl<S: EventSink> Core<S> {
     /// Routes `ESC <intermediates> <final>`.
@@ -20,10 +20,10 @@ impl<S: EventSink> Core<S> {
             ([], b'c') => self.reset(),
             ([], b'=') => self.modes.insert(Mode::APP_KEYPAD),
             ([], b'>') => self.modes.remove(Mode::APP_KEYPAD),
-            ([], b'n') => self.screen_mut().charsets.shift(Charsets::G2),
-            ([], b'o') => self.screen_mut().charsets.shift(Charsets::G3),
-            ([], b'N') => self.screen_mut().charsets.single_shift(Charsets::G2),
-            ([], b'O') => self.screen_mut().charsets.single_shift(Charsets::G3),
+            ([], b'n') => self.charsets.shift(Charsets::G2),
+            ([], b'o') => self.charsets.shift(Charsets::G3),
+            ([], b'N') => self.charsets.single_shift(Charsets::G2),
+            ([], b'O') => self.charsets.single_shift(Charsets::G3),
             ([b'#'], b'8') => self.screen_alignment_test(),
             ([slot @ (b'(' | b')' | b'*' | b'+')], final_byte) => {
                 self.designate(*slot, final_byte);
@@ -41,15 +41,15 @@ impl<S: EventSink> Core<S> {
             b'*' => Charsets::G2,
             _ => Charsets::G3,
         };
-        self.screen_mut().charsets.designate(index, charset);
+        self.charsets.designate(index, charset);
     }
 
     /// DECSC.
     pub(crate) fn save_cursor(&mut self) {
         let origin = self.modes.contains(Mode::ORIGIN);
+        let charsets = self.charsets;
         let screen = self.screen_mut();
-        screen.saved =
-            Some(SavedCursor { cursor: screen.cursor, origin, charsets: screen.charsets });
+        screen.saved = Some(SavedCursor { cursor: screen.cursor, origin, charsets });
     }
 
     /// DECRC. Without a saved state the cursor goes home with default attributes.
@@ -61,17 +61,15 @@ impl<S: EventSink> Core<S> {
         let last_y = screen.grid.lines().saturating_sub(1);
         screen.cursor =
             Cursor { x: saved.cursor.x.min(last_x), y: saved.cursor.y.min(last_y), ..saved.cursor };
-        screen.charsets = saved.charsets;
+        self.charsets = saved.charsets;
     }
 
-    /// DECALN: fills the screen with `E`.
+    /// DECALN: fills the screen with `E` in the default style. The cursor and the margins stay
+    /// where they are (the Alacritty reference test `decaln_reset`).
     fn screen_alignment_test(&mut self) {
         let screen = self.screen_mut();
-        screen.region = Region::full(screen.grid.lines());
-        screen.cursor.x = 0;
-        screen.cursor.y = 0;
-        screen.cursor.wrap_pending = false;
-        let fill = screen.cursor.pen.cell('E');
+        let mut fill = crate::cell::Cell::default();
+        fill.set_scalar('E');
         for y in 0..screen.grid.lines() {
             if let Some(row) = screen.grid.row_mut(y) {
                 row.fill(0, usize::MAX, fill);
@@ -80,14 +78,18 @@ impl<S: EventSink> Core<S> {
         }
     }
 
-    /// RIS: back to the power-on state, the cursor style and the title included (Alacritty's
-    /// `Term::reset_state`, maintainer decisions Q-23 and Q-25; like Alacritty no event is sent
-    /// for the title). The palette, the working directory and the history are kept.
+    /// RIS: back to the power-on state, exactly what Alacritty's `Term::reset_state` resets
+    /// (maintainer decisions Q-23 and Q-25): the history too (the reference test `grid_reset`),
+    /// the cursor style and the title (like Alacritty, no event is sent for the title). The
+    /// palette and the working directory stay.
     pub(crate) fn reset(&mut self) {
+        self.clear_scrollback();
         let size = self.primary.grid.size();
         self.alt = None;
         self.extras.clear();
         self.alt_keyboard = crate::keyboard::KeyboardStack::default();
+        self.alt_saved = None;
+        self.charsets = Charsets::default();
         self.modes = Mode::default();
         self.tabs.reset();
         self.primary = Screen::new(size);

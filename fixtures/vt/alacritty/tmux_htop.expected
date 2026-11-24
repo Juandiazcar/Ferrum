@@ -1,0 +1,130 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 105x29 history 0
+row |  0  [|||||||                  20.0%]   Tasks: 363, 1603 thr; 1 running|
+  2-4 fg=i6
+  5-5 bold
+  6-8 fg=i2
+  9-12 fg=i1
+  13-35 fg=i0 bold
+  36-36 bold
+  40-46 fg=i6
+  47-49 fg=i6 bold
+  50-51 fg=i6
+  52-55 fg=i2 bold
+  56-59 fg=i2
+  60-61 fg=i6
+  62-62 fg=i2 bold
+  63-70 fg=i6
+row |  1  [||                        5.9%]   Load average: 1.61 1.80 1.79 |
+  2-4 fg=i6
+  5-5 bold
+  6-6 fg=i2
+  7-7 fg=i1
+  8-35 fg=i0 bold
+  36-36 bold
+  40-53 fg=i6
+  54-58 bold
+  59-63 fg=i6 bold
+  64-68 fg=i6
+row |  2  [|||||                    13.9%]   Uptime: 2 days, 06:36:04|
+  2-4 fg=i6
+  5-5 bold
+  6-8 fg=i2
+  9-10 fg=i1
+  11-35 fg=i0 bold
+  36-36 bold
+  40-47 fg=i6
+  48-63 fg=i6 bold
+row |  3  [|||                       5.9%]|
+  2-4 fg=i6
+  5-5 bold
+  6-7 fg=i2
+  8-8 fg=i1
+  9-35 fg=i0 bold
+  36-36 bold
+row |  Mem[|||||||||||||||||||9.29G/16.0G]|
+  2-4 fg=i6
+  5-5 bold
+  6-23 fg=i2
+  24-25 fg=i4
+  26-34 fg=i3
+  35-35 fg=i0 bold
+  36-36 bold
+row |  Swp[|||||||||||||||    1000M/2.00G]|
+  2-4 fg=i6
+  5-5 bold
+  6-20 fg=i1
+  21-35 fg=i0 bold
+  36-36 bold
+row ||
+row |  PID USER      PRI  NI  VIRT   RES S CPU% MEM%   TIME+  Command                |
+  0-37 fg=i0 bg=i2
+  38-42 fg=i0 bg=i6
+  43-79 fg=i0 bg=i2
+row | 1141 jwilm      26   0 10.5G  227M R  0.8  0.3 11:35.17 target/release/alacritt|
+  24-29 fg=i1 bold
+  30-35 fg=i6
+  36-37 fg=i2
+row |29598 jwilm      26   0 10.0G  133M R  2.2  0.2  0:01.37 target/debug/alacritty|
+  24-29 fg=i1 bold
+  30-35 fg=i6
+  36-37 fg=i2
+row |  580 jwilm      17   0 9752M 59344 R  0.8  0.1  7:39.16 tmux|
+  24-31 fg=i6
+  36-37 fg=i2
+row |29240 jwilm      17   0 13.6G  829M R  0.2  1.3  0:59.49 /Applications/Google Ch|
+  24-29 fg=i1 bold
+  30-35 fg=i6
+  36-37 fg=i2
+row |29220 jwilm      17   0 13.2G  586M R  0.4  0.9  0:14.83 /Applications/Google Ch|
+  24-29 fg=i1 bold
+  30-35 fg=i6
+  36-37 fg=i2
+row |  923 jwilm      17   0 15.6G 1800M R  3.7  2.7 51:50.94 /Applications/Google Ch|
+  0-79 fg=i0 bg=i6
+row |29826 jwilm      24   0 9621M  7408 R  0.3  0.0  0:00.12 htop|
+  24-31 fg=i6
+  36-37 fg=i2
+row |22141 jwilm      17   0 13.3G  517M R  0.2  0.8  1:05.40 /Applications/Google Ch|
+  24-29 fg=i1 bold
+  30-35 fg=i6
+  36-37 fg=i2
+row |19930 jwilm      17   0 13.2G  588M R  0.3  0.9  1:00.37 /Applications/Google Ch|
+  24-29 fg=i1 bold
+  30-35 fg=i6
+  36-37 fg=i2
+row |13248 jwilm      17   0 13.8G  446M R  0.2  0.7  6:24.47 /Applications/Google Ch|
+  24-29 fg=i1 bold
+  30-35 fg=i6
+  36-37 fg=i2
+row |  396 jwilm      17   0  9.8G 74240 R  0.2  0.1  3:06.16 /System/Library/CoreSer|
+  24-29 fg=i1 bold
+  30-31 fg=i6
+  36-37 fg=i2
+row |  433 jwilm      17   0  9.7G 45856 R  0.2  0.1  2:35.99 /Applications/Karabiner|
+  24-29 fg=i1 bold
+  30-31 fg=i6
+  36-37 fg=i2
+row |23390 jwilm      17   0 11.4G  250M R  0.1  0.4  0:53.99 /Applications/Spotify.a|
+  24-29 fg=i1 bold
+  30-35 fg=i6
+  36-37 fg=i2
+row |F1Help  F2Setup F3SearchF4FilterF5Tree  F6SortByF7Nice -F8Nice +F9Kill  F10Quit |
+  2-7 fg=i0 bg=i6
+  10-15 fg=i0 bg=i6
+  18-23 fg=i0 bg=i6
+  26-31 fg=i0 bg=i6
+  34-39 fg=i0 bg=i6
+  42-47 fg=i0 bg=i6
+  50-55 fg=i0 bg=i6
+  58-63 fg=i0 bg=i6
+  66-71 fg=i0 bg=i6
+  75-79 fg=i0 bg=i6
+row |1:htop*                                                                         |
+  0-6 fg=i0 bg=i3
+  7-79 fg=i0 bg=i4
+row ||
+row ||
+row ||
+row ||
+row ||

@@ -1,0 +1,37 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 139x35 history 0
+row |[undeadleech@archhq saved_cursor]$ echo -e "\e7 \e(0 test \e8 xxx"|
+row | xxx⎽├|
+row |[undeadleech@archhq saved_cursor]$ echo -e "\e[?1049h \e(0 test \e[?1049l xxx"|
+row | xxx|
+row |[undeadleech@archhq saved_cursor]$ echo -e "\e7 \e(0 \e[?1049h test \e[?1049l \e8 xxx"|
+row |   │││|
+row |[┤┼␍␊▒␍┌␊␊␌␤@▒⎼␌␤␤─ ⎽▒┴␊␍ ␌┤⎼⎽⎺⎼]$ ␊│␋├|
+row |␊│␋├|
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

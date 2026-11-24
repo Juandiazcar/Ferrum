@@ -1,0 +1,37 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 106x30 history 0
+row |[kchibisov@NightLord alacritty]$ printf "\e[31;1;4;9mTEST asd\n"|
+row |TEST asd|
+  0-7 fg=i1 bold strike underline=single
+row |[kchibisov@NightLord alacritty]$ echo -e "hello        world" "\033[10;D"  "\033[4;X"|
+  0-84 fg=i1 bold strike underline=single
+row |hello         orld |
+  0-9 fg=i1 bold strike underline=single
+  14-18 fg=i1 bold strike underline=single
+row |[kchibisov@NightLord alacritty]$ |
+  0-32 fg=i1 bold strike underline=single
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

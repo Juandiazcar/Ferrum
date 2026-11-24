@@ -1,0 +1,469 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 174x96 history 0
+row |  96 ///                                                                                                                                                                      |
+  0-4 fg=#444444 bg=#282828
+  5-7 fg=#666666 bg=#282828
+  8-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row |  97 /// Uniforms are prefixed with "u", and vertex attributes are prefixed with "a".                                                                                         |
+  0-4 fg=#444444 bg=#282828
+  5-84 fg=#666666 bg=#282828
+  85-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row |  98 #[derive(Debug)]                                                                                                                                                         |
+  0-4 fg=#444444 bg=#282828
+  5-13 fg=#c9d05c bg=#282828
+  14-18 fg=#73cef4 bg=#282828
+  19-20 fg=#c9d05c bg=#282828
+  21-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row |  99 pub struct ShaderProgram {                                                                                                                                               |
+  0-4 fg=#444444 bg=#282828
+  5-7 fg=#b3deef bg=#282828
+  8-8 fg=#eeeeee bg=#282828
+  9-14 fg=#b3deef bg=#282828
+  15-15 fg=#eeeeee bg=#282828
+  16-28 fg=#b3deef bg=#282828
+  29-30 fg=#eeeeee bg=#282828
+  31-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 100     // Program id                                                                                                                                                        |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-21 fg=#666666 bg=#282828
+  22-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 101     id: GLuint,                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-19 fg=#eeeeee bg=#282828
+  20-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 102                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 103     /// projection matrix uniform                                                                                                                                        |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-37 fg=#666666 bg=#282828
+  38-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 104     u_projection: GLint,                                                                                                                                                 |
+  0-4 fg=#444444 bg=#282828
+  5-28 fg=#eeeeee bg=#282828
+  29-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 105                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 106     /// Terminal dimensions (pixels)                                                                                                                                     |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-40 fg=#666666 bg=#282828
+  41-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 107     u_term_dim: GLint,                                                                                                                                                   |
+  0-4 fg=#444444 bg=#282828
+  5-26 fg=#eeeeee bg=#282828
+  27-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 108                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 109     /// Cell dimensions (pixels)                                                                                                                                         |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-36 fg=#666666 bg=#282828
+  37-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 110     u_cell_dim: GLint,                                                                                                                                                   |
+  0-4 fg=#444444 bg=#282828
+  5-26 fg=#eeeeee bg=#282828
+  27-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 111                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 112     /// Visual bell                                                                                                                                                      |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-23 fg=#666666 bg=#282828
+  24-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 113     u_visual_bell: GLint,                                                                                                                                                |
+  0-4 fg=#444444 bg=#282828
+  5-29 fg=#eeeeee bg=#282828
+  30-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 114                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 115     /// Background pass flag                                                                                                                                             |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-32 fg=#666666 bg=#282828
+  33-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 116     ///                                                                                                                                                                  |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-11 fg=#666666 bg=#282828
+  12-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 117     /// Rendering is split into two passes; 1 for backgrounds, and one for text                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-83 fg=#666666 bg=#282828
+  84-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 118     u_background: GLint,                                                                                                                                                 |
+  0-4 fg=#444444 bg=#282828
+  5-28 fg=#eeeeee bg=#282828
+  29-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 119                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 120     padding_x: f32,                                                                                                                                                      |
+  0-4 fg=#444444 bg=#282828
+  5-19 fg=#eeeeee bg=#282828
+  20-22 fg=#73cef4 bg=#282828
+  23-23 fg=#eeeeee bg=#282828
+  24-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 121     padding_y: f32,                                                                                                                                                      |
+  0-4 fg=#444444 bg=#282828
+  5-19 fg=#eeeeee bg=#282828
+  20-22 fg=#73cef4 bg=#282828
+  23-23 fg=#eeeeee bg=#282828
+  24-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 122 }                                                                                                                                                                        |
+  0-4 fg=#444444 bg=#282828
+  5-5 fg=#eeeeee bg=#282828
+  6-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 123                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 124                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 125 #[derive(Debug, Clone)]                                                                                                                                                  |
+  0-4 fg=#444444 bg=#282828
+  5-13 fg=#c9d05c bg=#282828
+  14-18 fg=#73cef4 bg=#282828
+  19-20 fg=#c9d05c bg=#282828
+  21-25 fg=#73cef4 bg=#282828
+  26-27 fg=#c9d05c bg=#282828
+  28-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 126 pub struct Glyph {                                                                                                                                                       |
+  0-4 fg=#444444 bg=#282828
+  5-7 fg=#b3deef bg=#282828
+  8-8 fg=#eeeeee bg=#282828
+  9-14 fg=#b3deef bg=#282828
+  15-15 fg=#eeeeee bg=#282828
+  16-20 fg=#b3deef bg=#282828
+  21-22 fg=#eeeeee bg=#282828
+  23-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 127     tex_id: GLuint,                                                                                                                                                      |
+  0-4 fg=#444444 bg=#282828
+  5-23 fg=#eeeeee bg=#282828
+  24-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 128     top: f32,                                                                                                                                                            |
+  0-4 fg=#444444 bg=#282828
+  5-13 fg=#eeeeee bg=#282828
+  14-16 fg=#73cef4 bg=#282828
+  17-17 fg=#eeeeee bg=#282828
+  18-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 129     left: f32,                                                                                                                                                           |
+  0-4 fg=#444444 bg=#282828
+  5-14 fg=#eeeeee bg=#282828
+  15-17 fg=#73cef4 bg=#282828
+  18-18 fg=#eeeeee bg=#282828
+  19-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 130     width: f32,                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-15 fg=#eeeeee bg=#282828
+  16-18 fg=#73cef4 bg=#282828
+  19-19 fg=#eeeeee bg=#282828
+  20-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 131     height: f32,                                                                                                                                                         |
+  0-4 fg=#444444 bg=#282828
+  5-16 fg=#eeeeee bg=#282828
+  17-19 fg=#73cef4 bg=#282828
+  20-20 fg=#eeeeee bg=#282828
+  21-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 132     uv_bot: f32,                                                                                                                                                         |
+  0-4 fg=#444444 bg=#282828
+  5-16 fg=#eeeeee bg=#282828
+  17-19 fg=#73cef4 bg=#282828
+  20-20 fg=#eeeeee bg=#282828
+  21-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 133     uv_left: f32,                                                                                                                                                        |
+  0-4 fg=#444444 bg=#282828
+  5-17 fg=#eeeeee bg=#282828
+  18-20 fg=#73cef4 bg=#282828
+  21-21 fg=#eeeeee bg=#282828
+  22-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 134     uv_width: f32,                                                                                                                                                       |
+  0-4 fg=#444444 bg=#282828
+  5-18 fg=#eeeeee bg=#282828
+  19-21 fg=#73cef4 bg=#282828
+  22-22 fg=#eeeeee bg=#282828
+  23-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 135     uv_height: f32,                                                                                                                                                      |
+  0-4 fg=#444444 bg=#282828
+  5-19 fg=#eeeeee bg=#282828
+  20-22 fg=#73cef4 bg=#282828
+  23-23 fg=#eeeeee bg=#282828
+  24-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 136 }                                                                                                                                                                        |
+  0-4 fg=#444444 bg=#282828
+  5-5 fg=#eeeeee bg=#282828
+  6-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 137                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 138 /// Naïve glyph cache                                                                                                                                                    |
+  0-4 fg=#444444 bg=#282828
+  5-25 fg=#666666 bg=#282828
+  26-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 139 ///                                                                                                                                                                      |
+  0-4 fg=#444444 bg=#282828
+  5-7 fg=#666666 bg=#282828
+  8-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 140 /// Currently only keyed by `char`, and thus not possible to hold different                                                                                              |
+  0-4 fg=#444444 bg=#282828
+  5-79 fg=#666666 bg=#282828
+  80-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 141 /// representations of the same code point.                                                                                                                              |
+  0-4 fg=#444444 bg=#282828
+  5-47 fg=#666666 bg=#282828
+  48-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 142 pub struct GlyphCache {                                                                                                                                                  |
+  0-4 fg=#444444 bg=#282828
+  5-7 fg=#b3deef bg=#282828
+  8-8 fg=#eeeeee bg=#282828
+  9-14 fg=#b3deef bg=#282828
+  15-15 fg=#eeeeee bg=#282828
+  16-25 fg=#b3deef bg=#282828
+  26-27 fg=#eeeeee bg=#282828
+  28-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 143     /// Cache of buffered glyphs                                                                                                                                         |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-36 fg=#666666 bg=#282828
+  37-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 144     cache: HashMap<GlyphKey, Glyph, BuildHasherDefault<FnvHasher>>,                                                                                                      |
+  0-4 fg=#444444 bg=#282828
+  5-22 fg=#eeeeee bg=#282828
+  23-23 fg=#f43753 bg=#282828
+  24-58 fg=#eeeeee bg=#282828
+  59-59 fg=#f43753 bg=#282828
+  60-68 fg=#eeeeee bg=#282828
+  69-70 fg=#f43753 bg=#282828
+  71-71 fg=#eeeeee bg=#282828
+  72-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 145                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 146     /// Rasterizer for loading new glyphs                                                                                                                                |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-45 fg=#666666 bg=#282828
+  46-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 147     rasterizer: Rasterizer,                                                                                                                                              |
+  0-4 fg=#444444 bg=#282828
+  5-31 fg=#eeeeee bg=#282828
+  32-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 148                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 149     /// regular font                                                                                                                                                     |
+  0-4 fg=#444444 bg=#282828
+  5-8 fg=#eeeeee bg=#282828
+  9-24 fg=#666666 bg=#282828
+  25-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 150     font_key: FontKey,                                                                                                                                                   |
+  0-4 fg=#444444 bg=#282828
+  5-26 fg=#eeeeee bg=#282828
+  27-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row | 151                                                                                                                                                                          |
+  0-4 fg=#444444 bg=#282828
+  5-104 bg=#282828
+  105-105 fg=#eeeeee bg=#323232
+  106-173 bg=#282828
+row |                                                                                                      151,0-1        7%                                                       |
+  0-0 fg=#eeeeee bg=#282828
+  1-101 bg=#282828
+  102-108 fg=#eeeeee bg=#282828
+  109-116 bg=#282828
+  117-118 fg=#eeeeee bg=#282828
+  119-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828
+row |                                                                                                                                                                              |
+  0-173 bg=#282828

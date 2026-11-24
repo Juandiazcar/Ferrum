@@ -1,0 +1,36 @@
+# Converted from alacritty_terminal tests/ref (Apache-2.0); see THIRD_PARTY.md.
+size 105x29 history 0
+row |jwilm@kurast.local ➜  ~/code/alacritty  cat c|
+  19-21 fg=i2 bold
+  22-38 fg=i6 bold
+  40-42 fg=i5
+row |Cargo.lock  Cargo.toml  colors.pl*  copypasta/|
+  24-32 fg=i2 bold
+  36-44 fg=i1 bold
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||
+row ||

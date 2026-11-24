@@ -48,7 +48,7 @@ Goal: identical behavior everywhere (NFR-PORT-01). Differences below are the onl
 
 - **Min version**: Windows 10 1809 (ConPTY). Windows 11 fully supported. x86_64 and aarch64.
 - **PTY**: ConPTY (`CreatePseudoConsole`) through a direct `windows-sys` backend inside `ferrum-pty` (audited `unsafe`, `docs/05` §4); `portable-pty` is used on Linux and macOS only (ADR 0026). If the direct backend cannot pass the `PtyBackend` contract suite on a supported Windows build, the fallback is `portable-pty` plus the same workarounds. Measured ConPTY behavior to handle (ADR 0026; document and test each in `ferrum-pty`): (1) **startup cursor query**: when `PSEUDOCONSOLE_INHERIT_CURSOR` is used, the first and only output is `ESC[6n` and the child's output is withheld until the terminal answers (`ESC[1;1R` for a new session); (2) there is **no initial full repaint**: nothing is re-rendered when a session starts; (3) **every resize, including a no-op one, is followed by a viewport-only repaint** (`ESC[?25l ESC[H`, each visible row, `ESC[K`) that never includes scrollback; (4) child exit is observed on the process handle, not by reader EOF (the reader ends only when the pseudoconsole is closed), and `TerminateProcess` alone leaves descendants alive while closing the pseudoconsole ends them; (5) an exit code of 259 must not be mistaken for "still running"; (6) `TERM` is not inherited (see *Console quirks*).
-- **I/O model**: ConPTY pipes are anonymous pipes (synchronous). Therefore on Windows the daemon uses **one blocking reader thread per session** (256 KiB stack, named `pty-read-<id>`) that pushes chunks into a bounded channel and wakes the main loop (`mio::Waker`). Writes use a per-session writer thread or overlapped I/O. The `PtyBackend` trait hides this; the daemon loop only sees "readable chunk" events. Thread overhead (10 sessions ≈ 2.5 MB virtual, little resident) is within budget.
+- **I/O model** (maintainer decision Q-31): **one I/O thread serves the output of all ConPTY sessions** with overlapped I/O: each pseudoconsole writes to a named pipe whose end in Ferrum is opened with `FILE_FLAG_OVERLAPPED` and serviced by an I/O completion port (through `mio`) on that single thread, named `pty-io`, which wakes the daemon loop through the `PtyBackend` readiness model (`Readiness::Notify`). There is no reader thread per session. Writes use a per-session writer thread or overlapped I/O. The `PtyBackend` trait hides this; the daemon loop only sees "readable chunk" events.
 - **IPC**: named pipes via `interprocess` with a restrictive DACL.
 - **Input**: `winit` Win32; IME (TSF) via winit; AltGr handling (Ctrl+Alt) must not be treated as Ctrl+Alt shortcuts on layouts that need AltGr; test with German, Spanish, and US-International layouts.
 - **Fonts**: `fontdb` scans `C:\Windows\Fonts` and the per-user fonts dir; emoji via Segoe UI Emoji (COLR/CBDT).
@@ -79,7 +79,7 @@ A custom titlebar costs no meaningful memory (it is a few widgets). It is an are
 | App shortcuts | Ctrl+Shift | Cmd | Ctrl+Shift |
 | Clipboard extras | primary selection | — | right-click behavior |
 | PTY | Unix PTY | Unix PTY | ConPTY |
-| Daemon I/O | single-thread `mio` | single-thread `mio` | reader thread per session + `mio` waker |
+| Daemon I/O | single-thread `mio` | single-thread `mio` | single-thread `mio` + one overlapped-I/O thread for all ConPTY sessions (Q-31) |
 | Memory metric | PSS | phys_footprint | Private Working Set |
 | Menus | none | native app menu | none |
 | Decorations | server/client side | native | native |

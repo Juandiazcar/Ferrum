@@ -46,6 +46,7 @@ portable-pty      = "0.9.0"
 mio               = { version = "1.2.5", default-features = false, features = ["os-poll", "os-ext", "net"] }
 rustix            = { version = "1.1.6", default-features = false, features = ["std", "termios", "pty", "process", "fs"] }
 interprocess      = "2.4.9"
+terminal_size     = { version = "0.4.4", default-features = false }  # ferrum-testkit only: the PTY helper reads its size
 
 # data
 serde             = { version = "1.0.229", default-features = false, features = ["std", "derive"] }

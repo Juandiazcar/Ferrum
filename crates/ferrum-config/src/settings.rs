@@ -10,6 +10,7 @@
 mod appearance;
 mod import_export;
 mod performance;
+mod project_limits;
 mod shells;
 mod terminal;
 mod v0;
@@ -29,6 +30,7 @@ pub use performance::{
     Channel, GlyphCacheMib, ImageCacheMib, MaxFps, Performance, SpillDiskCapMib,
     SpillThresholdLines, Updates,
 };
+pub use project_limits::{MaxNameChars, MaxRecipeSessions, MaxRoots, MaxSessions, ProjectLimits};
 pub use shells::{Profile, Shells};
 pub use terminal::{
     Bell, COLUMN_PLACEHOLDER, DEFAULT_URL_SCHEMES, DEFAULT_WORD_CHARACTERS, EDITOR_PLACEHOLDER,

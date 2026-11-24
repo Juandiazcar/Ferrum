@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::project_limits::ProjectLimits;
 use crate::value::bounded;
 
 /// Titlebar style (`FR-UI-012`, `docs/09` §1.1).
@@ -141,6 +142,8 @@ pub struct Projects {
     pub new_session_root: NewSessionRoot,
     /// Recent projects remembered.
     pub recent_projects: RecentProjects,
+    /// Limits on a project's size.
+    pub limits: ProjectLimits,
 }
 
 impl Default for Projects {
@@ -149,6 +152,7 @@ impl Default for Projects {
             restore_last_layout: true,
             new_session_root: NewSessionRoot::default(),
             recent_projects: RecentProjects::default(),
+            limits: ProjectLimits::default(),
         }
     }
 }

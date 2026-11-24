@@ -35,8 +35,8 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | libc (fallback) | `libc` | 0.2.191 | platform | only for what `rustix` lacks (e.g., `mallopt`, `malloc_trim`) |
 | Event loop I/O (Unix) | `mio` | 1.2.5 | daemon | no async runtime; Windows uses reader threads (see `docs/11`) |
 | IPC sockets/pipes | `interprocess` | 2.4.9 | proto/daemon/app | UDS + Windows named pipes with a uniform API |
-| Serialization | `serde` | 1.0.229 | all | derive only where needed |
-| Wire format | `postcard` | 1.1.3 | proto | compact, no-std friendly, deterministic |
+| Serialization | `serde` | 1.0.229 (re-verified 2026-11-24, latest stable) | all | derive only where needed; `default-features = false`, `std` + `derive` |
+| Wire format | `postcard` | 1.2.0 (2026-11-24, latest stable; MSRV 1.88) | proto | compact, no-std friendly, deterministic; `default-features = false`, `use-std` (`to_io` into a reused buffer). Brings `cobs` (unused by the plain encoding) |
 | Config format | `toml` | 1.2.2 (re-verified 2026-11-24, latest stable) | config, xtask | serde-based; atomic writes by us; `default-features = false` with `std`, `serde`, `parse`, `display` |
 | Compression (scrollback) | `lz4_flex` | 0.14.2 | scrollback | pure Rust, `default-features = false`, `safe-encode`/`safe-decode` |
 | mmap | `memmap2` | 0.9.12 | render | fonts only. The scrollback spill file uses plain positional reads and writes from `std` (ADR 0027), because mapping needs `unsafe` |

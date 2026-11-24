@@ -132,6 +132,7 @@ Used only by throwaway packages under `spikes/` (own workspace and lockfile, exc
 | `proptest` | 1.12.0 (2026-11-23, latest stable) | property tests (`ferrum-scrollback`, `ferrum-vt`; `default-features = false`, `std`) |
 | `insta` | 1.49.0 (2026-11-23, latest stable) | snapshot/golden tests (`default-features = false`; `ferrum-vt` fixtures) |
 | `dhat` | 0.3.3 (2026-11-23, latest stable) | allocation counting in tests (`default-features = false`) |
+| `terminal_size` | 0.4.4 (2026-11-24, latest stable; released 2026-03-23) | `ferrum-testkit` only: the `ferrum-pty-helper` child of the `PtyBackend` contract suite reports the terminal size it sees (PT-15) without `unsafe`; depends only on `rustix` (Unix) and `windows-sys` 0.61 (Windows), both already in this table (`default-features = false`) |
 | `git-cliff` | 2.14.2 | changelog |
 | `typos-cli` | 1.52.2 | typo check |
 | `taplo-cli` | 0.10.0 | TOML formatting |

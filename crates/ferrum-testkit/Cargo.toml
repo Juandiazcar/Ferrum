@@ -9,7 +9,9 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+ferrum-pty = { workspace = true }
 ferrum-scrollback = { workspace = true }
+terminal_size = { workspace = true }
 
 [lints]
 workspace = true

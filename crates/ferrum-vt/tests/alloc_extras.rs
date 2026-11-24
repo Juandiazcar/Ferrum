@@ -6,12 +6,12 @@
 //! `MAX_LINK_TABLE_BYTES`). A new underline color allocates nothing (its record is two words).
 //! One test per binary: `dhat` profiles the whole process.
 
-#![cfg(not(miri))] // dhat is not supported under Miri
 #![allow(clippy::expect_used, reason = "test code: a failed expectation is a failed test")]
 
 use ferrum_scrollback::{Scrollback, ScrollbackConfig};
 use ferrum_vt::{MAX_EXTRAS, NullSink, Size, Terminal};
 
+#[cfg(not(miri))] // dhat is not supported under Miri
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
@@ -54,7 +54,6 @@ fn links(first: u32) -> Vec<u8> {
     out
 }
 
-#[test]
 fn a_full_extras_table_allocates_nothing_in_steady_state() {
     let _profiler = dhat::Profiler::builder().testing().build();
     // One entry left: every new color takes it and frees the previous one.
@@ -73,4 +72,11 @@ fn a_full_extras_table_allocates_nothing_in_steady_state() {
     term.parse(&measured);
     assert_eq!(blocks() - before, 0, "a refused hyperlink allocates");
     assert_eq!(term.extras().overflowed() - refused, u64::from(SEQUENCES), "all refused");
+}
+
+fn main() {
+    ferrum_testkit::single_test::single_test(
+        "a_full_extras_table_allocates_nothing_in_steady_state",
+        a_full_extras_table_allocates_nothing_in_steady_state,
+    );
 }

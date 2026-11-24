@@ -4,7 +4,6 @@
 //! (the inline fallback), the push that seals allocates exactly the blob. One test per binary:
 //! `dhat` profiles the whole process.
 
-#![cfg(not(miri))] // dhat is not supported under Miri
 #![allow(clippy::expect_used, reason = "test code: a failed expectation is a failed test")]
 
 #[path = "support/lines.rs"]
@@ -15,6 +14,7 @@ use ferrum_scrollback::{
 };
 use lines::numbered;
 
+#[cfg(not(miri))] // dhat is not supported under Miri
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
@@ -67,7 +67,6 @@ fn seal_pending(store: &mut Scrollback, sealer: &mut ChunkSealer) -> u64 {
     count
 }
 
-#[test]
 fn push_line_and_sealing_allocate_nothing_but_the_blob_in_steady_state() {
     let mut feeder = Feeder::new();
     let _profiler = dhat::Profiler::builder().testing().build();
@@ -110,4 +109,11 @@ fn push_line_and_sealing_allocate_nothing_but_the_blob_in_steady_state() {
     let inline = store.memory_report().inline_seals - before.1;
     assert!(inline > 0, "the pending cap was reached");
     assert_eq!(blocks() - before.0, inline, "one allocation per inline seal");
+}
+
+fn main() {
+    ferrum_testkit::single_test::single_test(
+        "push_line_and_sealing_allocate_nothing_but_the_blob_in_steady_state",
+        push_line_and_sealing_allocate_nothing_but_the_blob_in_steady_state,
+    );
 }

@@ -17,10 +17,21 @@ tracing = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 dhat = { workspace = true }
+ferrum-testkit = { workspace = true }
 proptest = { workspace = true }
 
 [[bench]]
 name = "scrollback"
+harness = false
+
+# `dhat` counts every thread: run on the main thread (ferrum-testkit `single_test`).
+[[test]]
+name = "alloc_push_line"
+harness = false
+
+# `dhat` counts every thread: run on the main thread (ferrum-testkit `single_test`).
+[[test]]
+name = "memory_budget"
 harness = false
 
 [lints]

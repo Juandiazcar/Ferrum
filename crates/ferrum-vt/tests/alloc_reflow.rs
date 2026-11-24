@@ -1,12 +1,12 @@
 //! Reflow streams the history (FR-TERM-010, ADR 0028): it never holds a second, uncompressed copy
 //! of a long soft-wrapped line. One test per binary: `dhat` profiles the whole process.
 
-#![cfg(not(miri))] // dhat is not supported under Miri
 #![allow(clippy::expect_used, reason = "test code: a failed expectation is a failed test")]
 
 use ferrum_scrollback::{Scrollback, ScrollbackConfig};
 use ferrum_vt::{NullSink, Size, Terminal};
 
+#[cfg(not(miri))] // dhat is not supported under Miri
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
@@ -33,7 +33,6 @@ fn noise(state: &mut u64, len: usize) -> Vec<u8> {
         .collect()
 }
 
-#[test]
 fn reflowing_one_huge_wrapped_line_needs_no_second_copy() {
     let _profiler = dhat::Profiler::builder().testing().build();
     let config = ScrollbackConfig::new(HISTORY_LINES, HISTORY_LINES).expect("config");
@@ -52,5 +51,12 @@ fn reflowing_one_huge_wrapped_line_needs_no_second_copy() {
         "peak {} bytes over {} bytes of history",
         after.max_bytes,
         before.curr_bytes
+    );
+}
+
+fn main() {
+    ferrum_testkit::single_test::single_test(
+        "reflowing_one_huge_wrapped_line_needs_no_second_copy",
+        reflowing_one_huge_wrapped_line_needs_no_second_copy,
     );
 }

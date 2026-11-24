@@ -408,6 +408,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "dhat",
+ "ferrum-testkit",
  "postcard",
  "proptest",
  "serde",
@@ -437,6 +438,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "dhat",
+ "ferrum-testkit",
  "lz4_flex",
  "proptest",
  "rustc-hash 2.1.3",
@@ -466,6 +468,7 @@ dependencies = [
  "criterion",
  "dhat",
  "ferrum-scrollback",
+ "ferrum-testkit",
  "insta",
  "memchr",
  "proptest",

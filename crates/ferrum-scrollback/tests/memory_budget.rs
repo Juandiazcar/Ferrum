@@ -4,7 +4,6 @@
 //! once with nobody sealing, so the pending chunk is at its cap. One test per binary: `dhat`
 //! profiles the whole process.
 
-#![cfg(not(miri))] // dhat is not supported under Miri
 #![allow(clippy::expect_used, reason = "test code: a failed expectation is a failed test")]
 
 #[path = "../../../fixtures/output/output.rs"]
@@ -17,6 +16,7 @@ use ferrum_scrollback::{
 const _: () = assert!(MAX_PENDING_CHUNKS == 2, "PENDING_ALLOWANCE is two chunk buffers");
 use fixture::{Fixture, Profile, REFERENCE_COLS};
 
+#[cfg(not(miri))] // dhat is not supported under Miri
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
@@ -65,7 +65,6 @@ fn fill(seed: u64, profile: Profile, sealing: Sealing) -> (usize, MemoryReport) 
     (live, store.memory_report())
 }
 
-#[test]
 fn report_reconciles_with_dhat_and_reference_mix_fits_the_allowances() {
     let _profiler = dhat::Profiler::builder().testing().build();
     let cases = [Profile::Mixed, Profile::Entropy]
@@ -91,4 +90,11 @@ fn report_reconciles_with_dhat_and_reference_mix_fits_the_allowances() {
             }
         }
     }
+}
+
+fn main() {
+    ferrum_testkit::single_test::single_test(
+        "report_reconciles_with_dhat_and_reference_mix_fits_the_allowances",
+        report_reconciles_with_dhat_and_reference_mix_fits_the_allowances,
+    );
 }

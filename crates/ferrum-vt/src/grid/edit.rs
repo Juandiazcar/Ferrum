@@ -16,6 +16,11 @@ fn break_wide_at(row: &mut Row, x: usize, blank: Cell) {
             if let Some(head) = x.checked_sub(1).and_then(|h| row.get_mut(h)) {
                 *head = blank;
             }
+            // The spacer goes too: it may be outside the range being erased or deleted, and
+            // must not outlive its head.
+            if let Some(spacer) = row.get_mut(x) {
+                *spacer = blank;
+            }
         }
         Some(flags) if flags.contains(CellFlags::WIDE) => {
             if let Some(tail) = row.get_mut(x + 1) {
@@ -153,6 +158,25 @@ mod tests {
                 .iter()
                 .all(|cell| !cell.flags().intersects(CellFlags::WIDE | CellFlags::SPACER))
         }));
+    }
+
+    #[test]
+    fn a_spacer_never_outlives_a_deleted_or_erased_head() {
+        let all_plain = |grid: &Grid| {
+            grid.row(0).is_some_and(|row| {
+                row.cells()
+                    .iter()
+                    .all(|cell| !cell.flags().intersects(CellFlags::WIDE | CellFlags::SPACER))
+            })
+        };
+        let mut grid = grid_of("a漢b");
+        make_wide(&mut grid, 1);
+        grid.delete_cells(0, 0, 2, Cell::default());
+        assert!(all_plain(&grid), "delete: the head went, the spacer behind it must go too");
+        let mut grid = grid_of("a漢b");
+        make_wide(&mut grid, 1);
+        grid.erase_cells(0, 0, 2, Cell::default());
+        assert!(all_plain(&grid), "erase: same at the right edge of the range");
     }
 
     #[test]

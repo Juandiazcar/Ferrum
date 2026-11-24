@@ -21,14 +21,35 @@
 
 #![deny(unsafe_code)] // docs/05 §4: unsafe only in audited modules, each with `// SAFETY:`
 
+#[cfg(windows)]
+mod conpty;
 mod env;
 mod error;
+#[cfg(any(unix, windows))]
+mod program;
 mod spec;
 mod traits;
+#[cfg(unix)]
+mod unix;
+#[cfg(any(windows, test))]
+mod windows_command;
 
+#[cfg(windows)]
+pub use conpty::ConptyBackend;
 pub use env::{TERM, TERM_PROGRAM, session_env};
 pub use error::PtyError;
 pub use spec::{EnvOp, ExitSource, ExitStatus, PtySize, Readiness, SpawnSpec};
 pub use traits::{
     Notify, PtyBackend, PtyChild, PtyKiller, PtyReader, PtyResize, PtySession, PtyWriter,
 };
+#[cfg(unix)]
+pub use unix::UnixBackend;
+
+/// The backend of the running OS: `UnixBackend` on Linux and macOS, `ConptyBackend` on Windows.
+pub fn native_backend() -> Box<dyn PtyBackend> {
+    #[cfg(unix)]
+    let backend = UnixBackend;
+    #[cfg(windows)]
+    let backend = ConptyBackend::default();
+    Box::new(backend)
+}

@@ -22,6 +22,15 @@ CI covers Windows Server 2025 (build 26100) and the author machine covers Window
 | MV-S4-2 | Same run on Windows 11 24H2 and 25H2 retail builds | n/a | n/a | pending (build 26300 verified 2026-11-21) |
 | MV-S4-3 | Windows on ARM64 (aarch64): experiments 1, 2, 5 | n/a | n/a | pending |
 
+## PTY backends (WP-05, ADR 0026)
+
+CI runs the `PtyBackend` contract suite (`cargo nextest run -p ferrum-testkit --test pty_contract_native`) on `ubuntu-latest`, `macos-latest` and `windows-latest` (Windows Server 2025, build 26100). Builds CI does not have:
+
+| ID | Check | Linux | macOS | Windows |
+|---|---|---|---|---|
+| MV-05-1 | Run `cargo nextest run -p ferrum-testkit --test pty_contract_native` on Windows 10 1809, 21H2 and 22H2; PT-12 (`close_does_not_hang_with_unread_output`) matters most: older conhost builds may block `ClosePseudoConsole` while output is unread | n/a | n/a | pending |
+| MV-05-2 | Same suite on Windows 11 24H2/25H2 retail and on Windows on ARM64 | n/a | n/a | pending |
+
 ## Render pipeline (spike S3, ADR 0025)
 
 CI covered X11 under Xvfb, headless Wayland (weston) and a virtual macOS runner whose display clamped the window to 1024×642; the author machine covered Windows 11 at scale 1.0. Run from `spikes/s3-render-pipeline` with `bash run.sh <font.ttf> 3` (see the ADR for the font and the packages).

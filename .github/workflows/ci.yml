@@ -58,6 +58,24 @@ jobs:
       - run: cargo nextest run --workspace --locked
       - run: cargo test --workspace --doc --locked
 
+  pty-stress:
+    # PT-09 (the final output of a fast-exiting child) and the rest of the PtyBackend contract
+    # suite, repeated under the parallel load where macOS once lost output (WP-05 audit).
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rust
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: nextest
+      - name: Native PTY contract suite, 20 runs
+        run: |
+          for run in $(seq 1 20); do
+            echo "run $run"
+            cargo nextest run -p ferrum-testkit --test pty_contract_native --locked
+          done
+
   deny-and-deps:
     runs-on: ubuntu-latest
     steps:

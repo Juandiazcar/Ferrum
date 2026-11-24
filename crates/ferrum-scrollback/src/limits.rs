@@ -3,9 +3,29 @@
 /// Lines in the hot chunk before it is sealed (`docs/02` §3.2: "the newest <= 1 024 lines").
 pub const HOT_CHUNK_LINES: usize = 1_024;
 
+/// Most full chunks that may wait, uncompressed, for the worker to seal them (`docs/02` §5).
+///
+/// Two (maintainer decision Q-26, amended 2026-11-23): the pending chunks and the pooled buffers
+/// together are at most two full chunk buffers, 0.172 MB measured and 0.18 MB by allowance (the
+/// "per session pending chunks" line of `docs/03` §2, whose extra 0.09 MB comes from the sealed
+/// chunks line), so a session stays within its 1.0 MB allowance. When both are taken, the push
+/// path seals inline (backpressure, `MemoryReport::inline_seals`). With one, half of the chunks
+/// of `vt_parse/ascii_8mib` were sealed inline on an Apple M2 (blobs come back only between
+/// reads); the measurements with two are in ADR 0028.
+pub const MAX_PENDING_CHUNKS: usize = 2;
+
 /// The hot chunk buffer grows by exactly this many bytes at a time (`reserve_exact`), never by
 /// `Vec` doubling, so its capacity stays within the 0.10 MB allowance (ADR 0024, `docs/03` §2).
 pub const HOT_GROWTH_STEP_BYTES: usize = 16 * 1_024;
+
+/// A pooled chunk buffer (hot chunk data, pooled pending buffer, sealer output scratch) whose
+/// capacity is above this after use is freed instead of kept (`docs/03` §3 rule 7), so a burst of
+/// huge rows (up to `MAX_CHUNK_RAW_BYTES` per chunk) does not pin its memory for the rest of the
+/// session. It must stay above the normal working size, or steady state would allocate again:
+/// a full reference chunk is 0.086 MB measured (0.10 MB allowance, `docs/03` §2), and a chunk of
+/// full-width rows of the reference 200-column grid with a style run every word is about
+/// 0.3 MB; 512 KiB keeps both.
+pub const POOLED_BUFFER_KEEP_BYTES: usize = 512 * 1_024;
 
 /// Largest encoded line in bytes (flags, text, runs). Rows are bounded by the terminal width, so
 /// this is far above any real row and only stops a hostile or corrupt producer.

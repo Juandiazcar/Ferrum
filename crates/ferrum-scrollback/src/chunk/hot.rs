@@ -1,7 +1,16 @@
 //! The hot chunk: the newest lines, uncompressed, with bounded buffer growth.
 
 use crate::encode::{Encoder, Planned};
-use crate::limits::{HOT_CHUNK_LINES, HOT_GROWTH_STEP_BYTES};
+use crate::limits::{HOT_CHUNK_LINES, HOT_GROWTH_STEP_BYTES, POOLED_BUFFER_KEEP_BYTES};
+
+/// Empties `buffer`, and frees it when its capacity is above [`POOLED_BUFFER_KEEP_BYTES`].
+pub(crate) fn free_if_above_keep(buffer: &mut Vec<u8>) {
+    if buffer.capacity() > POOLED_BUFFER_KEEP_BYTES {
+        *buffer = Vec::new();
+    } else {
+        buffer.clear();
+    }
+}
 
 /// Up to [`HOT_CHUNK_LINES`] encoded lines back to back plus the start offset of each.
 #[derive(Debug)]
@@ -55,9 +64,10 @@ impl HotChunk {
         self.data.get(start..end)
     }
 
-    /// Forgets all lines but keeps the buffers (steady state allocates nothing).
+    /// Forgets all lines but keeps the buffers (steady state allocates nothing), except a data
+    /// buffer above [`POOLED_BUFFER_KEEP_BYTES`], which is freed (`docs/03` §3 rule 7).
     pub(crate) fn clear(&mut self) {
-        self.data.clear();
+        free_if_above_keep(&mut self.data);
         self.starts.clear();
     }
 
@@ -67,5 +77,10 @@ impl HotChunk {
 
     pub(crate) fn index_capacity_bytes(&self) -> usize {
         self.starts.capacity() * size_of::<u32>()
+    }
+
+    /// Heap bytes of both buffers.
+    pub(crate) fn capacity_bytes(&self) -> usize {
+        self.data_capacity() + self.index_capacity_bytes()
     }
 }

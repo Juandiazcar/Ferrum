@@ -1,7 +1,7 @@
 //! Random access by line index.
 
 use super::{Place, Scrollback};
-use crate::chunk::{ChunkBuf, decode_chunk};
+use crate::chunk::{ChunkBuf, HotChunk, decode_chunk};
 use crate::decode::decode_line;
 use crate::error::{DecodeError, ScrollbackError};
 use crate::line::DecodedLine;
@@ -27,10 +27,11 @@ impl LineCursor {
     }
 }
 
-/// Where a line lives: sealed chunk `index` line `line`, or hot line `line`.
-enum Location {
+/// Where a line lives: line `line` of sealed chunk `chunk`, or line `line` of an uncompressed
+/// chunk.
+enum Location<'s> {
     Sealed { chunk: usize, line: usize },
-    Hot(usize),
+    Raw { lines: &'s HotChunk, line: usize },
 }
 
 impl Scrollback {
@@ -48,8 +49,8 @@ impl Scrollback {
     ) -> Result<Option<&'c DecodedLine>, ScrollbackError> {
         let Some(location) = self.locate(index) else { return Ok(None) };
         match location {
-            Location::Hot(line) => {
-                let bytes = self.hot.line(line).ok_or(DecodeError::BadIndex)?;
+            Location::Raw { lines, line } => {
+                let bytes = lines.line(line).ok_or(DecodeError::BadIndex)?;
                 decode_line(bytes, &mut cursor.line)?;
             }
             Location::Sealed { chunk, line } => {
@@ -90,7 +91,7 @@ impl Scrollback {
         }
     }
 
-    fn locate(&self, index: usize) -> Option<Location> {
+    fn locate(&self, index: usize) -> Option<Location<'_>> {
         if index >= self.retained {
             return None;
         }
@@ -98,11 +99,14 @@ impl Scrollback {
         let mut offset = index + skipped;
         for (chunk, sealed) in self.chunks.iter().enumerate() {
             if offset < sealed.lines {
-                return Some(Location::Sealed { chunk, line: offset });
+                return Some(match &sealed.place {
+                    Place::Pending { lines, .. } => Location::Raw { lines, line: offset },
+                    Place::Ram(_) | Place::Spilled(_) => Location::Sealed { chunk, line: offset },
+                });
             }
             offset -= sealed.lines;
         }
-        (offset < self.hot.len()).then_some(Location::Hot(offset))
+        (offset < self.hot.len()).then_some(Location::Raw { lines: &self.hot, line: offset })
     }
 
     fn load_chunk(&self, index: usize, cursor: &mut LineCursor) -> Result<(), ScrollbackError> {
@@ -117,6 +121,8 @@ impl Scrollback {
                 store.read(*handle, &mut cursor.spill)?;
                 decode_chunk(&cursor.spill, &mut cursor.chunk)?;
             }
+            // `locate` reads pending chunks in place; this arm is never taken.
+            Place::Pending { .. } => return Err(DecodeError::BadIndex.into()),
         }
         cursor.chunk.id = Some(sealed.id);
         Ok(())

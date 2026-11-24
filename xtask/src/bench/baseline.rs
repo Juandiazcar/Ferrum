@@ -26,6 +26,10 @@ pub(crate) const CEILINGS_NS: &[(&str, f64)] = &[
     ("vt_parse/sgr_heavy_8mib", 139_810_133.0),
     ("vt_parse/ascii_8mib_no_history", 41_943_040.0),
     ("vt_parse/sgr_heavy_8mib_no_history", 139_810_133.0),
+    // The worker seals the history the parser retires (Q-21 amendment, ADR 0028), so it must
+    // keep up with NFR-PERF-02's 400 MB/s; an encoded row is about as long as its input. The
+    // bench seals 857 466 encoded bytes (11 fixture chunks): 2.14 ms at 400 MB/s, so 4.29 ms.
+    ("scrollback_seal/fixture_chunks", 4_287_330.0),
     // "Reflow of 10 000 lines on resize <= 40 ms", so the ceiling is 80 ms.
     ("vt_reflow/10k_lines_200_to_100_columns", 80_000_000.0),
 ];

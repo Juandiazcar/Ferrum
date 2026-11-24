@@ -5,7 +5,7 @@
 #[path = "support/lines.rs"]
 mod lines;
 
-use ferrum_scrollback::{HOT_CHUNK_LINES, LineCursor, Scrollback, ScrollbackConfig};
+use ferrum_scrollback::{ChunkSealer, HOT_CHUNK_LINES, LineCursor, Scrollback, ScrollbackConfig};
 use lines::{numbered, push};
 
 const LINES: usize = HOT_CHUNK_LINES * 2 + 17;
@@ -41,7 +41,19 @@ fn pops_every_line_oldest_first_across_hot_and_sealed_chunks() {
 #[test]
 fn rotating_front_to_back_keeps_the_order_and_frees_chunks() {
     let mut store = filled(LINES);
-    let before = store.memory_report().sealed_bytes;
+    // Full chunks are sealed as the daemon worker does, so the sealed bytes are the history.
+    let mut sealer = ChunkSealer::new();
+    let mut seal = |store: &mut Scrollback| {
+        while let Some(pending) = store.take_pending() {
+            store.install(sealer.seal(pending).expect("seal")).expect("install");
+        }
+    };
+    seal(&mut store);
+    let history = |store: &Scrollback| {
+        let report = store.memory_report();
+        report.sealed_bytes + report.pending_bytes
+    };
+    let before = history(&store);
     let boundary = store.pushed_lines();
     let mut cursor = LineCursor::new();
     let mut moved = 0usize;
@@ -53,7 +65,7 @@ fn rotating_front_to_back_keeps_the_order_and_frees_chunks() {
     }
     assert_eq!(moved, LINES);
     assert_eq!(store.len(), LINES);
-    assert!(store.memory_report().sealed_bytes <= before + before / 4, "old chunks are released");
+    assert!(history(&store) <= before + before / 4, "old chunks are released");
 }
 
 #[test]

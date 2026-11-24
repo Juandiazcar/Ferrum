@@ -1,40 +1,79 @@
-//! Sealing: LZ4-compress the hot chunk into a blob with a delta-encoded line index.
+//! Sealing: LZ4-compress a full chunk into a blob with a delta-encoded line index.
 
 use lz4_flex::block::{CompressTable, compress_into_with_table, get_maximum_output_size};
 
-use super::HotChunk;
+use super::hot::free_if_above_keep;
+use super::{HotChunk, PendingChunk, SealedBlob};
 use crate::error::ScrollbackError;
 use crate::varint::put_len;
 
-/// Scratch buffers shared by all seals of a session (`docs/02` §5: compression runs on one worker,
-/// so the scratch is shared, not per chunk).
-pub(crate) struct Sealer {
+/// Compresses full chunks; owns the scratch buffers that every seal reuses.
+///
+/// The daemon worker owns one and seals the [`PendingChunk`]s of every session with it
+/// (`docs/02` §5: compression runs on one worker, so the scratch is shared, not per chunk). Each
+/// [`Scrollback`](crate::Scrollback) also owns one for the inline fallback.
+pub struct ChunkSealer {
     index: Vec<u8>,
     out: Vec<u8>,
     /// LZ4 hash table, reused so a seal allocates nothing but its result (`docs/05` §6).
     table: CompressTable,
+    /// Test hook: how many seals succeed before every later one fails as a failed LZ4 call would
+    /// (compression cannot fail on real input).
+    #[cfg(test)]
+    pub(crate) failing_after: Option<usize>,
 }
 
 /// Heap size of the large LZ4 hash table (4 096 entries of `u32`), counted as shared scratch.
 const LZ4_TABLE_BYTES: usize = 4_096 * size_of::<u32>();
 
-impl Default for Sealer {
+impl Default for ChunkSealer {
     fn default() -> Self {
         // The large table is needed from the first seal: a full chunk is above 64 KiB of input
         // only sometimes, and a table upgrade later would allocate on the hot path.
-        Self { index: Vec::new(), out: Vec::new(), table: CompressTable::large() }
+        Self {
+            index: Vec::new(),
+            out: Vec::new(),
+            table: CompressTable::large(),
+            #[cfg(test)]
+            failing_after: None,
+        }
     }
 }
 
-impl std::fmt::Debug for Sealer {
+impl std::fmt::Debug for ChunkSealer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Sealer").field("scratch_bytes", &self.capacity_bytes()).finish()
+        f.debug_struct("ChunkSealer").field("scratch_bytes", &self.capacity_bytes()).finish()
     }
 }
 
-impl Sealer {
+impl ChunkSealer {
+    /// A sealer with its LZ4 table allocated (16 KiB); the output scratch grows on the first seal.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Compresses `pending` into the blob that [`Scrollback::install`](crate::Scrollback::install)
+    /// puts in its place. Allocates the blob (the retained data itself) and nothing else once the
+    /// scratch has its working size. `pending` is consumed and dropped before the blob is
+    /// returned, so the scrollback can reuse its buffers when the blob is installed.
+    ///
+    /// # Errors
+    /// [`ScrollbackError::Compress`] if LZ4 fails; the chunk then stays pending (readable) until
+    /// it is evicted or spilled (spilling seals it inline).
+    pub fn seal(&mut self, pending: PendingChunk) -> Result<SealedBlob, ScrollbackError> {
+        let PendingChunk { origin, id, lines } = pending;
+        let blob = self.seal_hot(&lines)?;
+        // Released here so the owner finds the buffer unshared when it installs the blob.
+        drop(lines);
+        Ok(SealedBlob { origin, id, blob })
+    }
+
     /// Builds the sealed blob of `hot` (which must hold at least one line).
-    pub(crate) fn seal(&mut self, hot: &HotChunk) -> Result<Box<[u8]>, ScrollbackError> {
+    pub(crate) fn seal_hot(&mut self, hot: &HotChunk) -> Result<Box<[u8]>, ScrollbackError> {
+        #[cfg(test)]
+        if let Some(left) = self.failing_after.as_mut() {
+            *left = left.checked_sub(1).ok_or(ScrollbackError::Compress)?;
+        }
         self.index.clear();
         let raw = hot.data();
         let mut previous = 0usize;
@@ -57,11 +96,14 @@ impl Sealer {
         let written = compress_into_with_table(raw, target, &mut self.table)
             .map_err(|_| ScrollbackError::Compress)?;
         self.out.truncate(header + written);
-        Ok(Box::from(self.out.as_slice()))
+        let blob = Box::from(self.out.as_slice());
+        free_if_above_keep(&mut self.out);
+        free_if_above_keep(&mut self.index);
+        Ok(blob)
     }
 
     /// Capacity of the scratch buffers, for memory accounting.
-    pub(crate) fn capacity_bytes(&self) -> usize {
+    pub fn capacity_bytes(&self) -> usize {
         self.index.capacity() + self.out.capacity() + LZ4_TABLE_BYTES
     }
 }
@@ -87,7 +129,7 @@ mod tests {
             let planned = encoder.plan(&mut styles, &line).expect("plan");
             hot.append(&encoder, &planned);
         }
-        Sealer::default().seal(&hot).expect("seal")
+        ChunkSealer::default().seal_hot(&hot).expect("seal")
     }
 
     #[test]

@@ -1,6 +1,13 @@
 //! Criterion benches of `ferrum-vt` (`docs/03` §4, NFR-PERF-02): parse throughput over plain
 //! ASCII and SGR-heavy output (single core), UTF-8 text, and the reflow of 10 000 lines.
 //! Throughput is bytes per second; `cargo xtask bench` gates the medians.
+//!
+//! With history on, the benches model the daemon (`docs/02` §5, Q-21 amendment in ADR 0028):
+//! the input is parsed in 64 KiB reads; between reads the I/O thread hands full history chunks
+//! to a worker thread, which compresses them concurrently, and installs the sealed blobs it got
+//! back. The `_inline_seal` variants compress on the parse thread instead (informational: the
+//! gap is the work the worker takes over). Each bench prints how often the push path had to
+//! seal inline because the worker fell behind (`MemoryReport::inline_seals`).
 
 #![allow(clippy::expect_used, reason = "bench setup: a failed expectation aborts the run")]
 #![allow(
@@ -9,9 +16,14 @@
 )]
 
 use std::hint::black_box;
+use std::io::Write as _;
+use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
+use std::thread::JoinHandle;
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use ferrum_scrollback::{Scrollback, ScrollbackConfig};
+use ferrum_scrollback::{
+    ChunkSealer, MAX_PENDING_CHUNKS, PendingChunk, Scrollback, ScrollbackConfig, SealedBlob,
+};
 use ferrum_vt::{NullSink, Size, Terminal};
 use fixture::{Fixture, Profile};
 
@@ -28,6 +40,76 @@ const REFLOW_LINES: usize = 12_000;
 /// Seed of the product fixture and logical lines generated from it (enough for 8 MiB).
 const SEED: u64 = 1;
 const FIXTURE_LINES: usize = 40_000;
+/// Bytes the daemon reads from a PTY at a time (`docs/02` §5: at most 64 KiB).
+const READ_BYTES: usize = 64 * 1_024;
+const CHUNK_LINES: u64 = ferrum_scrollback::HOT_CHUNK_LINES as u64;
+
+/// Who compresses full history chunks.
+enum Sealing {
+    /// A worker thread, concurrently (the daemon design).
+    Worker { jobs: SyncSender<PendingChunk>, results: Receiver<SealedBlob>, thread: JoinHandle<()> },
+    /// The parse thread, between reads.
+    Inline(ChunkSealer),
+}
+
+impl Sealing {
+    fn worker() -> Self {
+        // Bounded like the daemon's channels: never more than the pending chunks in flight.
+        let (jobs, inbox) = sync_channel::<PendingChunk>(MAX_PENDING_CHUNKS);
+        let (outbox, results) = sync_channel(MAX_PENDING_CHUNKS);
+        let thread = std::thread::Builder::new()
+            .name("bench-seal-worker".into())
+            .spawn(move || {
+                let mut sealer = ChunkSealer::new();
+                for pending in inbox {
+                    let blob = sealer.seal(pending).expect("seal");
+                    if outbox.send(blob).is_err() {
+                        break;
+                    }
+                }
+            })
+            .expect("spawn the worker");
+        Self::Worker { jobs, results, thread }
+    }
+
+    /// What the I/O thread does between two reads.
+    fn between_reads(&mut self, term: &mut Terminal<NullSink>) {
+        match self {
+            Self::Worker { jobs, results, .. } => {
+                while let Ok(sealed) = results.try_recv() {
+                    term.install_sealed_chunk(sealed).expect("install");
+                }
+                while let Some(pending) = term.take_pending_chunk() {
+                    jobs.send(pending).expect("the worker is alive");
+                }
+            }
+            Self::Inline(sealer) => {
+                while let Some(pending) = term.take_pending_chunk() {
+                    term.install_sealed_chunk(sealer.seal(pending).expect("seal"))
+                        .expect("install");
+                }
+            }
+        }
+    }
+
+    fn finish(self) {
+        if let Self::Worker { jobs, results, thread } = self {
+            drop((jobs, results));
+            thread.join().expect("the worker exits");
+        }
+    }
+}
+
+/// A parse bench: name, input, history lines and who seals.
+type Case = (&'static str, Vec<u8>, usize, fn() -> Sealing);
+
+/// Feeds `input` as the daemon does: 64 KiB reads, sealing work between them.
+fn feed(term: &mut Terminal<NullSink>, input: &[u8], sealing: &mut Sealing) {
+    for read in input.chunks(READ_BYTES) {
+        term.parse(read);
+        sealing.between_reads(term);
+    }
+}
 
 fn terminal() -> Terminal<NullSink> {
     with_history(HISTORY_LINES)
@@ -118,21 +200,32 @@ fn unicode() -> Vec<u8> {
 fn bench_parse(c: &mut Criterion) {
     let mut group = c.benchmark_group("vt_parse");
     group.throughput(Throughput::Bytes(INPUT_BYTES as u64));
-    let cases = [
-        ("ascii_8mib", ascii(), HISTORY_LINES),
-        ("sgr_heavy_8mib", sgr_heavy(), HISTORY_LINES),
-        ("unicode_8mib", unicode(), HISTORY_LINES),
-        ("ascii_8mib_no_history", ascii(), 0),
-        ("sgr_heavy_8mib_no_history", sgr_heavy(), 0),
+    let inline = || Sealing::Inline(ChunkSealer::new());
+    let cases: [Case; 7] = [
+        ("ascii_8mib", ascii(), HISTORY_LINES, Sealing::worker),
+        ("sgr_heavy_8mib", sgr_heavy(), HISTORY_LINES, Sealing::worker),
+        ("unicode_8mib", unicode(), HISTORY_LINES, Sealing::worker),
+        ("ascii_8mib_inline_seal", ascii(), HISTORY_LINES, inline),
+        ("sgr_heavy_8mib_inline_seal", sgr_heavy(), HISTORY_LINES, inline),
+        ("ascii_8mib_no_history", ascii(), 0, Sealing::worker),
+        ("sgr_heavy_8mib_no_history", sgr_heavy(), 0, Sealing::worker),
     ];
-    for (name, input, history) in cases {
-        let mut term = with_history(history);
-        term.parse(&input); // warm-up: grow every buffer to its working size
+    for (name, input, history, sealing) in cases {
+        let (mut term, mut sealing) = (with_history(history), sealing());
+        feed(&mut term, &input, &mut sealing); // warm-up: grow every buffer to its working size
+        let warm_up = term.scrollback().memory_report().inline_seals;
+        let chunks_before = term.scrollback().pushed_lines() / CHUNK_LINES;
         group.bench_function(name, |b| {
-            b.iter(|| {
-                term.parse(black_box(&input));
-            });
+            b.iter(|| feed(&mut term, black_box(&input), &mut sealing));
         });
+        let measured = term.scrollback().memory_report().inline_seals - warm_up;
+        let chunks = term.scrollback().pushed_lines() / CHUNK_LINES - chunks_before;
+        writeln!(
+            std::io::stderr().lock(),
+            "{name}: inline seals: {warm_up} in the warm-up, {measured} of {chunks} chunks measured"
+        )
+        .expect("stderr");
+        sealing.finish();
     }
     group.finish();
 }

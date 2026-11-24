@@ -90,6 +90,10 @@ pub enum ScrollbackError {
     /// The spill store failed while reading a cold chunk.
     #[error("spill store failed")]
     Spill(#[from] SpillError),
+    /// A sealed blob given to [`Scrollback::install`](crate::Scrollback::install) came from
+    /// another scrollback; it was dropped.
+    #[error("sealed chunk belongs to another scrollback")]
+    ForeignBlob,
     /// A spilled chunk is needed but the session has no spill store.
     #[error("chunk is spilled but no spill store is attached")]
     NoSpillStore,

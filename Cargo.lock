@@ -358,6 +358,9 @@ dependencies = [
  "ferrum-testkit",
  "serde",
  "thiserror",
+ "toml",
+ "unicode-segmentation",
+ "uuid",
 ]
 
 [[package]]
@@ -1054,6 +1057,16 @@ name = "unicode-width"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca718471876992059f251e33aafc334346ada08042b7661dd1fe313a9bced557"
+
+[[package]]
+name = "uuid"
+version = "1.29.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c14b15dffa2f4bd712103e857140aa04a4f2ff6e955c77d7eb8e53ee02a3b64"
+dependencies = [
+ "getrandom",
+ "serde_core",
+]
 
 [[package]]
 name = "vte"

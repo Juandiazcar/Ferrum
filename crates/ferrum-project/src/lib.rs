@@ -5,10 +5,12 @@
 //! A [`Project`] is a named, colored group of 1..N root directories with its sessions in sidebar
 //! order ([`SessionEntry`]), a [`Layout`] (a split tree whose leaves are sessions) and an optional
 //! startup [`Recipe`]. The daemon owns projects and persists each one as
-//! `data_dir/projects/<id>.toml` with `ferrum_config::store` and [`PROJECT_SCHEMA`]; a loaded
-//! project is untrusted input and goes through [`Project::validate`].
+//! `<data_dir>/ferrum/projects/<id>.toml` with `ferrum_config::store` and [`PROJECT_SCHEMA`]. A
+//! `Project` is valid by construction: files and edits go through `TryFrom<ProjectParts>`, and
+//! the user's size limits from the settings apply through [`Project::check_limits`].
 //!
-//! Allowed internal dependencies: ferrum-config (types only: `Rgb`, `Schema`).
+//! Allowed internal dependencies: ferrum-config (types only: `Rgb`, `Schema`, `ProjectLimits`
+//! and its bounded limit types).
 //! Must never depend on: ferrum-daemon, ferrum-ui, OS-specific code.
 
 #![forbid(unsafe_code)]
@@ -21,7 +23,7 @@ mod recipe;
 pub use error::ProjectError;
 pub use layout::{Axis, Layout, MAX_LAYOUT_DEPTH, RATIO_SCALE};
 pub use project::{
-    DEFAULT_COLOR, FALLBACK_NAME, MAX_ICON_BYTES, MAX_NAME_CHARS, MAX_ROOTS, MAX_SESSIONS,
-    PROJECT_SCHEMA, PROJECTS_DIR, Project, ProjectId, SessionEntry, SessionKey, suggest_name,
+    DEFAULT_COLOR, MAX_ICON_BYTES, PROJECT_SCHEMA, PROJECTS_DIR, Project, ProjectId, ProjectParts,
+    SessionEntry, SessionKey, suggest_name,
 };
-pub use recipe::{Arrangement, MAX_RECIPE_SESSIONS, Recipe, RecipeSession, SessionLaunch};
+pub use recipe::{Arrangement, MAX_TEXT_BYTES, Recipe, RecipeSession, SessionLaunch};

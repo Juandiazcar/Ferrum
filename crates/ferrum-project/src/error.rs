@@ -18,8 +18,8 @@ pub enum ProjectError {
         /// Longest allowed icon in bytes.
         max: usize,
     },
-    /// The project has no root directory, too many, an empty one or the same one twice.
-    #[error("a project needs 1 to {max} distinct, non-empty root directories")]
+    /// The project has no root directory, too many, a relative one or the same one twice.
+    #[error("a project needs 1 to {max} distinct, absolute root directories")]
     BadRoots {
         /// Most roots allowed.
         max: usize,
@@ -51,7 +51,17 @@ pub enum ProjectError {
     /// A split ratio is outside 1..=999 per mille.
     #[error("split ratio {0} is outside 1..=999 per mille")]
     BadRatio(u16),
-    /// A recipe sub-directory is absolute or leaves its root.
+    /// A recipe sub-directory is absolute, leaves its root, or is too long.
     #[error("recipe directory must be relative and stay inside its root")]
     BadRecipeDir,
+    /// A profile name is blank, too long or has control characters.
+    #[error("profile name is not valid")]
+    BadProfile,
+    /// A session's last working directory is relative or has control characters.
+    #[error("session working directory must be an absolute path")]
+    BadCwd,
+    /// A startup command has control characters (a newline would run a second command) or is
+    /// too long.
+    #[error("startup command must be one line without control characters")]
+    BadCommand,
 }

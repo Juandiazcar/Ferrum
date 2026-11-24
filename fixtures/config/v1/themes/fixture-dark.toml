@@ -1,0 +1,34 @@
+# Schema version 1 of a theme file (docs/09 §9). A test fixture, not a built-in theme.
+schema_version = 1
+
+[meta]
+name = "Fixture Dark"
+author = "Ferrum tests"
+variant = "dark"
+
+[colors]
+foreground = "#d7dae0"
+background = "#101214"
+cursor = "#e8590c"
+cursor_text = "#101214"
+selection_bg = "#2a2f36"
+selection_fg = "#d7dae0"
+ansi = [
+  "#1b1e22", "#e06c75", "#98c379", "#e5c07b", "#61afef", "#c678dd", "#56b6c2", "#abb2bf",
+  "#5c6370", "#ef7b84", "#a9d18a", "#f0cf8c", "#74bdf5", "#d58ae6", "#68c6d1", "#ffffff",
+]
+
+[ui]
+sidebar_bg = "#0b0d0f"
+sidebar_fg = "#d7dae0"
+accent = "#e8590c"
+border = "#22262b"
+status_bg = "#0b0d0f"
+status_fg = "#9aa1ab"
+danger = "#e5484d"
+warning = "#f5a524"
+success = "#46a758"
+
+[fonts]
+family = "JetBrains Mono"
+size = 13.5

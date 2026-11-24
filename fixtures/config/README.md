@@ -7,6 +7,6 @@ shipped: a new schema version adds a new directory and a migration step.
 | Version | Files | Status |
 |---|---|---|
 | `v0/` | `settings.toml` | **Synthetic.** Ferrum never shipped it. It is the flat, unversioned layout (no `schema_version`, no sections) that exists to exercise the migration framework end to end. Its keys `theme`, `font_family`, `font_size`, `cursor_style` move to `[appearance]`; `scrollback_lines`, `copy_on_select`, `bell` move to `[terminal]`; other keys are kept and ignored. |
-| `v1/` | `settings.toml` | First real layout: `schema_version = 1` and one table per settings section (`docs/09` §8). `v1/settings.toml` is also the expected result of migrating `v0/settings.toml`. |
+| `v1/` | `settings.toml`, `keybindings.toml`, `themes/fixture-dark.toml` | First real layouts: `schema_version = 1`. `settings.toml` has one table per settings section (`docs/09` §8) and is also the expected result of migrating `v0/settings.toml`; `keybindings.toml` holds user changes to the default shortcuts (`docs/09` §7); the theme follows `docs/09` §9 (a test fixture, not a built-in theme). |
 
 Project files (`ferrum-project`) start at schema version 1 and have no older versions yet.

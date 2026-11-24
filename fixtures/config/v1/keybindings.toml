@@ -1,0 +1,13 @@
+# Schema version 1 of keybindings.toml: user changes to the default shortcuts of docs/09 §7.
+schema_version = 1
+
+[[bindings]]
+action = "new_session"
+keys = "Ctrl+Shift+Y"
+
+[[bindings]]
+action = "split_right"
+keys = "cmd+opt+Right"
+
+[[bindings]]
+action = "zoom_pane"

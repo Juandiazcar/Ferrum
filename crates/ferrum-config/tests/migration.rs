@@ -82,3 +82,39 @@ proptest! {
         prop_assert_eq!(again.table, once.table);
     }
 }
+
+#[test]
+fn v1_keybindings_and_theme_fixtures_load() {
+    use ferrum_config::{KEYBINDINGS_SCHEMA, Keybindings, THEME_SCHEMA, Theme};
+    let text = include_str!("../../../fixtures/config/v1/keybindings.toml");
+    let (keys, from) = store::parse::<Keybindings>(text, &KEYBINDINGS_SCHEMA).unwrap();
+    assert_eq!(from, 1);
+    let chords: Vec<_> =
+        keys.bindings.iter().map(|b| b.keys.as_ref().map(ToString::to_string)).collect();
+    assert_eq!(chords, [Some("Ctrl+Shift+Y".to_owned()), Some("Alt+Super+Right".to_owned()), None]);
+
+    let text = include_str!("../../../fixtures/config/v1/themes/fixture-dark.toml");
+    let (theme, _) = store::parse::<Theme>(text, &THEME_SCHEMA).unwrap();
+    assert_eq!(theme.meta.name, "Fixture Dark");
+    assert_eq!(theme.colors.ansi.len(), 16);
+    assert_eq!(theme.ui.accent.to_string(), "#e8590c");
+    let saved = store::to_toml_string(&theme, &THEME_SCHEMA).unwrap();
+    assert_eq!(store::parse::<Theme>(&saved, &THEME_SCHEMA).unwrap().0, theme);
+}
+
+#[test]
+fn invalid_keybindings_and_themes_are_rejected() {
+    use ferrum_config::{KEYBINDINGS_SCHEMA, Keybindings, THEME_SCHEMA, Theme};
+    for text in [
+        "schema_version = 1\n[[bindings]]\naction = \"Bad Name\"",
+        "schema_version = 1\n[[bindings]]\naction = \"copy\"\nkeys = \"Hyper+C\"",
+        "[[bindings]]\naction = \"copy\"",
+    ] {
+        assert!(store::parse::<Keybindings>(text, &KEYBINDINGS_SCHEMA).is_err(), "{text}");
+    }
+    let theme = include_str!("../../../fixtures/config/v1/themes/fixture-dark.toml");
+    for (from, to) in [("variant = \"dark\"", "variant = \"light\""), ("\"#ffffff\",", "")] {
+        let broken = theme.replace(from, to);
+        assert!(store::parse::<Theme>(&broken, &THEME_SCHEMA).is_err(), "{to}");
+    }
+}

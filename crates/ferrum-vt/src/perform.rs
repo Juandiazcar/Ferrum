@@ -18,6 +18,8 @@ pub(crate) mod control {
     pub(crate) const CR: u8 = 0x0D;
     pub(crate) const SO: u8 = 0x0E;
     pub(crate) const SI: u8 = 0x0F;
+    pub(crate) const CAN: u8 = 0x18;
+    pub(crate) const SUB: u8 = 0x1A;
     /// First and last C1 control.
     pub(crate) const C1_FIRST: u8 = 0x80;
     pub(crate) const C1_LAST: u8 = 0x9F;
@@ -56,6 +58,11 @@ impl<S: EventSink> Perform for Core<S> {
     }
 
     fn execute(&mut self, byte: u8) {
+        // `vte` calls `unhook` and then executes the CAN or SUB that cancelled the DCS string.
+        if self.dcs_end && matches!(byte, control::CAN | control::SUB) {
+            self.dcs_end = false;
+            self.dcs_cancel();
+        }
         self.control(byte);
     }
 
@@ -69,5 +76,21 @@ impl<S: EventSink> Perform for Core<S> {
         if !ignore {
             self.esc(intermediates, byte);
         }
+    }
+
+    fn hook(&mut self, params: &Params, intermediates: &[u8], ignore: bool, action: char) {
+        if ignore {
+            self.dcs = crate::dcs::Dcs::Ignore;
+        } else {
+            self.dcs_hook(params, intermediates, action);
+        }
+    }
+
+    fn put(&mut self, byte: u8) {
+        self.dcs_put(byte);
+    }
+
+    fn unhook(&mut self) {
+        self.dcs_unhook();
     }
 }

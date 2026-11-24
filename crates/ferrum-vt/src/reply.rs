@@ -6,10 +6,14 @@ use crate::core::Core;
 use crate::events::{Event, EventSink};
 
 /// Longest reply the terminal builds.
-const REPLY_CAPACITY: usize = 64;
+const REPLY_CAPACITY: usize = 128;
 /// Digits of the largest `u64`, the most `number` can write.
 const MAX_DECIMAL_DIGITS: usize = 20;
 const DECIMAL_BASE: usize = 10;
+/// Bits of one hexadecimal digit.
+const NIBBLE_BITS: u32 = 4;
+const NIBBLE_MASK: u16 = 0xF;
+const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
 /// Control sequence introducer of a reply (7-bit form).
 pub(crate) const CSI: &[u8] = b"\x1b[";
 /// Control sequence introducer of a reply to a DEC private request.
@@ -63,11 +67,12 @@ impl Reply {
 
     /// Appends a 16-bit value as four lowercase hex digits.
     pub(crate) fn hex4(self, value: u16) -> Self {
-        const DIGITS: &[u8; 16] = b"0123456789abcdef";
-        let mut text = [0u8; 4];
-        for (slot, shift) in text.iter_mut().zip([12u16, 8, 4, 0]) {
-            let digit = usize::from((value >> shift) & 0xF);
-            *slot = DIGITS.get(digit).copied().unwrap_or(b'0');
+        let mut text = [0u8; u16::BITS as usize / NIBBLE_BITS as usize];
+        let mut rest = value;
+        for slot in text.iter_mut().rev() {
+            let digit = usize::from(rest & NIBBLE_MASK);
+            *slot = HEX_DIGITS.get(digit).copied().unwrap_or(b'0');
+            rest >>= NIBBLE_BITS;
         }
         self.text(&text)
     }

@@ -14,16 +14,17 @@
 //! the VT500 states in `sequence.rs`, so it knows where every sequence ends, with or without a
 //! dispatch, however the stream is cut into reads.
 //!
-//! The OSC cap (`docs/10` §3 item 9): an OSC payload may take at most `MAX_OSC_BYTES`. At the
-//! first byte over the cap the string is cancelled: its buffer is freed and the rest of it is
-//! dropped without being stored up to its terminator (BEL, CAN or SUB; an ESC is kept, it starts
-//! the next sequence). Nothing of its payload reaches the screen.
+//! The watchdog (`docs/10` §3 item 9): a sequence or string may take at most `MAX_SEQUENCE_BYTES`
+//! (an OSC payload `MAX_OSC_BYTES`). At the first byte over the cap it is cancelled: its buffer is
+//! freed, `vte` is reset, a DCS string is forgotten unanswered, and the rest of it is dropped
+//! without being stored up to the byte that ends it (its final byte, ST, BEL for an OSC, CAN or
+//! SUB; an ESC is kept, it starts the next sequence). Nothing of its payload reaches the screen.
 
 use memchr::memmem::Finder;
 
 use crate::core::Core;
 use crate::events::EventSink;
-use crate::limits::{MAX_OSC_BYTES, OSC_BUFFER_KEEP_BYTES};
+use crate::limits::{MAX_OSC_BYTES, MAX_SEQUENCE_BYTES, OSC_BUFFER_KEEP_BYTES};
 mod sequence;
 
 use sequence::{ESC, OSC_INTRODUCER, Seq};
@@ -60,6 +61,9 @@ enum VteState {
     Utf8Tail,
     /// Inside a sequence of this family (see `sequence.rs`).
     Sequence(Seq),
+    /// A sequence of this family was cancelled at the cap and `vte` was reset: its remaining
+    /// bytes are dropped, unstored, up to the byte that would have ended it.
+    Discard(Seq),
 }
 
 /// Whether the ESC that opens an OSC was already fed to `vte`.
@@ -87,6 +91,8 @@ pub(crate) struct Input {
     osc_buffer: Vec<u8>,
     osc: OscState,
     vte_state: VteState,
+    /// Bytes of the open sequence so far, its introducer included (the watchdog).
+    sequence_bytes: usize,
 }
 
 impl Input {
@@ -97,6 +103,7 @@ impl Input {
             osc_buffer: Vec::new(),
             osc: OscState::Idle,
             vte_state: VteState::Ground,
+            sequence_bytes: 0,
         }
     }
 
@@ -142,6 +149,7 @@ impl Input {
                 1
             }
             VteState::Sequence(seq) => self.feed_sequence(core, seq, slice),
+            VteState::Discard(seq) => self.discard_sequence(seq, slice),
         }
     }
 
@@ -170,7 +178,10 @@ impl Input {
     fn feed_tail_byte<S: EventSink>(&mut self, core: &mut Core<S>, byte: u8) -> usize {
         self.parser.advance(core, &[byte]);
         self.vte_state = match byte {
-            ESC => VteState::Sequence(Seq::Escape),
+            ESC => {
+                self.sequence_bytes = 1;
+                VteState::Sequence(Seq::Escape)
+            }
             FIRST_NON_ASCII..=u8::MAX => VteState::Utf8Tail,
             _ => VteState::Ground,
         };
@@ -188,24 +199,74 @@ impl Input {
     }
 
     /// The open sequence `seq` (or the one an ESC at the start of `slice` opens) goes to `vte` up
-    /// to its end.
+    /// to its end. At the first byte over `MAX_SEQUENCE_BYTES` it is cancelled (the watchdog).
     fn feed_sequence<S: EventSink>(&mut self, core: &mut Core<S>, seq: Seq, slice: &[u8]) -> usize {
-        let scan = sequence::scan(seq, slice);
-        self.parser.advance(core, slice.get(..scan.used).unwrap_or_default());
-        self.vte_state = scan.state.map_or(VteState::Ground, VteState::Sequence);
+        let budget = MAX_SEQUENCE_BYTES.saturating_sub(self.sequence_bytes);
+        let window = slice.get(..slice.len().min(budget.saturating_add(1))).unwrap_or_default();
+        let scan = sequence::scan(seq, window);
+        if let Some(open) = scan.state.filter(|_| scan.used > budget && !scan.at_boundary) {
+            self.feed_vte(core, window.get(..budget).unwrap_or_default());
+            self.cancel_sequence(core, open);
+            return budget;
+        }
+        let ended_dcs = self.feed_vte(core, window.get(..scan.used).unwrap_or_default());
+        self.sequence_bytes = match scan.state {
+            _ if scan.restarted => 1,
+            Some(_) => self.sequence_bytes + scan.used,
+            None => 0,
+        };
+        self.vte_state = match scan.state {
+            // An 8-bit ST that `vte` took as the end of the DCS data.
+            Some(Seq::Dcs) if ended_dcs => VteState::Ground,
+            Some(state) => VteState::Sequence(state),
+            None => VteState::Ground,
+        };
         scan.used
+    }
+
+    /// Feeds `bytes` to `vte`. A DCS string that `vte` left in them, and that CAN or SUB did not
+    /// cancel (`perform.rs`), ended with a terminator: it is answered here, so the answer never
+    /// depends on how the stream was cut. Returns true when that happened.
+    fn feed_vte<S: EventSink>(&mut self, core: &mut Core<S>, bytes: &[u8]) -> bool {
+        self.parser.advance(core, bytes);
+        let ended = std::mem::take(&mut core.dcs_end);
+        if ended {
+            core.dcs_complete();
+        }
+        ended
+    }
+
+    /// The watchdog: `vte` is reset (a DCS string in progress is forgotten unanswered) and the
+    /// rest of the sequence `seq` is dropped up to its terminator.
+    fn cancel_sequence<S: EventSink>(&mut self, core: &mut Core<S>, seq: Seq) {
+        tracing::debug!("escape sequence over the cap cancelled");
+        self.parser = Vte::new_with_size();
+        core.dcs_end = false;
+        core.dcs_cancel();
+        self.sequence_bytes = 0;
+        self.vte_state = VteState::Discard(seq);
+    }
+
+    /// Drops the bytes of a cancelled sequence up to its terminator.
+    fn discard_sequence(&mut self, seq: Seq, slice: &[u8]) -> usize {
+        let (used, state) = sequence::discard(seq, slice);
+        self.vte_state = state.map_or(VteState::Ground, VteState::Discard);
+        used
     }
 
     /// Switches to OSC capture; `vte` is first brought back to its ground state.
     fn begin_osc<S: EventSink>(&mut self, core: &mut Core<S>, esc: EscSeen) {
         match (esc, self.vte_state) {
-            (EscSeen::Consumed, _) => self.parser.advance(core, b"\\"),
-            (EscSeen::InBytes, VteState::Sequence(_) | VteState::Utf8Tail) => {
-                self.parser.advance(core, &[ESC, b'\\']);
+            (EscSeen::Consumed, _) => {
+                self.feed_vte(core, b"\\");
             }
-            (EscSeen::InBytes, VteState::Ground) => {}
+            (EscSeen::InBytes, VteState::Sequence(_) | VteState::Utf8Tail) => {
+                self.feed_vte(core, &[ESC, b'\\']);
+            }
+            (EscSeen::InBytes, VteState::Ground | VteState::Discard(_)) => {}
         }
         self.vte_state = VteState::Ground;
+        self.sequence_bytes = 0;
         self.osc = OscState::Collecting;
         self.osc_buffer.clear();
     }

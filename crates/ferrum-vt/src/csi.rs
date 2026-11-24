@@ -4,6 +4,7 @@ use crate::args::Args;
 use crate::core::Core;
 use crate::events::EventSink;
 use crate::modes::{Scope, Switch};
+use crate::reports::AttributeLevel;
 
 /// TBC parameter that clears the tab stop at the cursor (the default).
 const TBC_CURRENT: u16 = 0;
@@ -20,6 +21,11 @@ impl<S: EventSink> Core<S> {
             ([b'!'], 'p') => self.soft_reset(),
             ([b'$'], 'p') => self.report_mode(args, Scope::Ansi),
             ([b'?', b'$'], 'p') => self.report_mode(args, Scope::Private),
+            ([b'>'], 'c') => self.report_attributes(AttributeLevel::Secondary),
+            ([b'>'], 'q') => self.report_version(),
+            ([b'>'], 'u') => self.keyboard_push(args),
+            ([b'<'], 'u') => self.keyboard_pop(args),
+            ([b'='], 'u') => self.keyboard_set(args),
             _ => {}
         }
     }
@@ -34,6 +40,9 @@ impl<S: EventSink> Core<S> {
             'l' => self.set_modes(args, Scope::Ansi, Switch::Reset),
             'g' => self.clear_tab_stops(args.mode(0)),
             'r' => self.set_scroll_region(args),
+            'c' => self.report_attributes(AttributeLevel::Primary),
+            'n' => self.report_status(args.mode(0), Scope::Ansi),
+            't' => self.window_operation(args),
             's' => self.save_cursor(),
             'u' => self.restore_cursor(),
             _ => {}
@@ -87,6 +96,8 @@ impl<S: EventSink> Core<S> {
 
     fn csi_private(&mut self, args: Args<'_>, action: char) {
         match action {
+            'n' => self.report_status(args.mode(0), Scope::Private),
+            'u' => self.keyboard_query(),
             'h' => self.set_modes(args, Scope::Private, Switch::Set),
             'l' => self.set_modes(args, Scope::Private, Switch::Reset),
             _ => {}

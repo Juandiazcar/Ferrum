@@ -1,6 +1,7 @@
 //! RIS (`ESC c`) resets exactly what Alacritty's `Term::reset_state` resets (maintainer decisions
-//! Q-23 and Q-25: the Alacritty reference behavior, literally). Like Alacritty it sends no event
-//! for the title and keeps the palette (`docs/user/compat.md`).
+//! Q-23 and Q-25: the Alacritty reference behavior, literally): the cursor style and the title
+//! among the rest. Like Alacritty it sends no event for the title and keeps the palette
+//! (`docs/user/compat.md`).
 
 use ferrum_scrollback::{Scrollback, ScrollbackConfig};
 use ferrum_vt::{Event, EventSink, Size, Terminal};
@@ -37,4 +38,13 @@ fn ris_keeps_the_palette_and_the_working_directory() {
     term.parse(b"\x1bc");
     assert_eq!(format!("{:?}", term.palette()), palette);
     assert_eq!(term.cwd(), "file://host/tmp");
+}
+
+#[test]
+fn ris_resets_the_cursor_style() {
+    let mut term = terminal();
+    term.parse(b"\x1b[4 q");
+    assert!(term.cursor_style().is_some());
+    term.parse(b"\x1bc");
+    assert_eq!(term.cursor_style(), None);
 }

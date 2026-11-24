@@ -66,6 +66,16 @@ push on, `vt_reflow/10k_lines_200_to_100_columns`, `scrollback_seal/fixture_chun
 |---|---|---|---|---|
 | MV-WP02-1 | NFR-PERF-02 with the scrollback push on (400 MB/s ASCII, accepted as measured per Q-28; 120 MB/s SGR-heavy), the reflow of 10 000 lines (40 ms) and the worker seal ceiling, measured with the commands above; baselines saved | not required | not required | pending maintainer run |
 
+## Daemon IPC endpoint (WP-06, `docs/10` §2)
+
+CI runs `crates/ferrum-platform/tests/ipc.rs` on all three OS (a same-user client connects; the
+socket is 0600; a second Windows endpoint cannot take the pipe name). A peer of another user
+cannot be created on a CI runner, so the refusal paths are checked by hand.
+
+| ID | Check | Linux | macOS | Windows |
+|---|---|---|---|---|
+| MV-06-1 | Start `ferrumd` as user A; as user B (and as root on Unix), connect to A's endpoint: Unix `socat - UNIX-CONNECT:<run dir>/ferrumd.sock` (the run directory itself must refuse B: mode 0700), Windows `[System.IO.Pipes.NamedPipeClientStream]` on `ferrum-<hash>`; the connection is refused and the daemon logs `refused a connection` without the peer's details, and A's sessions are unaffected | pending | pending | pending |
+
 ## Later work packages
 
 Rows for IME, HiDPI, compositor behavior, OS drag and drop, installers and signing are added with

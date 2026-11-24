@@ -4,3 +4,12 @@
 [[profile.default.overrides]]
 filter = 'test(=large_output_integrity) | test(=ten_sessions_memory) | test(=startup_output_follows_docs_11)'
 success-output = "immediate"
+
+# One daemon per user: on Windows the IPC pipe is named after the user's SID only (`docs/10` §2),
+# so the tests that start an endpoint run one at a time on every OS.
+[test-groups]
+ipc-endpoint = { max-threads = 1 }
+
+[[profile.default.overrides]]
+filter = 'package(ferrum-platform) & binary(ipc)'
+test-group = 'ipc-endpoint'

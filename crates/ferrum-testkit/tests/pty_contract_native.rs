@@ -2,7 +2,6 @@
 //! §4) on this OS's backend
 //! (`ferrum_pty::native_backend`), one named test per case.
 
-#![cfg(unix)] // the Windows backend arrives in the next commit
 #![allow(clippy::unwrap_used, reason = "test code: a failed expectation is a failed test")]
 
 use std::path::PathBuf;

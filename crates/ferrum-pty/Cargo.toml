@@ -45,3 +45,15 @@ rustix = { workspace = true }
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = { workspace = true }
 
+[target.'cfg(windows)'.dependencies]
+mio = { workspace = true }
+windows-sys = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Security_Authorization",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Console",
+  "Win32_System_Pipes",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+] }

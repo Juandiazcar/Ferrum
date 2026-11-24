@@ -2,7 +2,11 @@
 
 **Responsibility:** clipboard, directories, single-instance, own-process memory metric and daemon autostart behind traits.
 
-**Status:** skeleton (WP-00). No public API yet.
+**Status:** partial. Contents so far:
+
+- `private_fs::{create_private_dir, create_private_file}` (WP-04): owner-only creation (0700 and
+  0600 on Unix; inherited per-user ACL on Windows), passed by the composition roots to
+  `ferrum_config::archive::StagingFs` for imports (`docs/10` §4).
 
 | | |
 |---|---|

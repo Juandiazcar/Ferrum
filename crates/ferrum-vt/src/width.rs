@@ -7,6 +7,8 @@
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
+use crate::limits::MAX_CLUSTER_BYTES;
+
 /// Columns of a wide character, the widest cell run of one cluster.
 pub(crate) const WIDE_COLUMNS: usize = 2;
 
@@ -34,6 +36,23 @@ pub fn clusters(text: &str) -> impl Iterator<Item = &str> {
     text.graphemes(true)
 }
 
+/// Like [`clusters`], but a cluster longer than `MAX_CLUSTER_BYTES` comes out in pieces of at
+/// most that many bytes, so no path builds a cluster the grapheme table would refuse.
+pub(crate) fn capped_clusters(text: &str) -> impl Iterator<Item = &str> {
+    clusters(text).flat_map(|cluster| {
+        let mut rest = cluster;
+        std::iter::from_fn(move || {
+            if rest.is_empty() {
+                return None;
+            }
+            let cut = rest.floor_char_boundary(MAX_CLUSTER_BYTES);
+            let (piece, tail) = rest.split_at_checked(cut)?;
+            rest = tail;
+            Some(piece)
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,6 +65,15 @@ mod tests {
         assert_eq!(cluster_width("e\u{0301}"), 1);
         assert_eq!(cluster_width("👨‍👩‍👧"), 2);
         assert_eq!(cluster_width("\u{2764}\u{FE0F}"), 2);
+    }
+
+    #[test]
+    fn long_clusters_come_out_in_capped_pieces() {
+        let chain = "\u{1f468}\u{200d}".repeat(50);
+        assert_eq!(clusters(&chain).count(), 1);
+        let pieces: Vec<&str> = capped_clusters(&chain).collect();
+        assert!(pieces.len() > 1 && pieces.iter().all(|piece| piece.len() <= MAX_CLUSTER_BYTES));
+        assert_eq!(pieces.concat(), chain);
     }
 
     #[test]

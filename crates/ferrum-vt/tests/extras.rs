@@ -187,3 +187,35 @@ fn a_full_table_never_reads_the_history_back_on_the_parse_path() {
     assert!(term.extras().overflowed() > 0, "the table is full of live ids");
     assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed), 0, "no history read");
 }
+
+/// The link numbers of every retained history line, oldest first.
+fn history_numbers(term: &Terminal<NullSink>) -> Vec<usize> {
+    (0..term.scrollback().len())
+        .map(|index| {
+            history_uri(term, index)
+                .and_then(|uri| uri.strip_prefix("https://x.test/")?.parse().ok())
+                .expect("every history line keeps its link")
+        })
+        .collect()
+}
+
+#[test]
+fn reuse_after_reflow_and_eviction_never_re_points_a_retained_row() {
+    let mut term = terminal(1_000);
+    let total = MAX_EXTRAS + 3_000;
+    for n in 0..total {
+        term.parse(&open_link(n));
+        term.parse(b"x");
+        term.parse(CLOSE_LINK);
+        term.parse(b"\r\n");
+        if n % 700 == 0 {
+            let cols = if n % 1_400 == 0 { 24 } else { 20 };
+            term.resize(Size::new(cols, 4)).expect("the history is in RAM");
+        }
+    }
+    assert_eq!(term.extras().overflowed(), 0, "ids of evicted rows were released");
+    let numbers = history_numbers(&term);
+    assert_eq!(numbers.len(), 1_000);
+    assert!(numbers.windows(2).all(|pair| pair[1] == pair[0] + 1), "no row was re-pointed");
+    assert_eq!(screen_uri(&term, 0, 0), Some(format!("https://x.test/{}", numbers[999] + 1)));
+}

@@ -19,8 +19,8 @@ impl Size {
         (size.cols == cols && size.rows == rows).then_some(size)
     }
 
-    /// A size clamped into the supported range. Compare with [`Size::exact`] to learn whether it
-    /// was clamped.
+    /// A size clamped into the supported range. Compare with [`Size::exact`] or read back
+    /// [`Terminal::size`](crate::Terminal::size) to learn what was applied.
     pub fn new(cols: u16, rows: u16) -> Self {
         Self {
             cols: cols.clamp(MIN_DIMENSION, MAX_COLS),

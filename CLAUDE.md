@@ -21,6 +21,8 @@ Every change is audited against the spec before merge (`ferrum-audit` skill). Th
 
 **One audit per change, one verification (maintainer rule, 2026-11-23).** The audit covers only what the change adds (its diff against `main`, not the whole app) and must be exhaustive in a single pass. After the fixes, a single verification checks the listed findings, the code the fixes add, and the gates; it is never a new full audit. Details in the `ferrum-audit` skill.
 
+**The spec is followed to the letter (maintainer rule, 2026-11-24).** Never edit `docs/spec/` to add exceptions, sanctioned deviations or rationale so that code passes. Where the code and the spec disagree, the code changes; where operating systems differ and the spec does not list it, the code behaves identically on all of them. Only decisions the maintainer actually takes are recorded (`docs/14` §2).
+
 **Subagents run on Opus 5.5 (maintainer rule, 2026-11-23)**, implementers and auditors alike (`model: "opus"`).
 
 ## Project skills (`.claude/skills/`)

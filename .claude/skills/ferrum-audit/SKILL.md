@@ -11,6 +11,8 @@ Goal: decide merge / request changes. Evidence over trust: re-run checks yoursel
 
 **Single-pass rule (maintainer, 2026-11-23):** each change gets **one** audit, scoped to what that change adds (its diff against `main`, never the whole app), and that one audit must be exhaustive: every file of the diff read line by line, every finding reported at once. After the fixes there is **one verification**, limited to (a) the listed findings, (b) the code the fix commits add or change, and (c) the gates (`cargo xtask check`, CI on 3 OS, fuzz, benches, dhat). A verification never becomes a fresh full audit. If it finds a defect outside (a)–(c), the first audit missed it: fix it in the same batch and say so in the audit comment; do not open another round.
 
+**Spec-literal rule (maintainer, 2026-11-24):** a finding is fixed in the code, never by adding an exception, deviation or rationale to `docs/spec/`. Spec changes happen only when the maintainer decides them.
+
 ## Steps
 1. `git fetch && git diff main...<branch> --stat`, then read the full diff file by file, line by line (no sampling, not only summaries). If several auditors split the diff, every file must be assigned to one of them.
 2. Re-read the WP in `docs/spec/docs/12-build-order.md`; check every exit criterion is met with evidence.

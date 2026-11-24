@@ -11,7 +11,9 @@
 //! may block, so the caller writes from its own thread. The [`PtyResize`] sets the size. The [`PtyChild`] observes the exit, kills, and
 //! closes the session, which ends every process attached to the terminal.
 //!
-//! [`session_env`] is the environment every session gets (FR-SESS-007).
+//! [`session_env`] is the environment every session gets (FR-SESS-007);
+//! [`shell_integration`] makes bash, zsh, fish and `PowerShell` report the working directory and
+//! prompt marks (FR-SESS-005).
 //!
 //! Every implementation passes the shared contract suite `ferrum_testkit::pty_contract`
 //! (PT-01 to PT-25 of ADR 0026); the deterministic fake lives in `ferrum-testkit` too.
@@ -27,6 +29,7 @@ mod env;
 mod error;
 #[cfg(any(unix, windows))]
 mod program;
+pub mod shell_integration;
 mod spec;
 mod traits;
 #[cfg(unix)]

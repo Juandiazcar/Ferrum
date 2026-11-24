@@ -36,7 +36,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | IPC sockets/pipes | `interprocess` | 2.4.9 | proto/daemon/app | UDS + Windows named pipes with a uniform API |
 | Serialization | `serde` | 1.0.229 | all | derive only where needed |
 | Wire format | `postcard` | 1.1.3 | proto | compact, no-std friendly, deterministic |
-| Config format | `toml` | 1.2.2 (re-verified 2026-11-21) | config, xtask | serde-based; atomic writes by us |
+| Config format | `toml` | 1.2.2 (re-verified 2026-11-24, latest stable) | config, xtask | serde-based; atomic writes by us; `default-features = false` with `std`, `serde`, `parse`, `display` |
 | Compression (scrollback) | `lz4_flex` | 0.14.2 | scrollback | pure Rust, `default-features = false`, `safe-encode`/`safe-decode` |
 | mmap | `memmap2` | 0.9.12 | render | fonts only. The scrollback spill file uses plain positional reads and writes from `std` (ADR 0027), because mapping needs `unsafe` |
 | Byte search | `memchr` | 2.8.3 (2026-11-22, latest stable) | vt, scrollback | `default-features = false`, `std`; `vt` uses `memmem` for `ESC ]` and `memchr` for ESC |

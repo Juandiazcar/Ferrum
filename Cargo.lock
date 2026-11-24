@@ -328,6 +328,14 @@ version = "0.1.0"
 [[package]]
 name = "ferrum-config"
 version = "0.1.0"
+dependencies = [
+ "ferrum-testkit",
+ "proptest",
+ "serde",
+ "thiserror",
+ "toml",
+ "tracing",
+]
 
 [[package]]
 name = "ferrum-daemon"

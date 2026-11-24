@@ -36,8 +36,8 @@ CI covered X11 under Xvfb, headless Wayland (weston) and a virtual macOS runner 
 ## Terminal state machine (WP-02, ADR 0028)
 
 The author machine is an Apple M2; NFR-PERF-02, the reflow budget and the worker seal are judged on
-the reference machine (maintainer decision Q-27). Run on the i5-9400 (Windows 11), on a quiet
-machine, from the repository root at the tip of the WP-02 stack:
+the reference machine (maintainer decision Q-27; ASCII with the push is accepted as measured, Q-28).
+Run on the i5-9400 (Windows 11), on a quiet machine, from the repository root at the tip of the WP-02 stack:
 
 ```
 cargo xtask bench --quick
@@ -54,7 +54,7 @@ push on, `vt_reflow/10k_lines_200_to_100_columns`, `scrollback_seal/fixture_chun
 
 | ID | Check | Linux | macOS | Windows |
 |---|---|---|---|---|
-| MV-WP02-1 | NFR-PERF-02 with the scrollback push on (400 MB/s ASCII, 120 MB/s SGR-heavy), the reflow of 10 000 lines (40 ms) and the worker seal ceiling, measured with the commands above; baselines saved | not required | not required | pending maintainer run |
+| MV-WP02-1 | NFR-PERF-02 with the scrollback push on (400 MB/s ASCII, accepted as measured per Q-28; 120 MB/s SGR-heavy), the reflow of 10 000 lines (40 ms) and the worker seal ceiling, measured with the commands above; baselines saved | not required | not required | pending maintainer run |
 
 ## Later work packages
 

@@ -1,7 +1,7 @@
 # 0028. `ferrum-vt` design decisions and parse throughput
 
-- Status: accepted (maintainer decisions Q-21 to Q-27, 2026-11-23; Q-21 amended the same day:
-  decision 8; Q-25 amends Q-23 and Q-26 amends the Q-21 amendment)
+- Status: accepted (maintainer decisions Q-21 to Q-27, 2026-11-23, and Q-28, 2026-11-24;
+  Q-21 amended the same day: decision 8; Q-25 amends Q-23 and Q-26 amends the Q-21 amendment)
 - Date: 2026-11-23
 
 ## Context
@@ -187,6 +187,17 @@ stack, except `perf(vt): speed up the ASCII path`).
 **Q-22 (reflow, 40 ms): met on this machine** (3.44 ms). **Q-21 with `MAX_PENDING_CHUNKS` = 2
 (Q-26 amended): met on this machine**: ASCII 439 MB/s against 400, SGR-heavy 222 MB/s against
 120. On the i5-9400: pending maintainer run (Q-27).
+
+**Q-28 (2026-11-24), ASCII with the push on x86.** On GitHub-hosted x86 runners `vt_parse/ascii_8mib`
+stayed under 400 MB/s, and each run gets a different CPU, so an absolute MB/s gate there is
+meaningless. The x86 work was A/B tested over three rounds on those runners: the ring index without
+a division (`grid.rs`) and the last-style cache plus the ASCII scalar-count shortcut
+(`ferrum-scrollback` `style.rs`, `encode.rs`) gave +4 to 7 % and were kept; an 8-cell copy in
+`encode_uniform`, a 16-byte aligned `Cell` and a direct return of the push result were neutral or
+worse and were dropped. Best measured with the push on: 292 MiB/s (EPYC 9V74, Windows), 369 MiB/s
+(Xeon 6975P-C, Linux), 406 MiB/s / 426 MB/s (Apple M2); without history 541 to 607 MiB/s on x86.
+The maintainer accepted the measured ASCII-with-push result (Q-28); SGR-heavy (at least 120 MB/s)
+and the reflow (at most 40 ms) remain met.
 
 ## Consequences
 

@@ -62,7 +62,7 @@ If a component exceeds its allowance in a PR, the PR must either shrink somethin
 | ID | Metric | Target | Method |
 |---|---|---|---|
 | NFR-PERF-01 | Keystroke → frame-ready (in-process) | p50 ≤ 4 ms, p99 ≤ 10 ms | bench harness: write byte to fake PTY echo, time until renderer reports frame ready |
-| NFR-PERF-02 | Parse throughput | ≥ 400 MB/s ASCII; ≥ 120 MB/s SGR-heavy | `criterion` bench on `ferrum-vt` over fixtures, single core |
+| NFR-PERF-02 | Parse throughput | ≥ 400 MB/s ASCII; ≥ 120 MB/s SGR-heavy | `criterion` bench on `ferrum-vt` over fixtures, single core. ASCII with the scrollback push: optimized as far as reasonable and the measured result accepted (maintainer decision Q-28, `docs/14` §2) |
 | NFR-PERF-03 | Full-screen repaint 200×60 | ≤ 2.5 ms CPU | `criterion` bench on `ferrum-render` |
 | NFR-PERF-04 | 20 sessions, one flooding (`yes`) | other sessions p99 ≤ 10 ms; UI ≥ 60 fps | scripted integration bench |
 | NFR-PERF-05 | Cold start to first frame | ≤ 120 ms warm daemon / ≤ 250 ms cold | harness timestamps |

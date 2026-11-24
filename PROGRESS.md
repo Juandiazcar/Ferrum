@@ -14,14 +14,19 @@ screen, mouse/focus/paste/sync mode state, hyperlinks with released ids (history
 push time, amortized sweeps), shell marks, damage tracking, event sink, selection model, resize
 with streaming reflow); the sequence watchdog (cap at the exact byte, discard to the
 terminator); `xtask import-alacritty-refs`; `docs/user/compat.md`; ADR 0028 (accepted, Q-21 to
-Q-27 recorded in `docs/14`); README.
+Q-28 recorded in `docs/14`); README.
 
 Audit rounds 1 (44 items) and 2 (38 items) are addressed in this rebuild; the maintainer
-decisions Q-21 to Q-27 are in `docs/14` §2 and ADR 0028. Q-25: protected erase removed, all 45
+decisions Q-21 to Q-28 are in `docs/14` §2 and ADR 0028. Q-25: protected erase removed, all 45
 Alacritty reference tests imported and passing. Q-26: one pending chunk missed the ASCII target on
 the M2 (353 MB/s, 48 % inline seals) and was reported back; the amended decision is two
 (0.18 MB, the sealed allowance lowered to 0.36 MB), which meets it there (below). Q-27: the
-reference-machine run is the maintainer's (MV-WP02-1), pending.
+reference-machine run is the maintainer's (MV-WP02-1), pending. Q-28 (2026-11-24): absolute MB/s
+gates on GitHub-hosted runners are meaningless (a different CPU each run); ASCII with the push is
+optimized as far as reasonable and accepted as measured. Best with the push on: 292 MiB/s (EPYC 9V74,
+Windows), 369 MiB/s (Xeon 6975P-C, Linux), 406 MiB/s / 426 MB/s (Apple M2); without history
+541-607 MiB/s on x86. Kept from the x86 A/B (3 rounds, +4-7 %): ring index without a division,
+last-style cache, ASCII scalar-count shortcut.
 
 Evidence, Apple M2 (not the reference machine; shared with other builds, load average 5 to 11;
 criterion medians, fixture inputs; the table is in ADR 0028):

@@ -21,16 +21,22 @@
 
 #![deny(unsafe_code)] // docs/05 §4: unsafe only in audited modules, each with `// SAFETY:`
 
+#[cfg(windows)]
+mod conpty;
 mod env;
 mod error;
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 mod program;
 mod reader_thread;
 mod spec;
 mod traits;
 #[cfg(unix)]
 mod unix;
+#[cfg(any(windows, test))]
+mod windows_command;
 
+#[cfg(windows)]
+pub use conpty::ConptyBackend;
 pub use env::{TERM, TERM_PROGRAM, session_env};
 pub use error::PtyError;
 pub use reader_thread::{ChunkSink, READ_BUFFER_BYTES, READER_STACK_BYTES, spawn_reader_thread};
@@ -39,8 +45,11 @@ pub use traits::{PtyBackend, PtyChild, PtyKiller, PtyReader, PtyResize, PtySessi
 #[cfg(unix)]
 pub use unix::UnixBackend;
 
-/// The backend of the running OS: `UnixBackend` on Linux and macOS.
-#[cfg(unix)]
+/// The backend of the running OS: `UnixBackend` on Linux and macOS, `ConptyBackend` on Windows.
 pub fn native_backend() -> Box<dyn PtyBackend> {
-    Box::new(UnixBackend)
+    #[cfg(unix)]
+    let backend = UnixBackend;
+    #[cfg(windows)]
+    let backend = ConptyBackend;
+    Box::new(backend)
 }

@@ -400,6 +400,9 @@ dependencies = [
 [[package]]
 name = "ferrum-pty"
 version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "ferrum-render"

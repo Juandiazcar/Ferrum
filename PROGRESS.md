@@ -2,6 +2,42 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## WP-03 `ferrum-proto` (stacked PRs #65 -> #66 -> #67)
+
+Done: row encoding for damage (`encode_row`, `decode_row`; styles carry resolved colors and an
+index into the block's `LinkTable`, which stores each URI once, never a session-local id, ADR
+0028), `RowBlock` capped at `MAX_ROW_BLOCK_BYTES` so every `Snapshot`/`Rows`/`Damage` message
+fits one frame (`Snapshot` carries the screen rows that fit, `Rows` the rest and the history), framing (`u32` little-endian length + `postcard`, the whole frame at most 4 MiB, checked
+from the header), the message set of `docs/02` §4 (`SessionKind`, one reserved variant per
+Phase 2 area; after `Welcome` the full state as `ProjectEvent::Created`/`SessionEvent::Created`
+items, then `Synced`; `Killed` apart from `Exited`), versioning and the handshake
+(`ProtocolVersion` 1.0, same major required, lower minor used; constant-time nonce equality; the
+handshake bytes pinned for every major), length-capped lists without nesting, validated ranges
+(`Percent`, `PerMille`), `ProjectId` as a UUID (maintainer decision Q-29), redacted `Debug` for
+user content (`Text`, `Bytes`, rows, nonce), golden vectors for every variant at every nesting
+level, the `decode` fuzz target in the nightly matrix, README. Dependencies: `postcard` 1.2.0
+(bumped from the 1.1.3 of `docs/07`), `uuid` 1.29.3 (the workspace entry of WP-04,
+no features in `ferrum-proto`; the same `Uuid` as `ferrum-project`'s `ProjectId`), `serde` 1.0.229 (re-verified), all latest stable on 2026-11-24.
+
+| Criterion | Result |
+|---|---|
+| Golden vectors | `tests/golden.rs`: 24 client and 26 daemon frames plus 29 nested values (every enum variant, a row per underline style) encode to the committed bytes and decode back |
+| Version negotiation | `tests/handshake.rs` (8 tests, including the pinned handshake bytes for another major) plus the `negotiate` doctest |
+| Round trip | `tests/row_roundtrip.rs` (rows), `tests/message_roundtrip.rs` (every variant of both message enums) |
+| Frame cap | `tests/frame_budget.rs`: a 1 024 x 512 screen with the `ferrum-vt` worst case per cell goes out in several `Damage` frames, and a full `Snapshot` with a 1 024-byte title fits one, each at most 4 MiB; `frame.rs` tests the cap at exactly 4 MiB with the header |
+| dhat | `tests/alloc_row.rs`: 0 blocks over 100 passes of a 200-column row, a 60-row `RowBlock` and its `Damage` frame after warm-up (fails as intended when a buffer is re-created) |
+| Fuzz | `decode`, 60 s local run on an Apple M2 on the final code: 11 326 808 runs, no crash; corpus = the golden frames |
+| Benches (Apple M2, informational) | `proto_encode/row_200_cols` 1.38 us, `proto_encode/damage_200x60` 91.2 us; `docs/03` names no target, so no ceiling and no baseline yet (`benches/baselines/README.md`); nightly gates them against the previous commit |
+
+Constants chosen (internal protocol and safety caps, Q-30): `PROTOCOL_VERSION` 1.0, `NONCE_LEN`
+32 bytes, `MAX_LIST_ITEMS` 1 024, `ROW_BLOCK_HEADROOM` 4 KiB (reasons in the crate README).
+`MAX_FRAME_LEN` 4 MiB is the spec's (header included, auditor's literal reading). No new open
+question.
+
+Open items: the reply messages of search and copy are not in `docs/02` §4 and arrive with WP-11
+and WP-12 as additive variants; `Layout` tree-shape validation belongs to the daemon (WP-06/WP-10).
+Next: WP-06 `ferrum-daemon` after WP-05.
+
 ## WP-04 `ferrum-config` and `ferrum-project` (stack #57 → #58 → #59 → #60)
 
 Four stacked PRs (merge in order): #57 `feat/config-settings-store` (settings model, keybindings

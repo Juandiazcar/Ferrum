@@ -33,8 +33,8 @@ criterion medians, fixture inputs; the table is in ADR 0028):
 
 | Criterion | Result |
 |---|---|
-| Q-21 NFR-PERF-02 with the scrollback push on, `MAX_PENDING_CHUNKS` = 2 | `vt_parse/ascii_8mib` 418.5 MiB/s (439 MB/s, target 400) with 5 286 of 64 550 chunks (8.2 %) sealed inline, `vt_parse/sgr_heavy_8mib` 211.5 MiB/s (222 MB/s, target 120): **met on the M2** (with one pending chunk ASCII was 336.5 MiB/s, 48 % inline: missed, Q-26 amended). Memory: `memory_report` sealed 0.338-0.343 MB, pending 0.086 MB, within the 0.36 / 0.18 MB allowances. i5-9400: **pending maintainer run** (Q-27) |
-| Q-22 reflow of 10 000 lines (`vt_reflow/10k_lines_200_to_100_columns`) | 36.8 ms after the streaming rewrite, **3.44 ms** at the round-3 tip on the M2 (target 40 ms); i5-9400: pending maintainer run |
+| Q-21 NFR-PERF-02 with the scrollback push on, `MAX_PENDING_CHUNKS` = 2 | `vt_parse/ascii_8mib` 418.5 MiB/s (439 MB/s, target 400) with 5 286 of 64 550 chunks (8.2 %) sealed inline, `vt_parse/sgr_heavy_8mib` 211.5 MiB/s (222 MB/s, target 120): **met on the M2** (with one pending chunk ASCII was 336.5 MiB/s, 48 % inline: missed, Q-26 amended). Memory: `memory_report` sealed 0.338-0.343 MB, pending 0.086 MB, within the 0.36 / 0.18 MB allowances. x86 hosted runners and i5-9400: accepted as measured (Q-27 amended, Q-28) |
+| Q-22 reflow of 10 000 lines (`vt_reflow/10k_lines_200_to_100_columns`) | 36.8 ms after the streaming rewrite, **3.44 ms** at the round-3 tip on the M2 (target 40 ms); x86 hosted runners 3.4 ms (Q-27 amended) |
 | Worker seal | `scrollback_seal/fixture_chunks` 1.81 ms (451.7 MiB/s), ceiling 4.29 ms |
 | Ceilings | `xtask/src/bench/baseline.rs` covers the with-push parse benches (2x target), the worker seal and the reflow; the vt and `scrollback_seal` baselines are **not** in `windows.json` (the maintainer saves them on the i5-9400, MV-WP02-1) |
 | Alacritty ref-tests | 45 of 45 imported and passing (Q-25: `selective_erasure` included, protected erase not implemented) |

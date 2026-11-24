@@ -1,6 +1,8 @@
 //! Named limits of the terminal state (`docs/05` §1 rule 9: no magic numbers). Every one of them
 //! bounds memory or work against hostile output (`docs/10` §3 items 9 and 11).
 
+/// Bytes of the longest UTF-8 encoded scalar.
+pub(crate) const MAX_UTF8_BYTES: usize = 4;
 /// Smallest grid dimension: a terminal of one cell is legal (`docs/05` §13 item 3).
 pub const MIN_DIMENSION: u16 = 1;
 /// Most columns a grid may have. A request above it is clamped: 1 024 x 512 cells of 16 bytes is
@@ -61,3 +63,10 @@ pub const DEFAULT_TAB_WIDTH: u16 = 8;
 /// Largest `REP`, `ICH`-style repeat count that is honored (a hostile `CSI 65535 b` is bounded by
 /// the grid anyway; this bounds the work of `REP`).
 pub const MAX_REPEAT: u16 = 8_192;
+/// Cells scanned that one refused entry pays for after a compaction of the grapheme table: a
+/// compaction that scanned `w` cells and freed `f` entries is not repeated for
+/// `w / WORK_PER_REFUSAL - f` refusals. 64 cells cost about as much as parsing one short escape
+/// sequence, so a hostile stream that forces a full table to be compacted again and again is
+/// slowed by a constant factor, independent of the grid size, while legitimate reuse is rarely
+/// refused.
+pub const WORK_PER_REFUSAL: usize = 64;

@@ -16,18 +16,25 @@
 
 mod cell;
 mod color;
+mod damage;
 mod error;
 mod extras;
 mod graphemes;
+mod grid;
 mod limits;
 mod row;
+mod size;
+mod slot_set;
 mod width;
 
 pub use cell::{Attrs, BLANK_CHAR, Cell, CellFlags, Underline};
 pub use color::{Color, ColorKind};
+pub use damage::Damage;
 pub use error::VtError;
 pub use extras::{ExtraId, Extras, LinkId};
 pub use graphemes::GraphemeTable;
+pub use grid::Grid;
 pub use limits::*;
 pub use row::Row;
+pub use size::Size;
 pub use width::{char_width, cluster_width, clusters, joins_cluster};

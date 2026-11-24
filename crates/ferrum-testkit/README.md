@@ -2,7 +2,11 @@
 
 **Responsibility:** dev-only helpers: fixtures, golden harness, PTY test driver, fake clock.
 
-**Status:** skeleton (WP-00). No public API yet.
+**Status:** partial. Contents so far:
+
+- `spill_contract`: the shared suite every `SpillStore` implementation passes (WP-01).
+- `temp::TempDir`: a fresh directory under the system temporary directory, removed on drop, for
+  tests that touch files (`docs/08` §7: never the real user config or data directories; WP-04).
 
 | | |
 |---|---|

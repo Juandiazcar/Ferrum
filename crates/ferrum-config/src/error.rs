@@ -87,6 +87,22 @@ impl ConfigError {
         )
     }
 
+    /// A short name of the error kind, safe to log: it never contains file content or paths.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Io { .. } => "io",
+            Self::TooLarge { .. } => "too_large",
+            Self::Syntax(_) => "syntax",
+            Self::Invalid(_) => "invalid",
+            Self::BadVersion => "bad_version",
+            Self::TooNew { .. } => "too_new",
+            Self::TooOld { .. } => "too_old",
+            Self::Migration { .. } => "migration",
+            Self::BadSchema(_) => "bad_schema",
+            Self::Serialize(_) => "serialize",
+        }
+    }
+
     pub(crate) fn io(path: impl Into<PathBuf>, source: io::Error) -> Self {
         Self::Io { path: path.into(), source }
     }

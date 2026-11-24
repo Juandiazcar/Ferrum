@@ -115,3 +115,31 @@ fn write_atomic_into_a_path_without_file_name_fails_cleanly() {
     let err = store::write_atomic(&dir.join(".."), b"x").unwrap_err();
     assert!(matches!(err, ConfigError::Io { .. }));
 }
+
+#[test]
+fn an_existing_backup_is_never_replaced() {
+    let dir = TempDir::new("config-store").unwrap();
+    let path = dir.join("settings.toml");
+    std::fs::write(dir.join("settings.toml.bad-5"), "older backup").unwrap();
+    std::fs::write(&path, "= broken").unwrap();
+    let loaded = Settings::load(&path, at(5)).unwrap();
+    let Source::Recovered { backup, .. } = loaded.source else { panic!("not recovered") };
+    assert_eq!(backup, dir.join("settings.toml.bad-5-1"));
+    assert_eq!(std::fs::read_to_string(dir.join("settings.toml.bad-5")).unwrap(), "older backup");
+    assert_eq!(std::fs::read_to_string(&backup).unwrap(), "= broken");
+}
+
+/// Linux file systems accept any bytes in a name (macOS APFS and Windows NTFS do not).
+#[cfg(target_os = "linux")]
+#[test]
+fn corrupt_file_with_a_non_utf8_name_is_still_recovered() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+    let dir = TempDir::new("config-store").unwrap();
+    let path = dir.join(OsStr::from_bytes(b"settings-\xff.toml"));
+    std::fs::write(&path, "= broken").unwrap();
+    let loaded = Settings::load(&path, at(7)).unwrap();
+    let Source::Recovered { backup, .. } = loaded.source else { panic!("not recovered") };
+    assert_eq!(backup.as_os_str().as_bytes(), [path.as_os_str().as_bytes(), b".bad-7"].concat());
+    assert!(backup.exists() && !path.exists());
+}

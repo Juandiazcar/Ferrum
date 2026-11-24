@@ -6,7 +6,7 @@
 //! either the old or the new file, never a torn one. Paths are always arguments: this crate never
 //! decides where files live.
 
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -25,7 +25,9 @@ pub const MAX_FILE_BYTES: u64 = 1_024 * 1_024;
 /// Suffix of the temporary file an atomic write goes through (hidden: a leading dot is added).
 const TEMP_SUFFIX: &str = ".tmp";
 
-/// Most numbered variants tried when a `*.bad-<timestamp>` backup name is already taken.
+/// Most numbered backup names tried (`.bad-<secs>`, `-1`, …). Anti-loop cap: it takes more than
+/// 16 corrupt loads of one file within the same second to exhaust it, and then loading fails
+/// with an error instead of overwriting a backup.
 const MAX_BACKUP_ATTEMPTS: u32 = 16;
 
 /// Where a loaded value came from.
@@ -98,8 +100,9 @@ where
     Ok(Loaded { value, source })
 }
 
-/// Like [`load`], but an unusable file ([`ConfigError::is_corrupt_content`]) is renamed to
-/// `<name>.bad-<unix seconds of now>` and the default is returned with [`Source::Recovered`].
+/// Like [`load`], but an unusable file ([`ConfigError::is_corrupt_content`]) is moved to
+/// `<name>.bad-<unix seconds of now>` (an existing backup is never replaced: `-1`, `-2`, … are
+/// tried) and the default is returned with [`Source::Recovered`].
 ///
 /// # Errors
 /// I/O errors, a file from a newer Ferrum ([`ConfigError::TooNew`]: left untouched, never
@@ -115,7 +118,9 @@ where
     match load(path, schema) {
         Err(cause) if cause.is_corrupt_content() => {
             let backup = set_aside(path, now)?;
-            tracing::warn!(error = %cause, "unusable configuration file set aside, defaults loaded");
+            // Only the error kind: the error text can quote a line of the file (which may hold
+            // profile environment values) or name a user path (docs/05 §8, docs/10 §4).
+            tracing::warn!(kind = cause.kind(), "unusable configuration file set aside");
             Ok(Loaded { value: T::default(), source: Source::Recovered { backup, cause } })
         }
         other => other,
@@ -186,14 +191,44 @@ fn temp_path(path: &Path) -> Result<(PathBuf, PathBuf), ConfigError> {
 
 fn set_aside(path: &Path, now: SystemTime) -> Result<PathBuf, ConfigError> {
     let secs = now.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    let base = format!("{}.bad-{secs}", path.display());
-    let candidates = std::iter::once(base.clone())
-        .chain((1..MAX_BACKUP_ATTEMPTS).map(|n| format!("{base}-{n}")));
-    for candidate in candidates.map(PathBuf::from) {
-        if !candidate.exists() {
-            fs::rename(path, &candidate).map_err(|e| ConfigError::io(path, e))?;
-            return Ok(candidate);
+    // OsString, not `display()`: a non-UTF-8 path must keep its exact bytes.
+    let mut base = path.as_os_str().to_owned();
+    base.push(format!(".bad-{secs}"));
+    for attempt in 0..MAX_BACKUP_ATTEMPTS {
+        let mut candidate = base.clone();
+        if attempt > 0 {
+            candidate.push(format!("-{attempt}"));
+        }
+        let candidate = PathBuf::from(candidate);
+        match move_without_overwrite(path, &candidate) {
+            Ok(()) => return Ok(candidate),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(ConfigError::io(path, e)),
         }
     }
     Err(ConfigError::io(path, io::Error::from(io::ErrorKind::AlreadyExists)))
+}
+
+/// Moves `from` to `to`, failing with `AlreadyExists` instead of replacing an existing `to`
+/// (`rename` would silently replace it on Unix, and an `exists()` check before it races). A hard
+/// link needs no space and no copy, so it works on a full disk and for any file size; only where
+/// the file system has no hard links is the file copied (into a `create_new` target).
+fn move_without_overwrite(from: &Path, to: &Path) -> io::Result<()> {
+    match fs::hard_link(from, to) {
+        Ok(()) => {}
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => return Err(e),
+        Err(_) => copy_without_overwrite(from, to)?,
+    }
+    fs::remove_file(from)
+}
+
+fn copy_without_overwrite(from: &Path, to: &Path) -> io::Result<()> {
+    let mut source = File::open(from)?;
+    let mut target = OpenOptions::new().write(true).create_new(true).open(to)?;
+    let copied = io::copy(&mut source, &mut target).and_then(|_| target.sync_all());
+    if copied.is_err() {
+        // Best effort: the partial backup is useless and the original is still in place.
+        let _cleanup = fs::remove_file(to);
+    }
+    copied
 }

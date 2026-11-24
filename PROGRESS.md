@@ -2,6 +2,43 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## WP-05 `ferrum-pty` (stacked PRs #62 → #63 → #64)
+
+Done: the `PtyBackend` traits of ADR 0026 (`PtySession` = reader, writer, resize, child, plus a
+cloneable `PtyKiller`; `ExitStatus` = `Exited(code)` or `Killed`, FR-SESS-006; readers report a
+pollable descriptor or `Readiness::Notify` with `try_read`/`set_notify`), `SpawnSpec::validate`,
+`session_env` (FR-SESS-007); the Unix backend (`portable-pty` 0.9.0 opens the terminal; `rustix`
+1.1.6, `std::process::Command` and, on macOS, `libc` 0.2.191 for the process table); the ConPTY
+backend on `windows-sys` 0.61.2 with **one I/O thread for all sessions** (`pty-io`, overlapped
+named pipes through `mio` 1.2.5; maintainer decision Q-31, recorded in `docs/14` §2, `docs/02` §5,
+`docs/11` §4 and ADR 0026); shell integration for bash, zsh, fish and PowerShell (FR-SESS-005,
+`assets/shell-integration/`); in `ferrum-testkit` the contract suite PT-01..PT-25 plus the
+`docs/11` §4 startup case, the helper child `ferrum-pty-helper` and the deterministic
+`FakeBackend`; the `pty-stress` CI job (macOS, the native suite 20 times).
+
+Same behavior on all three OS: one program lookup rule, the output ends at `close` (never at the
+child's exit), `kill` is immediate, `close` ends every process attached to the terminal, killed
+children report `Killed`, writes after `close` fail with `Closed`, no bytes on writer drop, no
+thread per session. ConPTY's startup query `ESC[6n` reaches the caller, whose session layer
+answers it (W1; the suite's harness does in tests).
+
+Measured (CI runs 45471569752, 45471582839, 45471519388, 45471521852; the cases print their numbers):
+
+| | Linux | macOS | Windows (Server 2025, 26100) |
+|---|---|---|---|
+| PT-23, 10 sessions, per session (gate 0.11 MB, `docs/03` §2) | 25.8-37.3 KB (RSS) | 67-80 KB (RSS) | 19.7-51.2 KB (private bytes) |
+| PT-18, 64 MB flood (recorded, not gated) | 3.06 s, 22.2 MB/s | 1.60 s, 42.5 MB/s | 10.3 s, 6.6 MB/s |
+| Startup bytes before the child's output (`docs/11` §4) | none | none | `ESC[6n`, then after the answer `ESC[?9001h ESC[?1004h ESC[m ESC]0;<title> BEL ESC[?25h`; no clear screen |
+| PT-09 under load (`pty-stress`) | n/a | 20/20 | n/a |
+
+Not verified (manual, `docs/manual-verification.md`): Windows < 26100 and ARM64 (MV-05-1/2; PT-12
+matters on older conhost); fish, pwsh 7, Windows PowerShell on desktop Windows and login shells
+(MV-05-3; CI runs PowerShell 5.1 under `PSExecutionPolicyPreference=Restricted`).
+
+Next: WP-06 `ferrum-daemon` (mio loop with `Readiness::Fd` and `Readiness::Notify` through a
+`mio::Waker`, the W1 answer in the session layer, a writer thread per session, `session_env` and
+`shell_integration::inject` at spawn).
+
 ## WP-03 `ferrum-proto` (stacked PRs #65 -> #66 -> #67)
 
 Done: row encoding for damage (`encode_row`, `decode_row`; styles carry resolved colors and an

@@ -4,7 +4,8 @@
 process lifecycle (ADR 0026).
 
 **Status:** WP-05. Traits, per-session environment (FR-SESS-007), Unix
-backend on `portable-pty`, direct ConPTY backend on `windows-sys`.
+backend on `portable-pty`, direct ConPTY backend on `windows-sys`, shell integration bootstrap
+files (FR-SESS-005, scripts in `assets/shell-integration/`, module `shell_integration`).
 
 ## Model
 

@@ -134,14 +134,7 @@ impl<S: EventSink> Core<S> {
             let count = rest.len().min(cols.saturating_sub(x));
             let Some((chunk, tail)) = rest.split_at_checked(count) else { break };
             let pen = screen.cursor.pen;
-            screen.grid.clear_wide_edges(y, x, x + count, pen.blank());
-            let span = screen.grid.row_mut(y).and_then(|row| row.cells_mut().get_mut(x..x + count));
-            if let Some(span) = span {
-                let (fg, bg, attrs) = (pen.fg_word(), pen.bg_word(), pen.attrs);
-                for (cell, &byte) in span.iter_mut().zip(chunk) {
-                    *cell = Cell::styled(char::from(byte), fg, bg, attrs);
-                }
-            }
+            screen.grid.write_ascii(y, x, chunk, (pen.fg_word(), pen.bg_word(), pen.attrs));
             Self::advance_cursor(screen, count, wrap);
             rest = tail;
         }

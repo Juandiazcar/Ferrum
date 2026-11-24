@@ -29,6 +29,12 @@ pub struct Grid {
     damage: Damage,
 }
 
+/// `index` reduced into `0..len`, for an `index` below `2 * len` (a ring position plus an
+/// offset below the ring length).
+const fn wrap(index: usize, len: usize) -> usize {
+    if index >= len { index - len } else { index }
+}
+
 impl Grid {
     /// A blank grid of `size`.
     pub fn new(size: Size) -> Self {
@@ -64,7 +70,11 @@ impl Grid {
     }
 
     fn physical(&self, y: usize) -> Option<usize> {
-        (y < self.rows.len()).then(|| (self.top + y) % self.rows.len())
+        let len = self.rows.len();
+        // perf: `top` and `y` are below `len`, so one subtraction wraps the ring; an integer
+        // division per row access was a tenth of the scroll cost on x86 (bench
+        // vt_parse/ascii_8mib).
+        (y < len).then(|| wrap(self.top + y, len))
     }
 
     /// Row `y` (0 = top of the screen).
@@ -166,7 +176,7 @@ impl Grid {
         if top == 0 && bottom + 1 == self.rows.len() {
             for _ in 0..count {
                 self.clear_row(0, blank);
-                self.top = (self.top + 1) % self.rows.len();
+                self.top = wrap(self.top + 1, self.rows.len());
             }
         } else {
             for y in top..bottom + 1 - count {

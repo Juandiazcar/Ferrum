@@ -9,6 +9,9 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::limits::MAX_CLUSTER_BYTES;
 
+/// Printable ASCII is `FIRST_PRINTABLE..=LAST_PRINTABLE`.
+const FIRST_PRINTABLE: u8 = 0x20;
+const LAST_PRINTABLE: u8 = 0x7E;
 /// Columns of a wide character, the widest cell run of one cluster.
 pub(crate) const WIDE_COLUMNS: usize = 2;
 
@@ -19,7 +22,30 @@ pub fn char_width(c: char) -> usize {
 
 /// Columns of a grapheme cluster: 0, 1 or 2.
 pub fn cluster_width(cluster: &str) -> usize {
+    if let [byte] = cluster.as_bytes()
+        && is_plain_ascii(*byte)
+    {
+        return 1;
+    }
     cluster.width().min(WIDE_COLUMNS)
+}
+
+/// Printable ASCII (0x20..=0x7E): one column, and a cluster of its own unless a non-ASCII scalar
+/// follows.
+pub(crate) fn is_plain_ascii(byte: u8) -> bool {
+    (FIRST_PRINTABLE..=LAST_PRINTABLE).contains(&byte)
+}
+
+/// Length in bytes of the leading run of printable ASCII in `text` that is made of whole
+/// clusters of one byte each: a byte followed by a non-ASCII scalar may be extended by it (a
+/// combining mark), so it is left out.
+pub(crate) fn ascii_run(text: &str) -> usize {
+    let bytes = text.as_bytes();
+    let run = bytes.iter().take_while(|&&byte| is_plain_ascii(byte)).count();
+    match bytes.get(run) {
+        Some(next) if !next.is_ascii() => run.saturating_sub(1),
+        _ => run,
+    }
 }
 
 /// True when `c` continues the cluster `previous` instead of starting a new one (UAX #29).
@@ -32,8 +58,19 @@ pub fn joins_cluster(previous: &str, c: char, scratch: &mut String) -> bool {
 }
 
 /// The grapheme clusters of `text`.
+///
+/// perf: a printable ASCII byte that is not followed by a non-ASCII scalar is a cluster by
+/// itself, so ASCII text skips the UAX #29 tables (bench `vt_reflow/10k_lines_200_to_100_columns`).
 pub fn clusters(text: &str) -> impl Iterator<Item = &str> {
-    text.graphemes(true)
+    let mut rest = text;
+    std::iter::from_fn(move || {
+        let first = *rest.as_bytes().first()?;
+        let alone = is_plain_ascii(first) && rest.as_bytes().get(1).is_none_or(u8::is_ascii);
+        let cut = if alone { 1 } else { rest.graphemes(true).next()?.len() };
+        let (cluster, tail) = rest.split_at_checked(cut)?;
+        rest = tail;
+        Some(cluster)
+    })
 }
 
 /// Like [`clusters`], but a cluster longer than `MAX_CLUSTER_BYTES` comes out in pieces of at
@@ -65,6 +102,18 @@ mod tests {
         assert_eq!(cluster_width("e\u{0301}"), 1);
         assert_eq!(cluster_width("👨‍👩‍👧"), 2);
         assert_eq!(cluster_width("\u{2764}\u{FE0F}"), 2);
+    }
+
+    #[test]
+    fn the_ascii_fast_path_agrees_with_the_segmentation_tables() {
+        for text in ["plain text", "a\u{301}b", "x\r\ny", "ab\u{200d}c", "z", "ab漢c", "e\u{301}"]
+        {
+            let slow: Vec<&str> = text.graphemes(true).collect();
+            assert_eq!(clusters(text).collect::<Vec<_>>(), slow, "{text:?}");
+        }
+        assert_eq!(ascii_run("abc"), 3);
+        assert_eq!(ascii_run("abc\u{301}"), 2);
+        assert_eq!(ascii_run("ab\tc"), 2);
     }
 
     #[test]

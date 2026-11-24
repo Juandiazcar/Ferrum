@@ -15,7 +15,7 @@
 use ferrum_scrollback::{LineFlags, Style, StyledRun};
 
 use crate::codec::WRAP_PAD;
-use crate::width::{capped_clusters, cluster_width, clusters};
+use crate::width::{ascii_run, capped_clusters, cluster_width, clusters};
 
 mod rows;
 
@@ -124,6 +124,13 @@ impl Rewrapper {
     fn place_text(&mut self, body: &str, runs: &mut RunCursor<'_>, rows: &mut Rows) {
         let mut rest = body;
         while !rest.is_empty() {
+            let run = ascii_run(rest);
+            if run > 0 {
+                let (ascii, tail) = rest.split_at_checked(run).unwrap_or((rest, ""));
+                self.place_ascii(ascii, runs, rows);
+                rest = tail;
+                continue;
+            }
             let Some(cluster) = clusters(rest).next() else { break };
             for piece in capped_clusters(cluster) {
                 let scalars = piece.chars().count();
@@ -131,6 +138,25 @@ impl Rewrapper {
                 self.put_cluster(piece, style, scalars, rows);
             }
             rest = rest.get(cluster.len()..).unwrap_or_default();
+        }
+    }
+
+    /// Printable ASCII: one column and one scalar per byte.
+    fn place_ascii(&mut self, ascii: &str, runs: &mut RunCursor<'_>, rows: &mut Rows) {
+        let mut rest = ascii;
+        while !rest.is_empty() {
+            if self.col >= self.cols {
+                self.wrap(rows);
+            }
+            let (style, count) = runs.take_run(rest.len().min(self.cols - self.col));
+            let (chunk, tail) = rest.split_at_checked(count).unwrap_or((rest, ""));
+            if let Some(inside) = self.cursor_in(count) {
+                self.cursor = Some(CursorPlace { row: self.emitted, col: self.col + inside });
+            }
+            self.cur.push(chunk, style, count);
+            self.col += count;
+            self.offset += count;
+            rest = tail;
         }
     }
 
@@ -179,6 +205,12 @@ impl Rewrapper {
 /// Byte offset where the last cluster of `text` starts; the whole text when that cluster is
 /// already too long to be extended (it is placed in pieces).
 fn held_start(text: &str) -> usize {
+    let bytes = text.as_bytes();
+    let plain_end = bytes.last().is_some_and(|&b| crate::width::is_plain_ascii(b))
+        && bytes.len().checked_sub(2).and_then(|i| bytes.get(i)).is_none_or(u8::is_ascii);
+    if plain_end {
+        return bytes.len() - 1;
+    }
     let Some(last) = clusters(text).last() else { return 0 };
     if last.len() > crate::limits::MAX_CLUSTER_BYTES { text.len() } else { text.len() - last.len() }
 }

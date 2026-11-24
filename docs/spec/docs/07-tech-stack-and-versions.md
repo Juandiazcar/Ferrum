@@ -42,7 +42,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Byte search | `memchr` | 2.8.3 | vt, scrollback | |
 | POD casts | `bytemuck` | 1.25.2 | render, vt | `Cell` ↔ bytes where needed |
 | Small vectors | `smallvec` | 1.16.6 | vt | only where profiling justifies |
-| Fast hashing | `rustc-hash` | 2.1.3 | vt, render | interning tables |
+| Fast hashing | `rustc-hash` | 2.1.3 | vt, scrollback, render | interning tables (the scrollback style table too) |
 | Bit flags | `bitflags` | 2.13.2 | vt | cell attrs, modes |
 | Clipboard | `arboard` | 3.7.0 | platform | text + image; Wayland/X11 handled; features trimmed |
 | Image decode | `image` | 0.25.10 | render | `default-features = false`, features: `png`, `jpeg`, `gif`, `webp` only |

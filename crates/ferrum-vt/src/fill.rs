@@ -119,7 +119,7 @@ mod tests {
             if let Some(row) = grid.row(0) {
                 encode_row(row, grid.graphemes(), &mut out);
             }
-            assert_eq!(out.text.trim_end(), text);
+            assert_eq!(out.text().trim_end(), text);
         }
     }
 

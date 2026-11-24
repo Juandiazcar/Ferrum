@@ -100,4 +100,25 @@ impl<'a> RunCursor<'a> {
         }
         style
     }
+
+    /// The style at the current scalar and how many of the next `max` scalars (at least 1) share
+    /// it; advances by that many.
+    pub(super) fn take_run(&mut self, max: usize) -> (Style, usize) {
+        loop {
+            let Some(run) = self.runs.get(self.index) else { return (Style::default(), max) };
+            let available = run.len.saturating_sub(self.used);
+            if available == 0 {
+                self.index += 1;
+                self.used = 0;
+                continue;
+            }
+            let count = available.min(max);
+            self.used += count;
+            if self.used >= run.len {
+                self.index += 1;
+                self.used = 0;
+            }
+            return (run.style, count);
+        }
+    }
 }

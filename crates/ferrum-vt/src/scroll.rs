@@ -1,27 +1,52 @@
 //! Scrolling, line insertion and deletion; rows that leave the top of the primary screen go to
 //! the scrollback (`docs/02` §3.2).
 
-use ferrum_scrollback::LineRef;
+use ferrum_scrollback::{LineRef, Scrollback};
 
-use crate::codec::encode_row;
+use crate::codec::encode_row_prefix;
 use crate::core::Core;
 use crate::events::{Event, EventSink};
+use crate::extras::Extras;
 
 impl<S: EventSink> Core<S> {
     /// Encodes row `y` of the primary grid into the scrollback.
     pub(crate) fn push_history_row(&mut self, y: usize) {
+        if self.scrollback.config().max_lines() == 0 {
+            // No history: the row is only counted, so that line numbers stay stable.
+            let empty = LineRef { flags: ferrum_scrollback::LineFlags::NONE, text: "", runs: &[] };
+            Self::store_history_line(
+                &mut self.scrollback,
+                &mut self.extras,
+                &mut self.sink,
+                &empty,
+            );
+            return;
+        }
         let Some(row) = self.primary.grid.row(y) else { return };
-        encode_row(row, self.primary.grid.graphemes(), &mut self.scratch.line);
-        let encoded = &self.scratch.line;
-        let line = LineRef { flags: row.flags(), text: &encoded.text, runs: &encoded.runs };
-        // Recording its extra ids on the way (`history_extras.rs`).
-        if let Err(error) = self.extras.history.push(&mut self.scrollback, &line) {
-            // A row over the scrollback's size limits (a full-width row of long clusters) is
-            // still stored and counted, its text clipped and without styles; never fatal.
+        // Blanks after the last character are trimmed by the scrollback anyway, so only a
+        // wrapped row (whose blanks are content) is encoded to its full width.
+        let width = if row.is_wrapped() { row.len() } else { row.used_len() };
+        let encoded = &mut self.scratch.line;
+        encode_row_prefix(row, width, self.primary.grid.graphemes(), encoded);
+        let line = LineRef { flags: row.flags(), text: encoded.text(), runs: &encoded.runs };
+        Self::store_history_line(&mut self.scrollback, &mut self.extras, &mut self.sink, &line);
+    }
+
+    /// Pushes one line into the scrollback, recording its extra ids (`history_extras.rs`). A row
+    /// over the scrollback's size limits (a full-width row of long clusters) is still stored and
+    /// counted, its text clipped and without styles (`Scrollback::push_line`); the loss is
+    /// logged, never fatal.
+    fn store_history_line(
+        scrollback: &mut Scrollback,
+        extras: &mut Extras,
+        sink: &mut S,
+        line: &LineRef<'_>,
+    ) {
+        if let Err(error) = extras.history.push(scrollback, line) {
             tracing::warn!(%error, "scrollback stored a row clipped");
         }
-        if let Some(event) = self.scrollback.take_event() {
-            self.sink.event(Event::Scrollback(event));
+        if let Some(event) = scrollback.take_event() {
+            sink.event(Event::Scrollback(event));
         }
     }
 

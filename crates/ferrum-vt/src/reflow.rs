@@ -178,7 +178,7 @@ impl<S: EventSink> Core<S> {
             let cursor_x = (y == screen.cursor.y).then_some(screen.cursor.x);
             let input = Feed {
                 flags: row.flags(),
-                text: &self.scratch.line.text,
+                text: self.scratch.line.text(),
                 runs: &self.scratch.line.runs,
                 cursor_x,
             };

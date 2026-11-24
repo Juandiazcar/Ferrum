@@ -62,6 +62,7 @@ mod scroll;
 mod selection;
 mod selection_text;
 mod sgr;
+mod sgr_fast;
 mod size;
 mod slot_set;
 mod style;

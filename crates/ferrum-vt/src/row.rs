@@ -5,16 +5,40 @@ use ferrum_scrollback::LineFlags;
 use crate::cell::Cell;
 
 /// A row of cells with the flags reflow and shell integration need.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Row {
     cells: Vec<Cell>,
     flags: LineFlags,
+    /// INVARIANT: every cell from `used` on is a default blank, so blanking or scanning the row
+    /// only has to look at the first `used` cells. Any access that may write a cell raises it.
+    used: usize,
+    /// The style words every cell of `..used` has when they are all plain ASCII cells in one
+    /// style (a row of printed text), `None` once anything else was written. It lets the
+    /// scrollback encoder skip the per-cell checks of such a row.
+    ascii_style: Option<StyleWords>,
 }
+
+/// The `(fg, bg, attrs)` words of a cell style.
+pub(crate) type StyleWords = (u32, u32, u16);
+
+/// The style words of a default blank.
+pub(crate) const DEFAULT_WORDS: StyleWords = (0, 0, 0);
+
+impl PartialEq for Row {
+    fn eq(&self, other: &Self) -> bool {
+        self.flags == other.flags && self.cells == other.cells
+    }
+}
+
+impl Eq for Row {}
 
 impl Row {
     /// A row of `cols` copies of `blank`.
     pub fn new(cols: usize, blank: Cell) -> Self {
-        Self { cells: vec![blank; cols], flags: LineFlags::NONE }
+        let plain = blank.is_default_blank();
+        let used = if plain { 0 } else { cols };
+        let ascii_style = plain.then_some(DEFAULT_WORDS);
+        Self { cells: vec![blank; cols], flags: LineFlags::NONE, used, ascii_style }
     }
 
     /// The cells.
@@ -24,6 +48,8 @@ impl Row {
 
     /// The cells, mutable.
     pub fn cells_mut(&mut self) -> &mut [Cell] {
+        self.used = self.cells.len();
+        self.ascii_style = None;
         &mut self.cells
     }
 
@@ -34,6 +60,8 @@ impl Row {
 
     /// The cell at `col`, mutable.
     pub fn get_mut(&mut self, col: usize) -> Option<&mut Cell> {
+        self.used = self.used.max(col.saturating_add(1).min(self.cells.len()));
+        self.ascii_style = None;
         self.cells.get_mut(col)
     }
 
@@ -79,23 +107,70 @@ impl Row {
         let to = to.min(self.cells.len());
         if let Some(span) = self.cells.get_mut(from..to) {
             span.fill(cell);
+            self.ascii_style = None;
+            if !cell.is_default_blank() {
+                self.used = self.used.max(to);
+            }
         }
     }
 
     /// Blanks the whole row and clears its flags.
     pub fn clear(&mut self, blank: Cell) {
-        self.cells.fill(blank);
         self.flags = LineFlags::NONE;
+        if blank.is_default_blank() {
+            // perf: only the cells that were written are blanked (bench vt_parse/ascii_8mib).
+            if let Some(written) = self.cells.get_mut(..self.used) {
+                written.fill(blank);
+            }
+            self.used = 0;
+            self.ascii_style = Some(DEFAULT_WORDS);
+        } else {
+            self.cells.fill(blank);
+            self.used = self.cells.len();
+            self.ascii_style = None;
+        }
+    }
+
+    /// Writes printable ASCII `bytes` from column `x` in the style `words` (`fg`, `bg`, `attrs`).
+    /// The caller has checked that the text fits in the row.
+    pub(crate) fn write_ascii(&mut self, x: usize, bytes: &[u8], words: StyleWords) {
+        let end = x + bytes.len();
+        let Some(span) = self.cells.get_mut(x..end) else { return };
+        // Uniform stays so when the text joins the cells before it in the same style; blanks
+        // left in a gap have the default style.
+        let joins = match self.ascii_style {
+            Some(_) if self.used == 0 => x == 0 || words == DEFAULT_WORDS,
+            Some(style) => style == words && (x <= self.used || words == DEFAULT_WORDS),
+            None => false,
+        };
+        self.ascii_style = joins.then_some(words);
+        for (cell, &byte) in span.iter_mut().zip(bytes) {
+            *cell = Cell::styled(char::from(byte), words.0, words.1, words.2);
+        }
+        self.used = self.used.max(end);
     }
 
     /// Changes the width, padding with `blank` or cutting the end.
     pub fn resize(&mut self, cols: usize, blank: Cell) {
         self.cells.resize(cols, blank);
+        if blank.is_default_blank() {
+            self.used = self.used.min(cols);
+        } else {
+            self.used = cols;
+            self.ascii_style = None;
+        }
+    }
+
+    /// The style words shared by every cell of the written part of the row when they are all
+    /// plain ASCII cells, with the length of that part.
+    pub(crate) fn ascii_style(&self) -> Option<(StyleWords, usize)> {
+        self.ascii_style.map(|style| (style, self.used))
     }
 
     /// Number of cells up to and including the last one that is not a default blank.
     pub fn used_len(&self) -> usize {
-        self.cells.iter().rposition(|cell| !cell.is_default_blank()).map_or(0, |last| last + 1)
+        let written = self.cells.get(..self.used).unwrap_or_default();
+        written.iter().rposition(|cell| !cell.is_default_blank()).map_or(0, |last| last + 1)
     }
 }
 
@@ -114,6 +189,32 @@ mod tests {
         assert!(row.is_wrapped());
         row.clear(Cell::default());
         assert_eq!((row.used_len(), row.is_wrapped()), (0, false));
+    }
+
+    #[test]
+    fn every_write_path_is_seen_by_clear_and_used_len() {
+        let mut x = Cell::default();
+        x.set_scalar('x');
+        let blank = Row::new(8, Cell::default());
+        let writes: [fn(&mut Row, Cell); 4] = [
+            |row, _| row.write_ascii(5, b"ab", (0, 0, 0)),
+            |row, x| row.get_mut(6).into_iter().for_each(|cell| *cell = x),
+            |row, x| row.fill(2, 4, x),
+            |row, x| row.cells_mut().iter_mut().last().into_iter().for_each(|cell| *cell = x),
+        ];
+        for write in writes {
+            let mut row = Row::new(8, Cell::default());
+            write(&mut row, x);
+            assert!(row.used_len() > 0);
+            row.clear(Cell::default());
+            assert_eq!(row, blank);
+            assert_eq!(row.used_len(), 0);
+        }
+        let mut row = Row::new(8, Cell::default());
+        row.fill(0, 8, x);
+        row.resize(3, Cell::default());
+        row.resize(8, Cell::default());
+        assert_eq!(row.used_len(), 3);
     }
 
     #[test]

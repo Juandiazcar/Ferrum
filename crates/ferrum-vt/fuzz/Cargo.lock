@@ -49,6 +49,7 @@ name = "ferrum-scrollback"
 version = "0.1.0"
 dependencies = [
  "lz4_flex",
+ "rustc-hash",
  "thiserror",
  "tracing",
 ]

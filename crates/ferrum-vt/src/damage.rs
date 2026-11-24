@@ -40,7 +40,13 @@ impl Damage {
 
     /// Marks `from..to` (clamped).
     pub fn mark_range(&mut self, from: usize, to: usize) {
-        for row in from..to.min(self.rows) {
+        let to = to.min(self.rows);
+        if from == 0 && to == self.rows {
+            // perf: scrolling the whole screen marks everything (bench vt_parse/ascii_8mib).
+            self.all = true;
+            return;
+        }
+        for row in from..to {
             self.mark(row);
         }
     }

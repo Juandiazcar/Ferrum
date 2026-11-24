@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 /// A user-defined shell profile.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 #[non_exhaustive]
 pub struct Profile {
@@ -25,19 +25,29 @@ pub struct Profile {
     pub cwd: Option<PathBuf>,
     /// Glyph shown next to the profile name.
     pub icon: Option<String>,
-    /// Inject shell integration (OSC 7 / OSC 133) for supported shells (`FR-SESS-005`: opt-out).
+    /// Inject shell integration (OSC 7 / OSC 133) for supported shells (`FR-SESS-005`: opt-out,
+    /// so it is on unless the file turns it off).
     pub shell_integration: bool,
+}
+
+impl Default for Profile {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            command: String::new(),
+            args: Vec::new(),
+            env: BTreeMap::new(),
+            cwd: None,
+            icon: None,
+            shell_integration: true,
+        }
+    }
 }
 
 impl Profile {
     /// A profile running `command` with no arguments and shell integration on.
     pub fn new(name: impl Into<String>, command: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            command: command.into(),
-            shell_integration: true,
-            ..Self::default()
-        }
+        Self { name: name.into(), command: command.into(), ..Self::default() }
     }
 }
 
@@ -46,8 +56,23 @@ impl Profile {
 #[serde(default)]
 #[non_exhaustive]
 pub struct Shells {
-    /// Name of the default profile; `None` uses the detected login shell.
+    /// Name of the default profile; `None` uses the detected login shell (`FR-SESS-004`).
     pub default_profile: Option<String>,
     /// User-defined profiles.
     pub profiles: Vec<Profile>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shell_integration_is_on_when_the_key_is_missing() {
+        let shells: Shells =
+            toml::from_str("[[profiles]]\nname = \"zsh\"\ncommand = \"/bin/zsh\"\n").unwrap();
+        assert!(shells.profiles.iter().all(|p| p.shell_integration));
+        assert!(Profile::new("fish", "fish").shell_integration);
+        let off: Profile = toml::from_str("shell_integration = false").unwrap();
+        assert!(!off.shell_integration);
+    }
 }

@@ -39,6 +39,12 @@ docs/08 §8: "full-precision numbers are taken on the maintainer's machines").
   in the maintainer's i5-9400 run (Q-27) and are then gated the same way (+10 %); until then
   `cargo xtask bench` reports them as missing baselines.
 
+- `proto_encode/row_200_cols` (WP-03, `ferrum-proto`: encoding one 200-column row) has **no
+  baseline yet** and no absolute ceiling (`docs/03` §4 names no target for it). A maintainer
+  saves it with `cargo xtask bench --save-baseline` on the reference machine; until then
+  `cargo xtask bench` without `--against` reports it as a missing baseline, and the nightly
+  `--against HEAD~1` job gates it (+10 %).
+
 **Filled by:** WP-01 (`ferrum-scrollback`: push, read, spilled read, search, in `windows.json`)
 and WP-02 (`ferrum-vt`: parse and reflow; their baselines come from the maintainer's run on the
 i5-9400, maintainer decision Q-27).

@@ -12,7 +12,7 @@ messages follow.
 | Must never depend on | any other ferrum crate, fonts or rendering |
 | `unsafe` | forbidden (`#![forbid(unsafe_code)]`) |
 | Dependencies | `thiserror` |
-| Dev-dependencies | `proptest`, `dhat` |
+| Dev-dependencies | `proptest`, `dhat`, `criterion` |
 | Features | none |
 
 ## Model
@@ -33,7 +33,8 @@ messages follow.
 ## Tests
 
 Row round-trip property (`tests/row_roundtrip.rs`), zero allocation in steady state
-(`tests/alloc_row.rs`) and unit tests of every decoder failure.
+(`tests/alloc_row.rs`) and unit tests of every decoder failure. Bench `proto_encode/row_200_cols`
+(no baseline yet: `benches/baselines/README.md`).
 
 The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2, enforced by
 `cargo xtask check-deps` from `xtask/deps-rules.toml`.

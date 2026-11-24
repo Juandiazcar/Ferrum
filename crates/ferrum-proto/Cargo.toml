@@ -12,8 +12,13 @@ publish.workspace = true
 thiserror = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 dhat = { workspace = true }
 proptest = { workspace = true }
+
+[[bench]]
+name = "encode"
+harness = false
 
 [lints]
 workspace = true

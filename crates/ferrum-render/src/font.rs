@@ -1,17 +1,29 @@
-//! Fonts: the embedded default, system families, and the cell metrics derived from them.
+//! Fonts: the embedded default, system families, the fallback chain that finds a face for every
+//! character, and the cell metrics.
 //!
 //! The primary family is either the embedded `JetBrains Mono` (`docs/07` §5) or a system family
-//! the user picked ("system fonts are preferred when the user selects one"). The system color
-//! emoji fonts of `docs/07` §5 are loaded when system fonts were scanned.
+//! the user picked ("system fonts are preferred when the user selects one"). A character the
+//! primary face does not map is looked up, in order, in the generic monospace families of
+//! `docs/11` §2, the system color emoji fonts of `docs/07` §5, and then every other system face
+//! whose coverage (recorded by [`SystemFonts::scan`]) may hold it; emoji presentation tries the
+//! emoji fonts first. The answer is memoized, so steady-state painting never searches. When
+//! nothing maps a character the primary face's `.notdef` glyph is drawn (the "tofu" box).
+//!
+//! Weights follow CSS: 400 regular, 700 bold. A variable face gets the weight through its `wght`
+//! axis; a static face without a heavier style is emboldened; a face without an italic style is
+//! slanted (`crate::glyph`).
 
 mod face;
 pub(crate) mod metrics;
+mod resolve;
 mod system;
 
+pub(crate) use face::Face;
 pub use metrics::{CellMetrics, FontSpec, MAX_FONT_PX};
+pub(crate) use resolve::{FaceId, Glyph, Synthesis};
 pub use system::SystemFonts;
 
-use face::Face;
+use rustc_hash::FxHashMap;
 
 use crate::error::RenderError;
 
@@ -19,6 +31,11 @@ use crate::error::RenderError;
 pub const EMBEDDED_FAMILY: &str = "JetBrains Mono";
 /// CSS `normal` weight.
 pub const REGULAR_WEIGHT: u16 = 400;
+/// CSS `bold` weight.
+pub const BOLD_WEIGHT: u16 = 700;
+
+/// Generic monospace families tried before any other system face (`docs/11` §2).
+const GENERIC_FALLBACKS: [&str; 3] = ["DejaVu Sans Mono", "Noto Sans Mono", "Liberation Mono"];
 
 /// System color emoji families (`docs/07` §5).
 const EMOJI_FAMILIES: [&str; 3] = ["Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji"];
@@ -32,13 +49,52 @@ pub enum Family<'a> {
     System(&'a str),
 }
 
-/// The fonts of one terminal view: the primary face, the emoji faces and the system fonts.
+/// Upright or italic text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Slant {
+    /// Upright.
+    #[default]
+    Upright,
+    /// Italic: the family's italic face, or the upright one slanted.
+    Italic,
+}
+
+/// The weight and slant text is drawn with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TextStyle {
+    /// CSS weight, 100–900.
+    pub weight: u16,
+    /// Slant.
+    pub slant: Slant,
+}
+
+impl TextStyle {
+    /// Regular upright text.
+    pub const REGULAR: Self = Self { weight: REGULAR_WEIGHT, slant: Slant::Upright };
+}
+
+/// Whether a character is drawn in its text or its emoji (color) form.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Presentation {
+    /// Primary and text faces first.
+    Text,
+    /// Color emoji faces first.
+    Emoji,
+}
+
+/// The fonts of one window: the primary family, the fallbacks and the system fonts.
 #[derive(Debug)]
 pub struct Fonts {
     faces: Vec<Face>,
-    primary: usize,
-    emoji: Vec<usize>,
     system: Option<SystemFonts>,
+    /// The system family, or `None` for the embedded font.
+    family: Option<String>,
+    /// The face of regular upright text, which the cell metrics come from.
+    regular: FaceId,
+    styles: Vec<resolve::Styled>,
+    text_fallbacks: Vec<FaceId>,
+    emoji_fallbacks: Vec<FaceId>,
+    memo: FxHashMap<resolve::MemoKey, Glyph>,
 }
 
 impl Fonts {
@@ -51,11 +107,22 @@ impl Fonts {
     /// [`RenderError::UnreadableFont`] when its file is not a usable font.
     pub fn new(family: Family<'_>, system: Option<SystemFonts>) -> Result<Self, RenderError> {
         let embedded = Face::embedded().ok_or(RenderError::UnreadableFont)?;
-        let mut fonts = Self { faces: vec![embedded], primary: 0, emoji: Vec::new(), system };
+        let mut fonts = Self {
+            faces: vec![embedded],
+            system,
+            family: None,
+            regular: FaceId::EMBEDDED,
+            styles: Vec::new(),
+            text_fallbacks: Vec::new(),
+            emoji_fallbacks: Vec::new(),
+            memo: FxHashMap::default(),
+        };
         if let Family::System(name) = family {
-            fonts.primary = fonts.load_family(name).ok_or(RenderError::FamilyNotFound)?;
+            fonts.family = Some(name.to_owned());
+            fonts.regular = fonts.styled(TextStyle::REGULAR).ok_or(RenderError::FamilyNotFound)?;
         }
-        fonts.emoji = EMOJI_FAMILIES.iter().filter_map(|name| fonts.load_family(name)).collect();
+        fonts.text_fallbacks = fonts.load_families(&GENERIC_FALLBACKS);
+        fonts.emoji_fallbacks = fonts.load_families(&EMOJI_FAMILIES);
         Ok(fonts)
     }
 
@@ -66,23 +133,37 @@ impl Fonts {
     /// [`RenderError::InvalidFontSpec`] for an unusable spec; [`RenderError::UnreadableFont`]
     /// when the primary face's file can no longer be read.
     pub fn cell_metrics(&self, spec: &FontSpec) -> Result<CellMetrics, RenderError> {
-        let face = self.faces.get(self.primary).ok_or(RenderError::UnreadableFont)?;
+        let face = self.face(self.regular).ok_or(RenderError::UnreadableFont)?;
         face.with_font(self.system.as_ref(), |font| CellMetrics::of(font, spec))
             .ok_or(RenderError::UnreadableFont)?
     }
 
     /// Whether a system color emoji font was found.
     pub fn has_color_emoji(&self) -> bool {
-        self.emoji.iter().any(|&index| self.faces.get(index).is_some_and(Face::is_color))
+        self.emoji_fallbacks.iter().any(|&id| self.face(id).is_some_and(Face::is_color))
     }
 
-    /// Loads the regular upright face of a system family; `None` when there is no such family.
-    fn load_family(&mut self, name: &str) -> Option<usize> {
-        let system = self.system.as_ref()?;
-        let (id, _) = system.find(name, REGULAR_WEIGHT, system::Slant::Upright)?;
-        let face = Face::system(system, id)?;
-        self.faces.push(face);
-        Some(self.faces.len() - 1)
+    pub(crate) fn face(&self, id: FaceId) -> Option<&Face> {
+        self.faces.get(usize::from(id.0))
+    }
+
+    pub(crate) fn system(&self) -> Option<&SystemFonts> {
+        self.system.as_ref()
+    }
+
+    /// Loads the regular upright faces of the installed `families`.
+    fn load_families(&mut self, families: &[&str]) -> Vec<FaceId> {
+        let mut loaded = Vec::new();
+        for family in families {
+            let found = self
+                .system
+                .as_ref()
+                .and_then(|system| system.find(family, REGULAR_WEIGHT, system::Slant::Upright));
+            if let Some(face) = found.and_then(|(id, _)| self.load_system_face(id)) {
+                loaded.push(face);
+            }
+        }
+        loaded
     }
 }
 
@@ -100,6 +181,47 @@ mod tests {
         let metrics = fonts.cell_metrics(&spec()).unwrap();
         assert_eq!((metrics.width, metrics.height), (7, 16));
         assert!(!fonts.has_color_emoji());
+    }
+
+    #[test]
+    fn ascii_comes_from_the_primary_face_in_every_style() {
+        let mut fonts = Fonts::new(Family::Embedded, None).unwrap();
+        let regular = fonts.glyph('A', TextStyle::REGULAR, Presentation::Text);
+        assert_eq!(regular.face, FaceId::EMBEDDED);
+        assert_ne!(regular.id, 0);
+        let style = TextStyle { weight: BOLD_WEIGHT, slant: Slant::Italic };
+        let bold = fonts.glyph('A', style, Presentation::Text);
+        assert_eq!((bold.id, bold.weight), (regular.id, BOLD_WEIGHT));
+        assert!(bold.synth.oblique && !bold.synth.embolden, "variable weight, synthetic slant");
+    }
+
+    #[test]
+    fn a_character_no_face_maps_resolves_to_notdef() {
+        let mut fonts = Fonts::new(Family::Embedded, None).unwrap();
+        let glyph = fonts.glyph('中', TextStyle::REGULAR, Presentation::Text);
+        assert_eq!((glyph.face, glyph.id), (FaceId::EMBEDDED, 0));
+        let again = fonts.glyph('中', TextStyle::REGULAR, Presentation::Text);
+        assert_eq!(again, glyph, "memoized");
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "fontdb maps the font files; Miri cannot map memory")]
+    fn system_fallbacks_find_characters_the_embedded_font_lacks() {
+        let mut fonts = Fonts::new(Family::Embedded, Some(SystemFonts::scan())).unwrap();
+        // Greek is in every CI image's fonts (DejaVu, Helvetica, Segoe UI) and not in the subset.
+        let glyph = fonts.glyph('λ', TextStyle::REGULAR, Presentation::Text);
+        assert_ne!(glyph.face, FaceId::EMBEDDED);
+        assert_ne!(glyph.id, 0);
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "fontdb maps the font files; Miri cannot map memory")]
+    fn emoji_presentation_prefers_a_color_face() {
+        let mut fonts = Fonts::new(Family::Embedded, Some(SystemFonts::scan())).unwrap();
+        assert!(fonts.has_color_emoji(), "each CI image has a color emoji font (docs/07 §5)");
+        let glyph = fonts.glyph('😀', TextStyle::REGULAR, Presentation::Emoji);
+        assert!(fonts.face(glyph.face).is_some_and(Face::is_color));
+        assert_ne!(glyph.id, 0);
     }
 
     #[test]

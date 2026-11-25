@@ -5,13 +5,19 @@
 //! were touched count against the fonts allowance (`docs/03` §2), and `ferrum-render` needs no
 //! `unsafe` outside its blit kernels (`docs/05` §4).
 
-use swash::{CacheKey, FontRef, TableProvider, tag_from_bytes};
+use swash::{CacheKey, FontRef, Setting, TableProvider, Tag, tag_from_bytes};
 
 use super::system::SystemFonts;
 
 /// The embedded default font (`assets/fonts`, `docs/07` §5).
 pub(crate) static EMBEDDED: &[u8] =
     include_bytes!("../../../../assets/fonts/JetBrainsMono-wght-subset.ttf");
+
+/// The variation axis of weight.
+const WEIGHT_AXIS: Tag = tag_from_bytes(b"wght");
+/// One CSS weight step: a static face at least this much lighter than the asked weight is
+/// emboldened.
+const WEIGHT_STEP: u16 = 100;
 
 /// Tables that hold color glyphs: layered outlines, PNG strikes (Google), `sbix` (Apple).
 const COLOR_TABLES: [&[u8; 4]; 3] = [b"COLR", b"CBDT", b"sbix"];
@@ -28,6 +34,10 @@ pub(crate) struct Face {
     data: Data,
     offset: u32,
     key: CacheKey,
+    /// Range of the `wght` axis, when the face is variable in weight.
+    weight_axis: Option<(f32, f32)>,
+    /// The face's own weight (OS/2), used when it has no `wght` axis.
+    static_weight: u16,
     is_color: bool,
 }
 
@@ -52,7 +62,18 @@ impl Face {
     fn describe(source: Data, font: FontRef<'_>) -> Self {
         let is_color =
             COLOR_TABLES.iter().any(|tag| font.table_by_tag(tag_from_bytes(tag)).is_some());
-        Self { data: source, offset: font.offset, key: font.key, is_color }
+        let weight_axis = font
+            .variations()
+            .find_by_tag(WEIGHT_AXIS)
+            .map(|axis| (axis.min_value(), axis.max_value()));
+        Self {
+            data: source,
+            offset: font.offset,
+            key: font.key,
+            weight_axis,
+            static_weight: font.attributes().weight().0,
+            is_color,
+        }
     }
 
     /// Runs `f` on the face's font data. `None` when the system file can no longer be mapped
@@ -71,6 +92,27 @@ impl Face {
         }
     }
 
+    /// The system face this is, if any.
+    pub(crate) fn system_id(&self) -> Option<fontdb::ID> {
+        match self.data {
+            Data::Embedded => None,
+            Data::System(id) => Some(id),
+        }
+    }
+
+    /// The variation setting that selects `weight` (clamped to the axis), if the face is
+    /// variable in weight.
+    pub(crate) fn weight_setting(&self, weight: u16) -> Option<Setting<f32>> {
+        let (min, max) = self.weight_axis?;
+        Some(Setting { tag: WEIGHT_AXIS, value: f32::from(weight).clamp(min, max) })
+    }
+
+    /// Whether drawing `weight` with this face needs synthetic emboldening: the face is static
+    /// and lighter than `weight` by at least one CSS weight step.
+    pub(crate) fn needs_embolden(&self, weight: u16) -> bool {
+        self.weight_axis.is_none() && weight >= self.static_weight.saturating_add(WEIGHT_STEP)
+    }
+
     /// Whether the face draws color glyphs (emoji).
     pub(crate) fn is_color(&self) -> bool {
         self.is_color
@@ -82,11 +124,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_embedded_face_is_not_color() {
+    fn the_embedded_face_is_variable_in_weight_and_not_color() {
         let face = Face::embedded();
         assert!(face.is_some(), "the embedded font parses");
         let Some(face) = face else { return };
+        assert_eq!(face.weight_axis, Some((100.0, 800.0)));
         assert!(!face.is_color());
+        assert!(!face.needs_embolden(700));
+        assert_eq!(face.weight_setting(900).map(|setting| setting.value), Some(800.0));
     }
 
     #[test]

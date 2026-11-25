@@ -22,8 +22,8 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Pixel presentation | `softbuffer` | 0.4.8 | app | CPU buffers, damage presentation; X11, Wayland, Win32, AppKit |
 | Window handles | `raw-window-handle` | 0.6.2 | app | transitive; pinned by winit/softbuffer |
 | 2D chrome drawing | `tiny-skia` | 0.12.0 | render | rounded rects, gradients, shadows on cached tiles only |
-| Fonts: shaping + raster | `swash` | 0.2.10 | render | one crate for shaping and rasterization incl. color glyphs; avoids `cosmic-text` weight |
-| Font discovery | `fontdb` | 0.24.0 | render | scans system fonts lazily; memory-maps files |
+| Fonts: shaping + raster | `swash` | 0.2.10 (2026-11-25, latest stable; `default-features = false`, `std` + `scale` + `render`) | render | one crate for shaping and rasterization incl. color glyphs; avoids `cosmic-text` weight. Brings `skrifa` 0.44, `read-fonts` 0.41, `zeno` 0.3.3, `yazi` 0.2.2 |
+| Font discovery | `fontdb` | 0.24.0 (2026-11-25, latest stable; `default-features = false`, `std` + `fs` + `memmap`, no fontconfig) | render | scans system fonts lazily; memory-maps files (through its own `memmap2`, only while a glyph is looked up or rasterized, so `ferrum-render` holds no mapping and needs no `unsafe` for it) |
 | Font parsing | `ttf-parser` | 0.25.1 | render | transitive via fontdb |
 | VT parsing | `vte` | 0.15.0 (2026-11-22, latest stable) | vt | state machine only; Ferrum owns the grid/handlers. `default-features = false`: the `no_std` buffer mode with a 1-byte OSC buffer, because `ferrum-vt` captures OSC strings itself with a 1 MiB cap (ADR 0028) |
 | Unicode widths | `unicode-width` | 0.2.3 (2026-11-22, latest stable) | vt | `default-features = false` (no `cjk` context widths) |
@@ -39,7 +39,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Wire format | `postcard` | 1.2.0 (2026-11-24, latest stable; MSRV 1.88) | proto | compact, no-std friendly, deterministic; `default-features = false`, `use-std` (`to_io` into a reused buffer). Brings `cobs` (unused by the plain encoding) |
 | Config format | `toml` | 1.2.2 (re-verified 2026-11-24, latest stable) | config, xtask | serde-based; atomic writes by us; `default-features = false` with `std`, `serde`, `parse`, `display` |
 | Compression (scrollback) | `lz4_flex` | 0.14.2 | scrollback | pure Rust, `default-features = false`, `safe-encode`/`safe-decode` |
-| mmap | `memmap2` | 0.9.12 | render | fonts only. The scrollback spill file uses plain positional reads and writes from `std` (ADR 0027), because mapping needs `unsafe` |
+| mmap | `memmap2` | 0.9.12 | render (through `fontdb`) | fonts only. The scrollback spill file uses plain positional reads and writes from `std` (ADR 0027), because mapping needs `unsafe` |
 | Byte search | `memchr` | 2.8.3 (2026-11-22, latest stable) | vt, scrollback | `default-features = false`, `std`; `vt` uses `memmem` for `ESC ]` and `memchr` for ESC |
 | Regular expressions | `regex` | 1.13.2 (verified 2026-11-25, latest stable; MSRV 1.65; MIT OR Apache-2.0; with `regex-automata` 0.4.19 and `regex-syntax` 0.8.12, both latest) | daemon | the regex toggle of daemon search (FR-TERM-015, WP-06); `default-features = false`, `std` + `unicode-case` + `unicode-perl` (case-insensitive expressions fold Unicode as literal search does, `ferrum_scrollback::LiteralMatcher`) + `perf-dfa` (the lazy DFA: a case-insensitive Unicode expression over 10 000 lines takes 6.7 ms instead of 19 ms, `docs/03` §4 asks for 15 ms; no further crate); release `ferrumd` 2.36 MB stripped on macOS arm64 (NFR-SIZE-01: 3 MB) |
 | POD casts | `bytemuck` | 1.25.2 | render, vt | `Cell` ↔ bytes where needed |

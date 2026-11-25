@@ -27,6 +27,7 @@
 mod conpty;
 mod env;
 mod error;
+mod exit_watch;
 #[cfg(any(unix, windows))]
 mod program;
 pub mod shell_integration;
@@ -41,6 +42,7 @@ mod windows_command;
 pub use conpty::ConptyBackend;
 pub use env::{TERM, TERM_PROGRAM, session_env};
 pub use error::PtyError;
+pub use exit_watch::{ExitWatch, native_exit_watch};
 pub use spec::{EnvOp, ExitSource, ExitStatus, PtySize, Readiness, SpawnSpec};
 pub use traits::{
     Notify, PtyBackend, PtyChild, PtyKiller, PtyReader, PtyResize, PtySession, PtyWriter,

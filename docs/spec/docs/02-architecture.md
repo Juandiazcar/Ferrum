@@ -93,6 +93,7 @@ Its grid stores every scrollback cell as a full cell struct (on the order of 20+
 
 **Daemon** (no async runtime; `polling`/`mio`-based loop keeps RAM and binary small):
 - 1 **I/O thread**: polls all PTY fds + client sockets. Reads PTY output in chunks (≤ 64 KiB), hands bytes to the owning session's parser *inline* (the parser is cheap), applies per-session fairness quantum (e.g. ≤ 256 KiB per session per loop turn) so a flooding session cannot starve others. **Windows:** the `PtyBackend` serves the output of every ConPTY session with overlapped I/O on one I/O thread of its own and wakes this loop when a session's output is ready (`docs/11` §4, maintainer decision Q-31); there is no thread per session, and the daemon's session logic is identical on all OSes because it only sees "chunk readable" events through the `PtyBackend` trait.
+- Child exit (maintainer decision Q-33): Windows: process exit is watched by a named `pty-exit` thread (WaitForMultipleObjects, one thread per 63 sessions); Unix: through mio on the loop.
 - 1 **worker thread** for CPU-heavy, interruptible work: reflow, search, compression of sealed chunks, spill I/O, layout persistence. Communicates through bounded channels.
 - Per-session parser state is not shared across threads; sessions are owned by the I/O thread. Compression/search receive immutable chunk handles.
 

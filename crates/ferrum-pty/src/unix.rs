@@ -156,6 +156,18 @@ impl PtyWriter for UnixWriter {
     fn write_all(&mut self, bytes: &[u8]) -> Result<(), PtyError> {
         self.0.write_all(bytes)
     }
+
+    fn try_write(&mut self, bytes: &[u8]) -> Result<Option<usize>, PtyError> {
+        if bytes.is_empty() {
+            return Ok(Some(0));
+        }
+        self.0.try_write(bytes)
+    }
+
+    fn readiness(&self) -> Readiness {
+        // The master: the same descriptor as the reader's, watched for writability.
+        Readiness::Fd(self.0.raw_master())
+    }
 }
 
 struct UnixResize {

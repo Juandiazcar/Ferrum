@@ -152,6 +152,21 @@ impl Terminal {
         Ok(())
     }
 
+    /// One non-blocking write: `None` when the terminal takes nothing now.
+    pub(super) fn try_write(&self, bytes: &[u8]) -> Result<Option<usize>, PtyError> {
+        if self.is_closed() {
+            return Err(PtyError::Closed);
+        }
+        loop {
+            match (&self.master).write(bytes) {
+                Ok(written) => return Ok(Some(written)),
+                Err(error) if error.kind() == ErrorKind::Interrupted => {}
+                Err(error) if error.kind() == ErrorKind::WouldBlock => return Ok(None),
+                Err(error) => return Err(PtyError::io("write the terminal", error)),
+            }
+        }
+    }
+
     /// The parent's slave descriptor, while the output is not over.
     pub(super) fn with_slave<T>(&self, action: impl FnOnce(&OwnedFd) -> T) -> Option<T> {
         self.slave.lock().unwrap_or_else(PoisonError::into_inner).as_ref().map(action)

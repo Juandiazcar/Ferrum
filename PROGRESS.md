@@ -2,6 +2,54 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## WP-06 `ferrum-daemon` (stacked PRs #90 → #91 → #92 → #93 → #94 → #95 → #96)
+
+Done: protocol 1.1 (`SearchResults`, `SessionEvent::Failed`/`SessionStatus::Failed` with the
+error, `SessionEvent::SpillDisabled`, `FileSetAside`, #90); `ferrum_pty::ExitWatch` (Linux pidfds
+in one epoll set, macOS one kqueue, Windows named `pty-exit` threads with `WaitForMultipleObjects`,
+one per 63 children (Q-33); no thread per child,
+no timer) and non-blocking `PtyWriter::try_write` with its readiness (#91); `ferrum-platform`
+`Dirs` (owner-only on every OS), `InstanceLock`, nonce file, IPC endpoint behind traits (Unix
+socket 0600; Windows pipe named after the user's SID, owner/SYSTEM DACL, first instance, remote
+clients rejected; the peer's user checked after its first bytes, by peer credentials or by
+impersonation; the test/tool client verifies the server), `default_shell` (`$SHELL`, the user
+database, `/etc/shells`, `/bin/sh`) and `MemoryRelease` (#92); setting
+`performance.daemon_exit_grace_secs` (FR-SESS-003, #93); `ferrum-vt` reflow that stops at a
+chunk boundary and `ferrum-scrollback` history snapshots for a reader thread (#94); the daemon
+(#94): one mio I/O thread and one worker, 64 KiB reads into one shared buffer with a fairness
+quantum of 64 KiB and at most 8 reads per session per turn, input written on the loop without
+blocking (descriptor writability on Unix, a notification on Windows), the `daemon-worker` (seal,
+reflow of a lent terminal that yields every 16 ms (doubling) so output is read, and stops for a newer size, search over a history snapshot while the session runs,
+closing, atomic project writes, a bounded backlog where writes of one file coalesce), per-client
+views with row hashes and `scroll_delta`, damage paced per session at `max_fps` (at most one frame per interval, input included), congested clients get the latest state, client buffers within the 2 MB reserve,
+synchronized output held until the update ends or 150 ms, handshake deadline and mutation rate
+limit, attach/detach/snapshot/history rows/scroll/resize, search with soft-wrapped rows joined in
+bounded windows (literal, or `regex` with Unicode case folding), the internal `EventBus` and the
+daemon `SessionKind` (`docs/02` §9), projects and layouts authoritative and echoed only after their
+file is written, files set aside reported to the UI, respawn in the last OSC 7 directory after a
+restart (FR-SESS-008), panic isolation around every use of a session's terminal, freed memory
+returned to the OS when idle, idle exit, `ferrumd.log` 1 MB x 3 without paths or content;
+scenarios against a real `ferrumd`, the frame `dhat` gate and the search bench (#95);
+`cargo xtask memcheck --daemon-only`, `cargo xtask flood --against <rev>` and the CI jobs
+`memcheck` and `daemon-flood` (#96).
+
+Measured: see the PR bodies of #94-#96 (CI runs of the current tips) for `memcheck --daemon-only`
+on the three OS, the NFR-PERF-04 echo p99 with one session flooding (the ordinary test run, debug
+daemon; the `daemon-flood` job, release daemon compared with the base commit) and the flood
+throughput (the `daemon-flood` comparison is on the p50, Q-34). Local, Apple M2 (loaded machine): release `ferrumd` 2.36 MB stripped (NFR-SIZE-01:
+3 MB); daemon search over 10 000 lines 3.2 ms literal, 6.7 ms regular expression (`docs/03` §4:
+15 ms).
+
+Constants (internal, anti-hostile or structural): every one is listed with its reason in the Q-30 row of `docs/14` §2 (fairness, frame and history steps, reflow budget, client and input buffers, handshake and mutation limits, worker queues, held events, search windows and regex limits, memory release, test and gate parameters).
+
+Decided: child exits on Windows are watched by named `pty-exit` threads (Q-33); the daemon flood gate compares the echo p50 with base (±10 %), the p99 keeps its absolute 10 ms (Q-34). The daemon's IPC transport is `mio`'s own `UnixListener`/`NamedPipe` on the single loop,
+`interprocess` stays for the UI's IPC thread (Q-32). `Select` belongs to WP-11 (selection and
+clipboard): the daemon accepts it and does nothing until then.
+
+Not verified here: refusal of another user's peer (MV-06-1).
+
+Next: WP-07 `ferrum-render`, WP-08 (full memcheck with the UI, required `memcheck (linux)`).
+
 ## Fix: flaky `dhat` gates (branch `fix/proto-alloc-row-flaky`)
 
 `alloc_row` failed once on ubuntu CI and passed on rerun. Cause: the libtest harness runs the

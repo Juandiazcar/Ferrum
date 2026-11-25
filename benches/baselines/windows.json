@@ -2,6 +2,8 @@
   "schema": 1,
   "os": "windows",
   "median_ns": {
+    "daemon_search/literal_insensitive_10k_lines": 3916119.230769231,
+    "daemon_search/regex_insensitive_10k_lines": 6878506.25,
     "scrollback_push/fixture_rows_retain_10k": 3498500.0,
     "scrollback_read/random_1k": 138859050.0,
     "scrollback_read/sequential_10k": 2621755.0,

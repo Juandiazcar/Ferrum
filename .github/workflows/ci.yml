@@ -109,7 +109,35 @@ jobs:
           tool: cargo-hack
       - run: cargo hack check --workspace --each-feature --locked
 
-  # `memcheck` (docs/06 §5) is intentionally NOT a job yet: nothing exists to measure and a job that
-  # passes without measuring would be a fake gate. ADR 0022: `memcheck --daemon-only` lands in WP-06,
-  # the full reference scenario (and the required status check) in WP-08; `nightly.yml` in WP-01.
-  # `cargo xtask memcheck` exits non-zero until then.
+  memcheck:
+    # ADR 0022: WP-06 adds `memcheck --daemon-only` (the daemon of the docs/03 §1 reference
+    # scenario against its docs/03 §2 allowance, each OS with its own metric); the full scenario
+    # with the UI under Xvfb and the required `memcheck (linux)` check arrive with WP-08.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rust
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo xtask memcheck --daemon-only
+
+  daemon-flood:
+    # NFR-PERF-04 at the daemon level against a release ferrumd: the absolute limit (the test, also
+    # run in the ordinary `test` job against the debug daemon) and the docs/08 §8 comparison with
+    # the daemon of the base commit on the same runner.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-rust
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Flood isolation, compared with the base commit
+        run: cargo xtask flood --against ${{ github.event.pull_request.base.sha || 'HEAD~1' }}

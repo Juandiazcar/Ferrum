@@ -1,15 +1,18 @@
 //! `cargo xtask`: repository automation (docs/04 §1, docs/05 §3).
 //!
-//! `memcheck` and `soak` need later work packages and are stubs: they print what is missing and exit
-//! non-zero, never fake numbers.
+//! `memcheck --daemon-only` measures the daemon (WP-06); the full `memcheck` and `soak` need later
+//! work packages and are stubs: they print what is missing and exit non-zero, never fake numbers.
 
 mod bench;
 mod check;
 mod deps;
+mod flood;
 mod import_refs;
+mod memcheck;
 mod out;
 mod setup;
 mod tools;
+mod worktree;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -58,8 +61,20 @@ enum Command {
         #[arg(long, value_name = "DIR", default_value = "fixtures/vt/alacritty")]
         to: PathBuf,
     },
-    /// Reference-scenario memory measurement (not implemented yet).
-    Memcheck(StubArgs),
+    /// Reference-scenario memory measurement: `--daemon-only` measures `ferrumd` (WP-06); the
+    /// full scenario with the UI arrives with WP-08.
+    Memcheck {
+        /// Measure the daemon alone against its allowance (`docs/03` §2).
+        #[arg(long)]
+        daemon_only: bool,
+    },
+    /// The flood-isolation gate (NFR-PERF-04) against a release `ferrumd`, and with `--against`
+    /// the comparison with the daemon of an earlier revision on this machine (`docs/08` §8).
+    Flood {
+        /// Also run the gate against the daemon of this git revision and compare (CI).
+        #[arg(long, value_name = "REV")]
+        against: Option<String>,
+    },
     /// Long-running leak check (not implemented yet).
     Soak(StubArgs),
 }
@@ -96,9 +111,11 @@ fn main() -> ExitCode {
                 (false, None) => bench::Mode::Compare,
             },
         ),
-        Command::Memcheck(_) => {
-            return not_implemented("memcheck", "WP-08", "no binaries to measure yet");
+        Command::Memcheck { daemon_only: true } => memcheck::run_daemon_only(),
+        Command::Memcheck { daemon_only: false } => {
+            return not_implemented("memcheck", "WP-08", "no UI to measure yet; use --daemon-only");
         }
+        Command::Flood { against } => flood::run(against.as_deref()),
         Command::Soak(_) => {
             return not_implemented("soak", "WP-08", "no daemon or UI to soak yet");
         }

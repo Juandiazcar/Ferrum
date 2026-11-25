@@ -90,4 +90,4 @@ Application smoke list (each launched, used for 2 minutes, resized, scrolled, cl
 
 ## 8. CI performance measurement caveats
 
-Shared CI runners are noisy. Memory is deterministic enough to gate absolutely. Throughput/latency gates compare against the previous `main` on the same runner image with a 10 % tolerance and also have a loose absolute ceiling (2× target) that always fails. Full-precision benchmark numbers are taken on the maintainer's machines before each release and recorded in `docs/perf-history.md`.
+Shared CI runners are noisy. Memory is deterministic enough to gate absolutely. Throughput/latency gates compare against the previous `main` on the same runner image with a 10 % tolerance and also have a loose absolute ceiling (2× target) that always fails. The daemon flood gate (NFR-PERF-04) compares the echo p50 against base with the 10 % tolerance; its p99 has only the absolute limit of ≤ 10 ms. Full-precision benchmark numbers are taken on the maintainer's machines before each release and recorded in `docs/perf-history.md`.

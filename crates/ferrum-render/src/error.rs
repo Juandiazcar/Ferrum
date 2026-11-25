@@ -13,6 +13,9 @@ pub enum RenderError {
     /// A font file could not be read as a font.
     #[error("the font file could not be read")]
     UnreadableFont,
+    /// A tile radius, border or blur is negative, not finite, or makes the tile too large.
+    #[error("the tile size is out of range")]
+    InvalidTileSize,
     /// The pixel buffer is not `width × height` pixels long.
     #[error("the pixel buffer does not match its width and height")]
     BufferSize,

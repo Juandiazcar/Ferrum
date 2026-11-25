@@ -7,7 +7,7 @@
 |---|---|
 | Allowed internal dependencies | none (no windowing; takes plain values, not config types) |
 | Must never depend on | winit, softbuffer, ferrum-config and any other ferrum crate |
-| External dependencies | `swash` (shaping, rasterization), `fontdb` (system font discovery), `rustc-hash` (cache maps), `thiserror` |
+| External dependencies | `swash` (shaping, rasterization), `fontdb` (system font discovery), `tiny-skia` (chrome tiles), `rustc-hash` (cache maps), `thiserror` |
 | `unsafe` | allowed only in the blit kernels (`#![deny(unsafe_code)]` + one local `#[allow]`) |
 
 ## Public API
@@ -31,6 +31,10 @@
   `Buffer::age`) are repainted, and the dirty rectangles are returned for
   `present_with_damage`. Age 0, an age past the remembered frames or a new layout repaint
   everything, padding included. Steady-state painting allocates nothing (`tests/alloc_paint.rs`).
+- `chrome::Tile`: a rounded rectangle (fill, optional border) or a blurred shadow drawn once
+  with `tiny-skia` at the smallest size that holds its corners, then composited at any size by
+  nine-slicing (`Tile::draw`), with no `tiny-skia` call and no allocation per frame. Radii,
+  colors and blur are the caller's (theme tokens, `docs/09` §9).
 - `Target`: the caller's `&mut [u32]` (`0x00RRGGBB`, the `softbuffer` buffer) with its size;
   `Rect`, `Rgb`.
 
@@ -58,7 +62,8 @@ The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2,
 ## Tests and benches
 
 - Golden images: `tests/golden.rs` paints small scenes with the embedded font (text styles,
-  decorations, cursor shapes, selection, box drawing, blocks, powerline, at 1× and 2×) and
+  decorations, cursor shapes, selection, box drawing, blocks, powerline, at 1× and 2×, and the
+  chrome tiles) and
   compares them with the `insta` binary snapshots in `fixtures/render/`, per channel within a
   tolerance of 2.
 - `tests/alloc_paint.rs` (`dhat`, `harness = false`): 0 allocations over 100 steady-state frames.

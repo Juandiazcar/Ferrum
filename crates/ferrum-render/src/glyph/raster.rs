@@ -4,10 +4,16 @@
 use swash::FontRef;
 use swash::scale::image::{Content, Image};
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
-use swash::zeno::{Angle, Format, Transform};
+use swash::zeno::{Angle, Format, Transform, Vector};
 
 use super::cache::{GlyphImage, Pixels};
+use crate::blit::ROW_ALIGN;
 use crate::font::{Face, Fonts, Glyph};
+
+/// Glyph pen positions are quantized to quarter pixels (the `subpixel_q` of the cache key,
+/// `docs/02` §6): the steps `FreeType` and Skia use for subpixel glyph positioning. Cell text
+/// starts on whole pixels (step 0); shaped clusters place marks between them.
+pub(crate) const SUBPIXEL_STEPS: u8 = 4;
 
 /// Synthetic italic slant: the default angle of CSS `font-style: oblique` (CSS Fonts 4, §2.3).
 const OBLIQUE_DEGREES: f32 = 14.0;
@@ -46,20 +52,16 @@ impl Rasterizer {
     }
 
     /// Rasterizes `glyph` at `size` physical pixels per em. A color glyph larger than `fit` is
-    /// drawn again at the size that fits. `None` when the face cannot be read or the glyph has
-    /// no image (a space: the caller draws nothing).
-    pub(crate) fn render(
-        &mut self,
-        fonts: &Fonts,
-        glyph: Glyph,
-        size: f32,
-        fit: Fit,
-    ) -> Option<GlyphImage> {
+    /// drawn again at the size that fits. A glyph without ink gives an empty image; `None` when
+    /// the face cannot be read.
+    pub(crate) fn render(&mut self, fonts: &Fonts, glyph: Glyph, at: At) -> Option<GlyphImage> {
         let face = fonts.face(glyph.face)?;
-        let mut image = self.render_at(fonts, face, glyph, size)?;
+        let (fit, subpixel) = (at.fit, at.subpixel);
+        let mut image = self.render_at(fonts, Request { face, glyph, size: at.size, subpixel })?;
         if face.is_color() && (image.width > fit.width || image.height > fit.height) {
             let scale = ratio(fit.width, image.width).min(ratio(fit.height, image.height));
-            image = self.render_at(fonts, face, glyph, size * scale)?;
+            let size = at.size * scale;
+            image = self.render_at(fonts, Request { face, glyph, size, subpixel })?;
         }
         if face.is_color() {
             // An emoji takes the two cells it is fitted to, whatever its font's own advance.
@@ -68,14 +70,8 @@ impl Rasterizer {
         Some(image)
     }
 
-    fn render_at(
-        &mut self,
-        fonts: &Fonts,
-        face: &Face,
-        glyph: Glyph,
-        size: f32,
-    ) -> Option<GlyphImage> {
-        let request = Request { face, glyph, size };
+    fn render_at(&mut self, fonts: &Fonts, request: Request<'_>) -> Option<GlyphImage> {
+        let Request { face, glyph, size, .. } = request;
         face.with_font(fonts.system(), |font| {
             let ok = self.scale_into(font, &request);
             let advance = font.glyph_metrics(&[]).scale(size).advance_width(glyph.id);
@@ -86,7 +82,7 @@ impl Rasterizer {
     }
 
     fn scale_into(&mut self, font: FontRef<'_>, request: &Request<'_>) -> bool {
-        let Request { face, glyph, size } = *request;
+        let Request { face, glyph, size, subpixel } = *request;
         let is_color = face.is_color();
         let mut scaler = self
             .context
@@ -98,6 +94,10 @@ impl Rasterizer {
         let sources: &[Source] = if is_color { &COLOR_SOURCES } else { &TEXT_SOURCES };
         let mut render = Render::new(sources);
         let _format = render.format(Format::Alpha);
+        if subpixel > 0 {
+            let x = f32::from(subpixel) / f32::from(SUBPIXEL_STEPS);
+            let _offset = render.offset(Vector::new(x, 0.0));
+        }
         if glyph.synth.embolden {
             let _bold = render.embolden(size * EMBOLDEN_FRACTION);
         }
@@ -115,23 +115,41 @@ struct Request<'a> {
     face: &'a Face,
     glyph: Glyph,
     size: f32,
+    subpixel: u8,
 }
 
-/// The cacheable form of `image`; `None` for an empty one.
+/// How a glyph is rasterized: its size, the box a color glyph must fit, and its pen position
+/// within the pixel.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct At {
+    /// Pixels per em.
+    pub(crate) size: f32,
+    pub(crate) fit: Fit,
+    /// Pen position within its pixel, in steps of 1/[`SUBPIXEL_STEPS`] px.
+    pub(crate) subpixel: u8,
+}
+
+/// The cacheable form of `image`, rows padded to the blit step.
 fn convert(image: &Image, advance: f32) -> Option<GlyphImage> {
     let placement = image.placement;
-    let area = usize::try_from(u64::from(placement.width) * u64::from(placement.height)).ok()?;
-    if area == 0 {
-        return None;
+    let width = usize::try_from(placement.width).ok()?;
+    let height = usize::try_from(placement.height).ok()?;
+    if width == 0 || height == 0 {
+        return Some(GlyphImage::empty(advance));
     }
+    let stride = aligned(placement.width)?;
+    let padded = usize::try_from(stride).ok()?;
+    let area = width.checked_mul(height)?;
     let pixels = match image.content {
-        Content::Mask => Pixels::Mask(image.data.get(..area)?.to_vec()),
+        Content::Mask => {
+            let rows = image.data.get(..area)?.chunks_exact(width);
+            Pixels::Mask(pad_rows(rows, padded, |&coverage| coverage))
+        }
         Content::Color | Content::SubpixelMask => {
             let straight = matches!(image.source, Source::ColorBitmap(_) | Source::Bitmap(_));
             let rgba = image.data.get(..area.checked_mul(4)?)?;
-            Pixels::Color(
-                rgba.as_chunks::<4>().0.iter().map(|&px| premultiply(px, straight)).collect(),
-            )
+            let rows = rgba.as_chunks::<4>().0.chunks_exact(width);
+            Pixels::Color(pad_rows(rows, padded, |&pixel| premultiply(pixel, straight)))
         }
     };
     Some(GlyphImage {
@@ -139,9 +157,30 @@ fn convert(image: &Image, advance: f32) -> Option<GlyphImage> {
         top: placement.top,
         width: placement.width,
         height: placement.height,
+        stride,
         advance,
         pixels,
     })
+}
+
+/// `width` rounded up to `crate::blit::ROW_ALIGN`.
+pub(crate) fn aligned(width: u32) -> Option<u32> {
+    Some(width.checked_add(ROW_ALIGN - 1)? / ROW_ALIGN * ROW_ALIGN)
+}
+
+/// The rows converted by `pixel`, each padded with the default (transparent) value to `stride`.
+pub(crate) fn pad_rows<'a, S: 'a, T: Default + Clone>(
+    rows: impl Iterator<Item = &'a [S]>,
+    stride: usize,
+    pixel: impl Fn(&S) -> T,
+) -> Vec<T> {
+    let mut out = Vec::new();
+    for row in rows {
+        let start = out.len();
+        out.extend(row.iter().map(&pixel));
+        out.resize(start + stride, T::default());
+    }
+    out
 }
 
 /// One RGBA pixel as premultiplied `0xAARRGGBB`. `swash` composites color outlines already

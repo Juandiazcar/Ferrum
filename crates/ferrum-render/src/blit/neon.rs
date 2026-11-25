@@ -7,7 +7,7 @@ use std::arch::aarch64::{
     vmlal_u8, vmull_u8, vmvn_u8, vqadd_u8, vshrn_n_u16, vsraq_n_u16, vst4_u8,
 };
 
-use super::{blend_color_scalar, blend_mask_scalar};
+use super::{Shape, blend_color_scalar, blend_mask_scalar, for_each_row};
 
 /// `round(t / 255)` of eight 16-bit lanes, narrowed to bytes.
 #[target_feature(enable = "neon")]
@@ -23,6 +23,7 @@ fn mix(d: uint8x8_t, s: uint8x8_t, a: uint8x8_t) -> uint8x8_t {
 }
 
 /// Callable only where NEON is enabled (`unsafe` at the call site; NEON is part of `aarch64`).
+#[inline]
 #[target_feature(enable = "neon")]
 pub(super) fn blend_mask(dst: &mut [u32], mask: &[u8], color: u32) {
     let len = dst.len().min(mask.len());
@@ -53,6 +54,7 @@ pub(super) fn blend_mask(dst: &mut [u32], mask: &[u8], color: u32) {
 }
 
 /// As [`blend_mask`]: NEON only.
+#[inline]
 #[target_feature(enable = "neon")]
 pub(super) fn blend_color(dst: &mut [u32], src: &[u32]) {
     let len = dst.len().min(src.len());
@@ -76,4 +78,16 @@ pub(super) fn blend_color(dst: &mut [u32], src: &[u32]) {
         }
     }
     blend_color_scalar(pixels_rest, sources_rest);
+}
+
+/// The rows of `shape`, NEON only (`unsafe` at the call site).
+#[target_feature(enable = "neon")]
+pub(super) fn blend_mask_rect(dst: &mut [u32], mask: &[u8], color: u32, shape: Shape) {
+    for_each_row(dst, mask, shape, |dst, mask| blend_mask(dst, mask, color));
+}
+
+/// The rows of `shape`, NEON only (`unsafe` at the call site).
+#[target_feature(enable = "neon")]
+pub(super) fn blend_color_rect(dst: &mut [u32], src: &[u32], shape: Shape) {
+    for_each_row(dst, src, shape, |dst, src| blend_color(dst, src));
 }

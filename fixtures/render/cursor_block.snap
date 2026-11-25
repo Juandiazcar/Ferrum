@@ -1,0 +1,5 @@
+---
+source: crates/ferrum-render/tests/golden.rs
+extension: png
+snapshot_kind: binary
+---

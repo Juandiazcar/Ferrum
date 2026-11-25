@@ -5,17 +5,21 @@
 //! 3 MB, a setting) is one budget. Steady-state drawing (every glyph already cached) allocates
 //! nothing.
 
+mod ascii;
 mod cache;
 mod raster;
+mod shape;
 
+use ascii::AsciiSlots;
 use cache::{GlyphCache, GlyphImage, GlyphKey, Pixels};
-use raster::{Fit, Rasterizer};
+use raster::{At, Fit, Rasterizer};
+use shape::Shaper;
 
-use crate::blit::Kernel;
+use crate::blit::{Kernel, Shape};
 use crate::color::Rgb;
 use crate::font::metrics::f32_from;
 use crate::font::{CellMetrics, Fonts, Glyph, Presentation, TextStyle};
-use crate::synth;
+use crate::synth::{self, Decoration, Lines};
 use crate::target::{Rect, Target};
 
 /// A glyph's advance may exceed the cell width by up to half a pixel and still take one cell:
@@ -52,6 +56,10 @@ pub(crate) struct Placement {
     pub(crate) metrics: CellMetrics,
     pub(crate) color: Rgb,
     pub(crate) clip: Rect,
+    /// Offset of the glyph from the pen, in pixels right and down (shaped clusters).
+    pub(crate) shift: (i32, i32),
+    /// The rest of the horizontal offset, in steps of 1/`SUBPIXEL_STEPS` px.
+    pub(crate) subpixel: u8,
 }
 
 /// The fonts, glyph cache and kernels of one window.
@@ -60,6 +68,8 @@ pub struct Glyphs {
     fonts: Fonts,
     cache: GlyphCache,
     raster: Rasterizer,
+    shaper: Shaper,
+    ascii: AsciiSlots,
     kernel: Kernel,
 }
 
@@ -70,6 +80,8 @@ impl Glyphs {
             fonts,
             cache: GlyphCache::new(cache_bytes),
             raster: Rasterizer::new(),
+            shaper: Shaper::new(),
+            ascii: AsciiSlots::new(),
             kernel: Kernel::detect(),
         }
     }
@@ -119,15 +131,101 @@ impl Glyphs {
 
     /// Cells the glyph's advance takes.
     fn advance(&mut self, glyph: Glyph, metrics: &CellMetrics) -> u32 {
-        let advance = self.cached(glyph, metrics).map_or(1.0, |image| image.advance);
+        let slot = self.slot(glyph, metrics, 0);
+        let advance =
+            slot.and_then(|slot| self.cache.image(slot)).map_or(1.0, |image| image.advance);
         cells_for(advance, metrics.width)
     }
 
     /// Draws `glyph` at `place`.
-    pub(crate) fn draw(&mut self, target: &mut Target<'_>, glyph: Glyph, place: &Placement) {
-        let kernel = self.kernel;
-        if let Some(image) = self.cached(glyph, &place.metrics) {
-            blit(target, kernel, image, place);
+    fn draw(&mut self, target: &mut Target<'_>, glyph: Glyph, place: &Placement) {
+        if let Some(slot) = self.slot(glyph, &place.metrics, place.subpixel) {
+            self.blit_slot(target, slot, place);
+        }
+    }
+
+    fn blit_slot(&self, target: &mut Target<'_>, slot: u32, place: &Placement) {
+        if let Some(image) = self.cache.image(slot) {
+            blit(target, self.kernel, image, place);
+        }
+    }
+
+    /// Draws the single character `ch` of a cell (synthesized or from a font).
+    pub(crate) fn draw_char(
+        &mut self,
+        target: &mut Target<'_>,
+        ch: char,
+        style: TextStyle,
+        place: &Placement,
+    ) {
+        if AsciiSlots::index(ch, style).is_some() {
+            if let Some(slot) = self.ascii_slot(ch, style, &place.metrics) {
+                self.blit_slot(target, slot, place);
+            }
+        } else if synth::is_synthesized(ch) {
+            self.draw_synthetic(target, ch, place);
+        } else if !is_ignorable(ch) {
+            let glyph = self.fonts.glyph(ch, style, presentation(ch, None));
+            self.draw(target, glyph, place);
+        }
+    }
+
+    /// The cache slot of printable ASCII `ch` through the direct table (`glyph::ascii`).
+    fn ascii_slot(&mut self, ch: char, style: TextStyle, metrics: &CellMetrics) -> Option<u32> {
+        let index = AsciiSlots::index(ch, style)?;
+        if let Some(slot) = self.ascii.get(index, metrics, self.cache.generation()) {
+            self.cache.touch(slot);
+            return Some(slot);
+        }
+        let glyph = self.fonts.glyph(ch, style, presentation(ch, None));
+        let slot = self.slot(glyph, metrics, 0)?;
+        self.ascii.set(index, slot, self.cache.generation());
+        Some(slot)
+    }
+
+    /// Draws a grapheme cluster of several characters, shaped (`glyph::shape`).
+    pub(crate) fn draw_cluster(
+        &mut self,
+        target: &mut Target<'_>,
+        text: &str,
+        style: TextStyle,
+        place: &Placement,
+    ) {
+        let mut glyphs = [None; shape::MAX_CLUSTER_GLYPHS];
+        let shaped = self.shaper.shape(&mut self.fonts, text, style, place.metrics.size_q);
+        for (slot, positioned) in glyphs.iter_mut().zip(shaped) {
+            *slot = Some(*positioned);
+        }
+        for positioned in glyphs.into_iter().flatten() {
+            let shifted = Placement {
+                shift: (positioned.x, positioned.y),
+                subpixel: positioned.subpixel,
+                ..*place
+            };
+            self.draw(target, positioned.glyph, &shifted);
+        }
+    }
+
+    /// Draws a decoration (underline, strikeout, overline) over the cell at `place`.
+    pub(crate) fn draw_decoration(
+        &mut self,
+        target: &mut Target<'_>,
+        decoration: Decoration,
+        place: &Placement,
+    ) {
+        let metrics = place.metrics;
+        let lines = Lines {
+            width: metrics.width,
+            height: metrics.height,
+            underline_top: metrics.underline_top,
+            strikeout_top: metrics.strikeout_top,
+            stroke: metrics.stroke,
+        };
+        let make = |_: &Fonts, _: &mut Rasterizer| {
+            mask_image(&synth::decoration(decoration, &lines)?, &metrics)
+        };
+        if let Some(slot) = self.image(GlyphKey::Decoration { decoration, lines }, make) {
+            self.blit_slot(target, slot, place);
         }
     }
 
@@ -140,106 +238,128 @@ impl Glyphs {
             height: metrics.height,
             light: metrics.stroke,
         };
-        let kernel = self.kernel;
         let make = |_: &Fonts, _: &mut Rasterizer| {
-            let canvas = synth::draw(ch, metrics.width, metrics.height, metrics.stroke)?;
-            Some(GlyphImage {
-                left: 0,
-                top: i32::try_from(metrics.baseline).ok()?,
-                width: canvas.width,
-                height: canvas.height,
-                advance: f32_from(metrics.width),
-                pixels: Pixels::Mask(canvas.pixels),
-            })
+            mask_image(&synth::draw(ch, metrics.width, metrics.height, metrics.stroke)?, &metrics)
         };
-        if let Some(image) = self.image(key, make) {
-            blit(target, kernel, image, place);
+        if let Some(slot) = self.image(key, make) {
+            self.blit_slot(target, slot, place);
         }
     }
 
-    /// The cached image of `glyph` on the grid of `metrics`, rasterizing it on a miss.
-    fn cached(&mut self, glyph: Glyph, metrics: &CellMetrics) -> Option<&GlyphImage> {
+    /// The cache slot of `glyph` on the grid of `metrics`, rasterizing it on a miss.
+    fn slot(&mut self, glyph: Glyph, metrics: &CellMetrics, subpixel: u8) -> Option<u32> {
         // Color glyphs (emoji) are wide: they are fitted to two cells.
         let fit = Fit { width: metrics.width.saturating_mul(2), height: metrics.height };
         let key = GlyphKey::Font {
             face: glyph.face,
             id: glyph.id,
             size_q: metrics.size_q,
+            subpixel_q: subpixel,
             weight: glyph.weight,
             synth: glyph.synth,
             fit: (fit.width, fit.height),
         };
         let size = f32_from(metrics.size_q) / crate::font::metrics::SIZE_Q_ONE;
-        self.image(key, |fonts, raster| raster.render(fonts, glyph, size, fit))
+        let at = At { size, fit, subpixel };
+        self.image(key, |fonts, raster| raster.render(fonts, glyph, at))
     }
 
-    /// The image of `key`, made by `make` and cached on a miss. An image larger than the whole
-    /// cache is not kept (nor drawn: it could not fit the screen).
+    /// The cache slot of `key`, made by `make` and cached on a miss. A failed `make` is cached
+    /// as an empty image (not retried every frame); an image larger than the whole cache is not
+    /// kept (nor drawn: it could not fit the screen).
     fn image(
         &mut self,
         key: GlyphKey,
         make: impl FnOnce(&Fonts, &mut Rasterizer) -> Option<GlyphImage>,
-    ) -> Option<&GlyphImage> {
+    ) -> Option<u32> {
         if let Some(slot) = self.cache.lookup(&key) {
-            return self.cache.image(slot);
+            return Some(slot);
         }
-        let image = make(&self.fonts, &mut self.raster)?;
-        let slot = self.cache.insert(key, image).ok()?;
-        self.cache.image(slot)
+        let image = make(&self.fonts, &mut self.raster).unwrap_or_else(|| GlyphImage::empty(0.0));
+        self.cache.insert(key, image).ok()
     }
+}
+
+/// A cell-sized mask as an image whose top-left corner is the cell's.
+fn mask_image(canvas: &synth::Canvas, metrics: &CellMetrics) -> Option<GlyphImage> {
+    let stride = raster::aligned(canvas.width)?;
+    let width = usize::try_from(canvas.width).ok()?.max(1);
+    let rows = canvas.pixels.chunks_exact(width);
+    Some(GlyphImage {
+        left: 0,
+        top: i32::try_from(metrics.baseline).ok()?,
+        width: canvas.width,
+        height: canvas.height,
+        stride,
+        advance: f32_from(metrics.width),
+        pixels: Pixels::Mask(raster::pad_rows(rows, usize::try_from(stride).ok()?, |&coverage| {
+            coverage
+        })),
+    })
 }
 
 fn placement(run: &TextRun<'_>) -> Placement {
-    Placement { x: run.x, y: run.y, metrics: run.metrics, color: run.color, clip: run.clip }
+    Placement {
+        x: run.x,
+        y: run.y,
+        metrics: run.metrics,
+        color: run.color,
+        clip: run.clip,
+        shift: (0, 0),
+        subpixel: 0,
+    }
 }
 
 /// Blends `image` into `target` at `place`, clipped to the clip rectangle, the target and the
-/// glyph's row of cells.
+/// glyph's row of cells. Rows are blended with their transparent padding when it is visible, so
+/// narrow glyphs take whole SIMD steps.
 fn blit(target: &mut Target<'_>, kernel: Kernel, image: &GlyphImage, place: &Placement) {
     let band = Rect::new(0, place.y, target.width(), place.metrics.height);
     let clip = place.clip.intersect(&band).intersect(&target.bounds());
-    let left = i64::from(place.x) + i64::from(image.left);
-    let top = i64::from(place.y) + i64::from(place.metrics.baseline) - i64::from(image.top);
-    let width = usize::try_from(image.width).unwrap_or(0);
-    for row in 0..image.height {
-        let y = top + i64::from(row);
-        let (Ok(y), Some(start)) =
-            (u32::try_from(y), usize::try_from(row).ok().and_then(|r| r.checked_mul(width)))
-        else {
-            continue;
-        };
-        if y < clip.y || y >= clip.bottom() {
-            continue;
-        }
-        let Some((x, skip, len)) = clip_span(left, image.width, clip) else { return };
-        let Some(dst) = target.span_mut(y, x, len) else { continue };
-        let from = start + skip;
-        match &image.pixels {
-            Pixels::Mask(mask) => {
-                if let Some(mask) = mask.get(from..from + dst.len()) {
-                    kernel.blend_mask(dst, mask, place.color.pixel());
-                }
+    let left = i64::from(place.x) + i64::from(image.left) + i64::from(place.shift.0);
+    let top = i64::from(place.y) + i64::from(place.metrics.baseline) - i64::from(image.top)
+        + i64::from(place.shift.1);
+    let columns = clip_span(left, image.stride, (clip.x, clip.right()));
+    let lines = clip_span(top, image.height, (clip.y, clip.bottom()));
+    let (Some((x, skip, width)), Some((y, first, rows))) = (columns, lines) else { return };
+    let (Ok(stride), Ok(width), Ok(rows), Ok(target_stride)) = (
+        usize::try_from(image.stride),
+        usize::try_from(width),
+        usize::try_from(rows),
+        usize::try_from(target.width()),
+    ) else {
+        return;
+    };
+    let shape = Shape { width, rows, dst_stride: target_stride, src_stride: stride };
+    let from = first * stride + skip;
+    let Some(dst) = target.tail_mut(x, y) else { return };
+    match &image.pixels {
+        Pixels::Mask(mask) => {
+            if let Some(mask) = mask.get(from..) {
+                kernel.blend_mask_rect(dst, mask, place.color.pixel(), shape);
             }
-            Pixels::Color(color) => {
-                if let Some(color) = color.get(from..from + dst.len()) {
-                    kernel.blend_color(dst, color);
-                }
+        }
+        Pixels::Color(pixels) => {
+            if let Some(pixels) = pixels.get(from..) {
+                kernel.blend_color_rect(dst, pixels, shape);
             }
         }
     }
 }
 
-/// The visible part of a glyph row starting at `left` and `width` pixels wide: target x, pixels
-/// skipped at the left, length.
-fn clip_span(left: i64, width: u32, clip: Rect) -> Option<(u32, usize, u32)> {
-    let start = left.max(i64::from(clip.x));
-    let end = (left + i64::from(width)).min(i64::from(clip.right()));
-    if end <= start {
+/// The visible part of `len` pixels starting at `start` inside `lo..hi`: where it starts on the
+/// target, how many pixels are skipped at its start, how many remain.
+fn clip_span(start: i64, len: u32, (lo, hi): (u32, u32)) -> Option<(u32, usize, u32)> {
+    let from = start.max(i64::from(lo));
+    let to = (start + i64::from(len)).min(i64::from(hi));
+    if to <= from {
         return None;
     }
-    let x = u32::try_from(start).ok()?;
-    let skip = usize::try_from(start - left).ok()?;
-    Some((x, skip, u32::try_from(end - start).ok()?))
+    Some((
+        u32::try_from(from).ok()?,
+        usize::try_from(from - start).ok()?,
+        u32::try_from(to - from).ok()?,
+    ))
 }
 
 /// Cells an advance of `advance` pixels takes on a grid of `cell_width`: none for a combining

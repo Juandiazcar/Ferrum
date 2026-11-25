@@ -15,6 +15,7 @@ use crate::blit::Kernel;
 use crate::color::Rgb;
 use crate::font::metrics::f32_from;
 use crate::font::{CellMetrics, Fonts, Glyph, Presentation, TextStyle};
+use crate::synth;
 use crate::target::{Rect, Target};
 
 /// A glyph's advance may exceed the cell width by up to half a pixel and still take one cell:
@@ -97,6 +98,12 @@ impl Glyphs {
             if is_ignorable(ch) {
                 continue;
             }
+            if synth::is_synthesized(ch) {
+                let x = run.x.saturating_add(column * run.metrics.width);
+                self.draw_synthetic(target, ch, &Placement { x, ..placement(run) });
+                (last_x, column) = (x, column + 1);
+                continue;
+            }
             let presentation = presentation(ch, chars.peek().copied());
             let glyph = self.fonts.glyph(ch, run.style, presentation);
             let x = run.x.saturating_add(column * run.metrics.width);
@@ -124,12 +131,37 @@ impl Glyphs {
         }
     }
 
-    /// The cached image of `glyph` on the grid of `metrics`, rasterizing it on a miss. A glyph
-    /// larger than the whole cache is not kept (and so not drawn: it cannot be on screen).
+    /// Draws the synthesized `ch` (box drawing, blocks, powerline) over the cell at `place`.
+    pub(crate) fn draw_synthetic(&mut self, target: &mut Target<'_>, ch: char, place: &Placement) {
+        let metrics = place.metrics;
+        let key = GlyphKey::Synthetic {
+            ch,
+            width: metrics.width,
+            height: metrics.height,
+            light: metrics.stroke,
+        };
+        let kernel = self.kernel;
+        let make = |_: &Fonts, _: &mut Rasterizer| {
+            let canvas = synth::draw(ch, metrics.width, metrics.height, metrics.stroke)?;
+            Some(GlyphImage {
+                left: 0,
+                top: i32::try_from(metrics.baseline).ok()?,
+                width: canvas.width,
+                height: canvas.height,
+                advance: f32_from(metrics.width),
+                pixels: Pixels::Mask(canvas.pixels),
+            })
+        };
+        if let Some(image) = self.image(key, make) {
+            blit(target, kernel, image, place);
+        }
+    }
+
+    /// The cached image of `glyph` on the grid of `metrics`, rasterizing it on a miss.
     fn cached(&mut self, glyph: Glyph, metrics: &CellMetrics) -> Option<&GlyphImage> {
         // Color glyphs (emoji) are wide: they are fitted to two cells.
         let fit = Fit { width: metrics.width.saturating_mul(2), height: metrics.height };
-        let key = GlyphKey {
+        let key = GlyphKey::Font {
             face: glyph.face,
             id: glyph.id,
             size_q: metrics.size_q,
@@ -137,11 +169,21 @@ impl Glyphs {
             synth: glyph.synth,
             fit: (fit.width, fit.height),
         };
+        let size = f32_from(metrics.size_q) / crate::font::metrics::SIZE_Q_ONE;
+        self.image(key, |fonts, raster| raster.render(fonts, glyph, size, fit))
+    }
+
+    /// The image of `key`, made by `make` and cached on a miss. An image larger than the whole
+    /// cache is not kept (nor drawn: it could not fit the screen).
+    fn image(
+        &mut self,
+        key: GlyphKey,
+        make: impl FnOnce(&Fonts, &mut Rasterizer) -> Option<GlyphImage>,
+    ) -> Option<&GlyphImage> {
         if let Some(slot) = self.cache.lookup(&key) {
             return self.cache.image(slot);
         }
-        let size = f32_from(metrics.size_q) / crate::font::metrics::SIZE_Q_ONE;
-        let image = self.raster.render(&self.fonts, glyph, size, fit)?;
+        let image = make(&self.fonts, &mut self.raster)?;
         let slot = self.cache.insert(key, image).ok()?;
         self.cache.image(slot)
     }

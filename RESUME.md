@@ -4,7 +4,7 @@ Handoff document so a new AI session (or a human) can pick up the work exactly w
 It is updated at every milestone (merge, WP state change, agent launch) and before a session's
 context runs out. `PROGRESS.md` remains the per-WP record; this file is the "how to resume" view.
 
-Last update: 2026-11-24: WP-02 merged; WP-03, WP-04 (fixing 32 audit blockers) and WP-05 in progress in parallel.
+Last update: 2026-11-25: WP-00..WP-06 merged; WP-07 `ferrum-render` in progress.
 
 ## 1. How to resume (paste into a new Claude Code session, working directory `Ferrum/`)
 
@@ -21,8 +21,8 @@ Opus subagents implement. Ask the maintainer only on real doubts.
 - Repository: https://github.com/Juandiazcar/Ferrum.
 - Spec: `docs/spec/`. Work order: `docs/spec/docs/12-build-order.md`.
 - Agent manual: `CLAUDE.md`. Project skills: `.claude/skills/ferrum-{wp,audit,git,deps}`.
-- ADRs: `docs/adr/` (0001, 0016, 0022–0027). Resolved decisions: `docs/spec/docs/14-risks-and-decisions.md` §2
-  (next free open-question number: Q-31; Q-29/Q-30 are being recorded by the WP-04 stack).
+- ADRs: `docs/adr/` (0001, 0016, 0022–0028). Resolved decisions: `docs/spec/docs/14-risks-and-decisions.md` §2
+  (next free open-question number: Q-35).
 
 ## 3. Workflow (agreed with the maintainer)
 
@@ -50,6 +50,12 @@ Opus subagents implement. Ask the maintainer only on real doubts.
 - `main` is protected: branches + PR + squash merge only. Never push or force-push `main`.
 - Maintainer personal data (e.g. email) is private: never send it to external services.
 - Repository content is English only.
+- **The spec is followed to the letter** (2026-11-24): never edit `docs/spec/` to add exceptions, deviations or
+  rationale; the code changes instead. OS behavior is identical unless `docs/11` §5 lists the difference. Only
+  real maintainer decisions are recorded (`docs/14` §2).
+- Every user-facing value the spec does not fix is a setting; internal caps are named constants with a reason,
+  all listed in the Q-30 row (Q-30).
+- The maintainer does not run benches: agents measure on hosted runners (Q-27 amended).
 
 ### Technical rules checked in every audit
 
@@ -64,44 +70,36 @@ verified on crates.io, `default-features = false`, recorded in `docs/07` · inte
 
 GitHub closes a stacked PR when its base branch is deleted, and `gh pr merge` on an upper PR merges into its
 stacked base, not `main`. Merge one at a time: before merging N run `gh pr edit <N+1> --base main`; after the
-merge run `git rebase --onto origin/main <old tip of N>`, push, wait for CI, merge. Never loop the chain blindly.
+merge run `git rebase --onto origin/main <ORIGINAL tip of N> <N+1>` (snapshot every branch tip before the first
+merge, never the rebased one), push, wait for CI, merge. A PR BEHIND `main` is rebased on `main` first; a branch
+checked out in another worktree is detached there first. Never loop the chain blindly. Each subagent gets its own
+scratch folder (shared ones got overwritten).
 
-## 4. Status (2026-11-24)
+## 4. Status (2026-11-25)
 
-Done and on `main` (CI green): WP-00 bootstrap, spikes S1–S4, RESUME.md (#17), WP-01 `ferrum-scrollback`
-(PRs #9, #10, #14, #15, #16 — commit `98eb763`), WP-02 `ferrum-vt` (#36–#53, #55 — commit `6b54abb`).
+Done and on `main` (CI green): WP-00 bootstrap, spikes S1–S4, WP-01 `ferrum-scrollback` (#9–#16), WP-02 `ferrum-vt`
+(#36–#53, #55), WP-04 `ferrum-config` + `ferrum-project` (#57–#60), WP-05 `ferrum-pty` (#62–#64), WP-03
+`ferrum-proto` (#65–#67), dhat harness fix (#89), WP-06 `ferrum-daemon` (#90–#96, last commit `a071f25`).
 
-Measured: S1 0.68 MB/session (WP-01 crate side ~0.43 MB) · S2 system allocator on Linux/Windows, mimalloc on
-macOS · S3 repaint ~1.0 ms typical / ~2.6–2.8 ms dense (i5-9400) · S4 direct ConPTY via windows-sys
-(portable-pty has bugs), 5–6 MB/s.
+Measured: S1 0.68 MB/session · S2 system allocator on Linux/Windows, mimalloc on macOS · S3 repaint ~1.0 ms
+typical / ~2.6–2.8 ms dense (i5-9400) · S4 direct ConPTY via windows-sys · WP-06 `memcheck --daemon-only`
+10.5 / 10.7 / 10.3 MB (Linux / macOS / Windows, allowance 18 MB), flood echo p99 ≤ 2.8 ms (gate 10 ms).
+
+Decisions taken in WP-02..WP-06: Q-28 (NFR-PERF-02 accepted as measured), Q-29 ProjectId = UUID, Q-30 settings vs
+constants, Q-31 one overlapped `pty-io` thread on Windows, Q-32 daemon IPC on mio / `interprocess` only in the UI,
+Q-33 Windows child exit on a named `pty-exit` thread, Q-34 flood gate p50 ±10 % (paired runs), p99 absolute.
 
 ## 5. Exact resume point
 
-- **WP-02 `ferrum-vt` is merged** (stack #36–#53 + #55, last commit `6b54abb`, 2026-11-24). Q-28: NFR-PERF-02 ASCII
-  with push accepted as measured (hosted runners give random CPUs). Temporary branches and WP-02 worktrees deleted.
-- **WP-04** `ferrum-config` + `ferrum-project`: stack #57 → #58 → #59 → #60 (worktree `Ferrum-wt-wp04`). Single-pass
-  audit found 32 blockers (posted on #60). Maintainer decisions to record in docs/14 by that stack: **Q-29 ProjectId =
-  UUID** (uuid enters v1.0); **Q-30 every self-chosen user-facing value becomes a setting** (internal anti-hostile
-  parser caps stay constants with a documented reason). Next: the implementer fixes all 32 → ONE verification
-  (listed findings + fix code + gates) → merge with the stacked procedure.
-- **WP-03** `ferrum-proto`: Opus implementer in worktree `Ferrum-wt-wp03` (branch `feat/wp03-proto`).
-- **WP-05** `ferrum-pty`: Opus implementer in worktree `Ferrum-wt-wp05` (branch `feat/wp05-pty`).
-- Then WP-06 `ferrum-daemon` (needs WP-02..WP-05).
-- Stacked merges: track each branch's ORIGINAL tip before rebasing the next one onto `origin/main`
-  (`git rebase --onto origin/main <original tip of N> <N+1>`); `main` requires branches to be up to date.
+- **WP-07 `ferrum-render`**: Opus implementer in worktree `Ferrum-wt-wp07` (started 2026-11-25). Next: single-pass
+  audit of its PRs → fixes → ONE verification → stacked merge.
+- Then WP-08 `ferrum-ui` + `ferrum-app`. **Before WP-08: the maintainer measures on a real Mac (MV-S3-1, Q-20).**
 
-## 6. What remains (21 WPs total; 19 left including WP-02)
+## 6. What remains (21 WPs total; 13 left)
 
-- Stage 1: WP-03 `ferrum-proto`, WP-04 `ferrum-config` + `ferrum-project`.
-- Stage 2: WP-05 `ferrum-pty` (direct windows-sys ConPTY, contract tests PT-01..PT-25), WP-06 `ferrum-daemon`
-  (+ CI job `memcheck --daemon-only` per ADR 0022; wrapped-row search join; compression on the worker thread).
-- Stage 3: WP-07 `ferrum-render` (must meet 2.5 ms dense on the i5-9400 and in CI — Q-19), WP-08 `ferrum-ui` +
-  `ferrum-app` (full memcheck + required check + soak). **Before WP-08: the maintainer measures on a real Mac
-  (MV-S3-1, Q-20).**
-- Stage 4: WP-09 to WP-15. Stage 5: WP-16 to WP-20 (release candidate).
-
-Maintainer to-do: recapture `benches/baselines/windows.json` on a quiet machine before release (it currently
-reads +9–14% from machine state, not code).
+- Stage 3: WP-07 `ferrum-render` (2.5 ms dense on i5/CI — Q-19), WP-08 `ferrum-ui` + `ferrum-app`.
+- Stage 4: WP-09 to WP-15. Stage 5: WP-16 to WP-20 (release candidate; WP-20 needs the maintainer).
+- Known nit: the vt and scrollback fuzz crates' path deps lack `version = "0.1.0"`.
 
 ## 7. Initial maintainer instructions (translated from Spanish, intent preserved)
 

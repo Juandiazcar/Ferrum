@@ -64,7 +64,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | OS randomness | `getrandom` | 0.4.3 (verified 2026-11-24, latest stable; `default-features = false`; already compiled through `uuid`) | platform | the 32-byte handshake nonce of the daemon (`docs/10` §2); a direct dependency instead of drawing bytes from UUIDs |
 | mimalloc control | `libmimalloc-sys` | 0.1.49 (verified 2026-11-25, latest stable; already compiled under `mimalloc`; MIT) | platform (macOS) | `default-features = false`, `extended`: `mi_collect(true)` returns freed memory of the macOS allocator when the daemon is idle (`docs/03` §3 rule 7, ADR 0016) |
 | Error types | `thiserror` | 2.0.21 (2026-11-23, latest stable) | libs | `default-features = false`, `std` |
-| Error context (bins) | `anyhow` | 1.0.104 | app, daemon, xtask | |
+| Error context (bins) | `anyhow` | 1.0.105 (bumped 2026-11-24, latest stable; `default-features = false`, `std`) | app, daemon, xtask | `ferrumd` (`src/main.rs`) only in the daemon crate |
 | Logging | `tracing` | 0.1.44 (2026-11-23, latest stable) | all | `default-features = false`, `std` and `release_max_level_warn` (the `max_level_*` features compile out debug/trace in release) |
 | Log sink | `tracing-subscriber` | 0.3.23 | app, daemon | `default-features = false`, `fmt` only; own tiny rotating file writer |
 | Update download | `ureq` | 3.5.2 | app (updater) | blocking, small; `rustls` backend |

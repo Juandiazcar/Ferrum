@@ -1,0 +1,173 @@
+//! Rasterization with `swash`: grayscale anti-aliased coverage for text, premultiplied color for
+//! emoji (`docs/02` §6: grayscale AA is the default).
+
+use swash::FontRef;
+use swash::scale::image::{Content, Image};
+use swash::scale::{Render, ScaleContext, Source, StrikeWith};
+use swash::zeno::{Angle, Format, Transform};
+
+use super::cache::{GlyphImage, Pixels};
+use crate::font::{Face, Fonts, Glyph};
+
+/// Synthetic italic slant: the default angle of CSS `font-style: oblique` (CSS Fonts 4, §2.3).
+const OBLIQUE_DEGREES: f32 = 14.0;
+/// Synthetic bold strength as a fraction of the size: `FreeType`'s `FT_GlyphSlot_Embolden` uses
+/// one 24th of the em.
+const EMBOLDEN_FRACTION: f32 = 1.0 / 24.0;
+
+/// Color faces: layered outlines (`COLR`), then color bitmaps (`CBDT`, `sbix`), then outlines.
+const COLOR_SOURCES: [Source; 3] =
+    [Source::ColorOutline(0), Source::ColorBitmap(StrikeWith::BestFit), Source::Outline];
+/// Text faces: outlines, then the face's own grayscale bitmaps.
+const TEXT_SOURCES: [Source; 2] = [Source::Outline, Source::Bitmap(StrikeWith::BestFit)];
+
+/// Where a color glyph must fit: at most `width` × `height` pixels.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Fit {
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+}
+
+/// The `swash` scaler state and its scratch image, reused for every glyph.
+pub(crate) struct Rasterizer {
+    context: ScaleContext,
+    image: Image,
+}
+
+impl std::fmt::Debug for Rasterizer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Rasterizer").finish_non_exhaustive()
+    }
+}
+
+impl Rasterizer {
+    pub(crate) fn new() -> Self {
+        Self { context: ScaleContext::new(), image: Image::new() }
+    }
+
+    /// Rasterizes `glyph` at `size` physical pixels per em. A color glyph larger than `fit` is
+    /// drawn again at the size that fits. `None` when the face cannot be read or the glyph has
+    /// no image (a space: the caller draws nothing).
+    pub(crate) fn render(
+        &mut self,
+        fonts: &Fonts,
+        glyph: Glyph,
+        size: f32,
+        fit: Fit,
+    ) -> Option<GlyphImage> {
+        let face = fonts.face(glyph.face)?;
+        let mut image = self.render_at(fonts, face, glyph, size)?;
+        if face.is_color() && (image.width > fit.width || image.height > fit.height) {
+            let scale = ratio(fit.width, image.width).min(ratio(fit.height, image.height));
+            image = self.render_at(fonts, face, glyph, size * scale)?;
+        }
+        Some(image)
+    }
+
+    fn render_at(
+        &mut self,
+        fonts: &Fonts,
+        face: &Face,
+        glyph: Glyph,
+        size: f32,
+    ) -> Option<GlyphImage> {
+        let request = Request { face, glyph, size };
+        face.with_font(fonts.system(), |font| {
+            let ok = self.scale_into(font, &request);
+            let advance = font.glyph_metrics(&[]).scale(size).advance_width(glyph.id);
+            ok.then(|| convert(&self.image, advance))
+        })
+        .flatten()
+        .flatten()
+    }
+
+    fn scale_into(&mut self, font: FontRef<'_>, request: &Request<'_>) -> bool {
+        let Request { face, glyph, size } = *request;
+        let is_color = face.is_color();
+        let mut scaler = self
+            .context
+            .builder(font)
+            .size(size)
+            .hint(!is_color)
+            .variations(face.weight_setting(glyph.weight))
+            .build();
+        let sources: &[Source] = if is_color { &COLOR_SOURCES } else { &TEXT_SOURCES };
+        let mut render = Render::new(sources);
+        let _format = render.format(Format::Alpha);
+        if glyph.synth.embolden {
+            let _bold = render.embolden(size * EMBOLDEN_FRACTION);
+        }
+        if glyph.synth.oblique {
+            let slant = Transform::skew(Angle::from_degrees(OBLIQUE_DEGREES), Angle::ZERO);
+            let _oblique = render.transform(Some(slant));
+        }
+        render.render_into(&mut scaler, glyph.id, &mut self.image)
+    }
+}
+
+/// One glyph to rasterize.
+#[derive(Clone, Copy)]
+struct Request<'a> {
+    face: &'a Face,
+    glyph: Glyph,
+    size: f32,
+}
+
+/// The cacheable form of `image`; `None` for an empty one.
+fn convert(image: &Image, advance: f32) -> Option<GlyphImage> {
+    let placement = image.placement;
+    let area = usize::try_from(u64::from(placement.width) * u64::from(placement.height)).ok()?;
+    if area == 0 {
+        return None;
+    }
+    let pixels = match image.content {
+        Content::Mask => Pixels::Mask(image.data.get(..area)?.to_vec()),
+        Content::Color | Content::SubpixelMask => {
+            let straight = matches!(image.source, Source::ColorBitmap(_) | Source::Bitmap(_));
+            let rgba = image.data.get(..area.checked_mul(4)?)?;
+            Pixels::Color(
+                rgba.as_chunks::<4>().0.iter().map(|&px| premultiply(px, straight)).collect(),
+            )
+        }
+    };
+    Some(GlyphImage {
+        left: placement.left,
+        top: placement.top,
+        width: placement.width,
+        height: placement.height,
+        advance,
+        pixels,
+    })
+}
+
+/// One RGBA pixel as premultiplied `0xAARRGGBB`. `swash` composites color outlines already
+/// premultiplied; decoded bitmaps (PNG strikes) are straight alpha.
+fn premultiply(rgba: [u8; 4], straight: bool) -> u32 {
+    let [red, green, blue, alpha] = rgba;
+    let scale = |channel: u8| {
+        if straight {
+            let t = u32::from(channel) * u32::from(alpha) + 128;
+            (t + (t >> 8)) >> 8
+        } else {
+            u32::from(channel.min(alpha))
+        }
+    };
+    u32::from(alpha) << 24 | scale(red) << 16 | scale(green) << 8 | scale(blue)
+}
+
+#[allow(clippy::cast_precision_loss, reason = "glyph sides are far below 2^24")]
+fn ratio(limit: u32, actual: u32) -> f32 {
+    if actual == 0 { 1.0 } else { limit as f32 / actual as f32 }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn straight_alpha_is_premultiplied_and_premultiplied_is_kept() {
+        assert_eq!(premultiply([255, 128, 0, 128], true), 0x8080_4000);
+        assert_eq!(premultiply([200, 100, 0, 100], false), 0x6464_6400);
+        assert_eq!(premultiply([10, 20, 30, 255], true), 0xFF0A_141E);
+    }
+}

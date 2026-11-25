@@ -38,4 +38,5 @@ missing_panics_doc = "warn"
 [dependencies]
 swash = { workspace = true }
 fontdb = { workspace = true }
+rustc-hash = { workspace = true }
 thiserror = { workspace = true }

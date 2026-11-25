@@ -7,7 +7,7 @@
 |---|---|
 | Allowed internal dependencies | none (no windowing; takes plain values, not config types) |
 | Must never depend on | winit, softbuffer, ferrum-config and any other ferrum crate |
-| External dependencies | `swash` (shaping, rasterization), `fontdb` (system font discovery), `thiserror` |
+| External dependencies | `swash` (shaping, rasterization), `fontdb` (system font discovery), `rustc-hash` (cache maps), `thiserror` |
 | `unsafe` | allowed only in the blit kernels (`#![deny(unsafe_code)]` + one local `#[allow]`) |
 
 ## Public API
@@ -20,7 +20,21 @@
 - `font::FontSpec`: logical size, scale factor (HiDPI, fractional included), line height and
   letter spacing, all plain values the UI takes from the settings.
 
+- `Glyphs`: the `Fonts`, the glyph cache and the blit kernels of one window.
+  `Glyphs::draw_text(&mut Target, &TextRun)` draws a line on the cell grid (one cell per
+  character, two for a wide glyph, none for a combining mark).
+- `Target`: the caller's `&mut [u32]` (`0x00RRGGBB`, the `softbuffer` buffer) with its size;
+  `Rect`, `Rgb`.
+
 System font files are memory-mapped by `fontdb` only while they are read; nothing is copied.
+A character the primary face lacks is found through the fallback chain (generic monospace
+families of `docs/11` §2, the emoji fonts, then any system face whose recorded coverage may hold
+it) and memoized.
+
+The glyph cache is a bounded LRU of grayscale coverage masks and premultiplied color images
+(`docs/02` §6), capped in bytes by the caller (the glyph cache setting, default 3 MB). Blending
+uses SSE2 or AVX2 (detected at run time) on `x86_64` and NEON on `aarch64`; tests check every
+kernel against the scalar one bit for bit.
 
 The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2, enforced by
 `cargo xtask check-deps` from `xtask/deps-rules.toml`.

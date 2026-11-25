@@ -21,7 +21,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Windowing | `winit` | 0.30.13 | app | Stable line at check time; 0.31 not stable yet. Re-check before WP-08 |
 | Pixel presentation | `softbuffer` | 0.4.8 | app | CPU buffers, damage presentation; X11, Wayland, Win32, AppKit |
 | Window handles | `raw-window-handle` | 0.6.2 | app | transitive; pinned by winit/softbuffer |
-| 2D chrome drawing | `tiny-skia` | 0.12.0 | render | rounded rects, gradients, shadows on cached tiles only |
+| 2D chrome drawing | `tiny-skia` | 0.12.0 (2026-11-25, latest stable; `default-features = false`, `std` + `simd`, no `png-format`) | render | rounded rects, gradients, shadows on cached tiles only |
 | Fonts: shaping + raster | `swash` | 0.2.10 (2026-11-25, latest stable; `default-features = false`, `std` + `scale` + `render`) | render | one crate for shaping and rasterization incl. color glyphs; avoids `cosmic-text` weight. Brings `skrifa` 0.44, `read-fonts` 0.41, `zeno` 0.3.3, `yazi` 0.2.2 |
 | Font discovery | `fontdb` | 0.24.0 (2026-11-25, latest stable; `default-features = false`, `std` + `fs` + `memmap`, no fontconfig) | render | scans system fonts lazily; memory-maps files (through its own `memmap2`, only while a glyph is looked up or rasterized, so `ferrum-render` holds no mapping and needs no `unsafe` for it) |
 | Font parsing | `ttf-parser` | 0.25.1 | render | transitive via fontdb |

@@ -12,6 +12,7 @@
 
 use std::path::PathBuf;
 
+use ferrum_render::chrome::{Border, RoundedRect, Shadow, Tile};
 use ferrum_render::font::{BOLD_WEIGHT, Family, FontSpec, Fonts, Slant, TextStyle};
 use ferrum_render::{
     Cell, CellText, CellWidth, Cursor, CursorShape, Frame, Glyphs, Grid, Overlay, Painter, Rect,
@@ -237,4 +238,21 @@ fn a_box_drawn_frame_is_seamless() {
         frame.iter().map(|line| text(line, FG, TextStyle::REGULAR)).collect();
     let rows: Vec<Row<'_>> = lines.iter().map(|cells| Row { cells, clusters: "" }).collect();
     check("box_frame", &paint(&rows, 7, Overlay::default(), 1.0));
+}
+
+#[test]
+#[cfg_attr(miri, ignore = "tiny-skia's anti-aliased fill indexes past the tile under Miri only")]
+fn chrome_tiles() {
+    let (width, height) = (160, 72);
+    let mut pixels = vec![BG.pixel(); usize::try_from(width * height).unwrap()];
+    let mut target = Target::new(&mut pixels, width, height).unwrap();
+    let shadow = Shadow { radius: 6, blur: 8, color: Rgb::BLACK, alpha: 160 };
+    let card = Rect::new(16, 12, 128, 40);
+    Tile::shadow(&shadow).unwrap().draw(&mut target, shadow.bounds(card, (0, 4)));
+    let border = Border { color: SELECTION, width: 1.0 };
+    let style = RoundedRect { radius: 6.0, fill: Rgb::new(0x1A, 0x1D, 0x21), border: Some(border) };
+    Tile::rounded_rect(&style).unwrap().draw(&mut target, card);
+    let button = RoundedRect { radius: 6.0, fill: ACCENT, border: None };
+    Tile::rounded_rect(&button).unwrap().draw(&mut target, Rect::new(28, 22, 64, 20));
+    check("chrome_tiles", &Image { width, height, pixels });
 }

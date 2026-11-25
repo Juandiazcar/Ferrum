@@ -31,6 +31,11 @@ A character the primary face lacks is found through the fallback chain (generic 
 families of `docs/11` §2, the emoji fonts, then any system face whose recorded coverage may hold
 it) and memoized.
 
+Box drawing (U+2500–U+257F), block elements (U+2580–U+259F) and the powerline separators
+(U+E0B0–U+E0B3) bypass the font: they are drawn on the cell's own pixel grid (light lines of the
+font's underline thickness, heavy twice that), so lines meet exactly across cells; tests check
+that every arm of every box-drawing character ends on the pixels of the matching straight line.
+
 The glyph cache is a bounded LRU of grayscale coverage masks and premultiplied color images
 (`docs/02` §6), capped in bytes by the caller (the glyph cache setting, default 3 MB). Blending
 uses SSE2 or AVX2 (detected at run time) on `x86_64` and NEON on `aarch64`; tests check every

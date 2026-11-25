@@ -39,7 +39,7 @@ pub struct SealedBlob {
     /// The scrollback it came from (unique per process).
     pub(crate) origin: u64,
     pub(crate) id: u64,
-    pub(crate) blob: Box<[u8]>,
+    pub(crate) blob: Arc<[u8]>,
 }
 
 impl SealedBlob {

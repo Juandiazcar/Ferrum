@@ -10,9 +10,9 @@ use crate::line::DecodedLine;
 /// sequential reads (scrolling, search) decompress each chunk once.
 #[derive(Debug, Default)]
 pub struct LineCursor {
-    chunk: ChunkBuf,
-    spill: Vec<u8>,
-    line: DecodedLine,
+    pub(super) chunk: ChunkBuf,
+    pub(super) spill: Vec<u8>,
+    pub(super) line: DecodedLine,
 }
 
 impl LineCursor {

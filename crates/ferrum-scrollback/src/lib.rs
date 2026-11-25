@@ -49,7 +49,9 @@ pub use limits::{
 };
 pub use line::{DecodedLine, LineFlags, LineRef, Run, StyledRun};
 pub use memory::MemoryReport;
-pub use scrollback::{LineCursor, Scrollback, ScrollbackEvent, SpillDisableCause, SpillState};
+pub use scrollback::{
+    HistorySnapshot, LineCursor, Scrollback, ScrollbackEvent, SpillDisableCause, SpillState,
+};
 pub use search::{CaseMode, Direction, LineMatch, LineMatcher, LiteralMatcher, Search};
-pub use spill::{FileSpill, MemorySpill, SpillHandle, SpillStore};
+pub use spill::{FileSpill, MemorySpill, SpillHandle, SpillReader, SpillStore};
 pub use style::{Style, StyleId, StyleTable};

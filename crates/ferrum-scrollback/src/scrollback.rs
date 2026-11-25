@@ -11,6 +11,9 @@
 mod access;
 mod pending;
 mod retention;
+mod snapshot;
+
+pub use snapshot::HistorySnapshot;
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -66,7 +69,7 @@ pub enum ScrollbackEvent {
 
 #[derive(Debug)]
 enum Place {
-    Ram(Box<[u8]>),
+    Ram(Arc<[u8]>),
     Spilled(SpillHandle),
     /// Full and uncompressed, waiting for [`Scrollback::install`]; `handed` once given out.
     Pending {

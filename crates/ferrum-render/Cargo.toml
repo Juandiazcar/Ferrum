@@ -42,10 +42,15 @@ rustc-hash = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 dhat = { workspace = true }
 ferrum-testkit = { workspace = true }
 insta = { workspace = true }
 png = { workspace = true }
+
+[[bench]]
+name = "repaint"
+harness = false
 
 # `dhat` counts every thread: run on the main thread (ferrum-testkit `single_test`).
 [[test]]

@@ -51,6 +51,15 @@ the machine they were taken on.
   release profile; run 45663852806), as the agents measure under Q-27 as amended: 3.92 ms and
   6.88 ms (medians).
 
+- `render_repaint/dense_200x60` and `render_repaint/typical_200x60` (WP-07, `ferrum-render`: the
+  full repaint of NFR-PERF-03, every cell a glyph per maintainer decision Q-19, and the typical
+  mix; absolute ceiling 5 ms, 2x the 2.5 ms target) and `render_repaint/damage_4_rows` (a frame
+  with four changed rows; no target in `docs/03` §4, so no ceiling) have **no baseline yet**. An
+  agent adds them from a recorded hosted run, as for `daemon_search`; until then
+  `cargo xtask bench` without `--against` reports them as missing baselines, and the nightly
+  `--against HEAD~1` job gates them (+10 %).
+
 **Filled by:** WP-01 (`ferrum-scrollback`: push, read, spilled read, search, in `windows.json`),
 WP-02 (`ferrum-vt`: parse and reflow, no baseline until the reference-machine run, Q-27 as
-amended) and WP-06 (`ferrum-daemon`: search, from a hosted Windows runner).
+amended), WP-06 (`ferrum-daemon`: search, from a hosted Windows runner) and WP-07
+(`ferrum-render`: repaint).

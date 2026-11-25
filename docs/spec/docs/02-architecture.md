@@ -70,7 +70,7 @@ Its grid stores every scrollback cell as a full cell struct (on the order of 20+
 
 ## 4. Protocol (`ferrum-proto`)
 
-- Transport: Unix domain socket (Linux/macOS) / named pipe (Windows), via `interprocess`. Owner-only permissions (see `docs/10`).
+- Transport: Unix domain socket (Linux/macOS) / named pipe (Windows). The daemon serves it with `mio`'s own `UnixListener` / `NamedPipe` on its single I/O loop (maintainer decision Q-32, consistent with Q-31); the UI's blocking IPC thread uses `interprocess`. Owner-only permissions (see `docs/10`).
 - Framing: `u32 length` + `postcard`-encoded message. Max frame 4 MiB. First frame is a handshake `{ protocol_version, client_kind, nonce }`; mismatched major versions are refused with a clear error and the UI offers to restart the daemon.
 - Backward compatibility: additive changes only within a major protocol version; enums are `#[non_exhaustive]`.
 - Key messages:

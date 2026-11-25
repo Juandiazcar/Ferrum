@@ -2,8 +2,8 @@
 //! archive or scrollback, are readable by their owner only).
 //!
 //! On Unix new directories get mode 0700 and new files 0600, set at creation (no window where
-//! they are more open). On Windows the per-user directories already carry an owner-only ACL that
-//! new entries inherit, so plain creation is used. The signatures use `std` types only, so pure
+//! they are more open). On Windows a new directory gets an access list for the user and `SYSTEM`
+//! only, which the files created inside inherit. The signatures use `std` types only, so pure
 //! crates (`ferrum_config::archive::StagingFs`) receive these as function pointers from the
 //! composition roots without depending on this crate.
 
@@ -30,9 +30,9 @@ pub fn create_private_dir(path: &Path) -> io::Result<()> {
         std::os::unix::fs::DirBuilderExt::mode(&mut builder, PRIVATE_DIR_MODE);
         builder.create(path)
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
     {
-        std::fs::DirBuilder::new().create(path)
+        crate::win32::create_private_dir(path)
     }
 }
 

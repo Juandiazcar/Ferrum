@@ -18,6 +18,7 @@ use crate::blit::Kernel;
 use crate::color::Rgb;
 use crate::font::metrics::{SIZE_Q_ONE, f32_from};
 use crate::font::{CellMetrics, Fonts, Glyph, TextStyle};
+use crate::synth;
 use crate::target::{Rect, Target};
 
 /// How text is antialiased (`docs/02` §6).
@@ -63,6 +64,8 @@ pub(crate) struct Placement {
     pub(crate) clip: Rect,
     /// Pen position within its pixel, in steps of 1/`SUBPIXEL_STEPS` px.
     pub(crate) subpixel: u8,
+    /// Cells the glyph spans (2 for a wide cell): a synthesized glyph covers all of them.
+    pub(crate) cells: u32,
 }
 
 /// Where a looked-up glyph image is.
@@ -129,6 +132,12 @@ impl Glyphs {
             if is_ignorable(ch) {
                 continue;
             }
+            if synth::is_synthesized(ch) {
+                let x = run.x.saturating_add(column.saturating_mul(run.metrics.width));
+                self.draw_synthetic(target, ch, &Placement { x, ..placement(run) });
+                (last_x, column) = (x, column.saturating_add(1));
+                continue;
+            }
             let presentation = presentation(ch, chars.peek().copied());
             let glyph = self.fonts.glyph(ch, run.style, presentation);
             let x = run.x.saturating_add(column.saturating_mul(run.metrics.width));
@@ -145,7 +154,7 @@ impl Glyphs {
     /// Cells the glyph's advance takes.
     fn advance(&mut self, glyph: Glyph, metrics: &CellMetrics) -> u32 {
         let stored = self.slot(glyph, metrics, 0);
-        let advance = self.image(stored).and_then(|image| image.advance);
+        let advance = self.stored(stored).and_then(|image| image.advance);
         cells_for(advance, metrics.advance)
     }
 
@@ -155,13 +164,26 @@ impl Glyphs {
         self.blit(target, stored, place);
     }
 
+    /// Draws the synthesized `ch` (box drawing, blocks, powerline) over the cells at `place`.
+    pub(crate) fn draw_synthetic(&mut self, target: &mut Target<'_>, ch: char, place: &Placement) {
+        let metrics = place.metrics;
+        let width = metrics.width.saturating_mul(place.cells.max(1));
+        let key = GlyphKey::Synthetic { ch, width, height: metrics.height, light: metrics.stroke };
+        let make = |_: &Fonts, _: &mut Rasterizer| {
+            let canvas = synth::draw(ch, width, metrics.height, metrics.stroke)?;
+            mask_image(canvas, &metrics)
+        };
+        let stored = self.image(key, make);
+        self.blit(target, stored, place);
+    }
+
     fn blit(&self, target: &mut Target<'_>, stored: Stored, place: &Placement) {
-        if let Some(image) = self.image(stored) {
+        if let Some(image) = self.stored(stored) {
             draw::blit(target, self.kernel, image, place);
         }
     }
 
-    fn image(&self, stored: Stored) -> Option<&GlyphImage> {
+    fn stored(&self, stored: Stored) -> Option<&GlyphImage> {
         match stored {
             Stored::Slot(slot) => self.cache.image(slot),
             Stored::Uncached => self.uncached.as_ref(),
@@ -175,7 +197,7 @@ impl Glyphs {
         // Color glyphs (emoji) are wide: they are fitted to two cells.
         let fit = Fit { width: metrics.width.saturating_mul(2), height: metrics.height };
         let antialias = self.antialias;
-        let key = GlyphKey {
+        let key = GlyphKey::Font {
             face: glyph.face,
             id: glyph.id,
             size_q: metrics.size_q,
@@ -185,13 +207,23 @@ impl Glyphs {
             antialias,
             fit: (fit.width, fit.height),
         };
+        let size = f32_from(metrics.size_q) / SIZE_Q_ONE;
+        let at = At { size, fit, subpixel, antialias };
+        self.image(key, |fonts, raster| raster.render(fonts, glyph, at))
+    }
+
+    /// Where the image of `key` is, made by `make` and cached on a miss. A failed `make` is
+    /// cached as an empty image (not tried again every frame); an image larger than the whole
+    /// cache is kept aside and drawn uncached.
+    fn image(
+        &mut self,
+        key: GlyphKey,
+        make: impl FnOnce(&Fonts, &mut Rasterizer) -> Option<GlyphImage>,
+    ) -> Stored {
         if let Some(slot) = self.cache.lookup(&key) {
             return Stored::Slot(slot);
         }
-        let size = f32_from(metrics.size_q) / SIZE_Q_ONE;
-        let at = At { size, fit, subpixel, antialias };
-        let image =
-            self.raster.render(&self.fonts, glyph, at).unwrap_or_else(|| GlyphImage::empty(None));
+        let image = make(&self.fonts, &mut self.raster).unwrap_or_else(|| GlyphImage::empty(None));
         match self.cache.insert(key, image) {
             Ok(slot) => Stored::Slot(slot),
             Err(image) => {
@@ -204,8 +236,21 @@ impl Glyphs {
     /// Removes the cached glyphs of fallback faces the fonts dropped.
     fn forget_dropped_faces(&mut self) {
         let cache = &mut self.cache;
-        self.fonts.drain_dropped(|face| cache.evict_where(|key| key.face == face));
+        self.fonts.drain_dropped(|face| cache.evict_where(|key| key.is_of(face)));
     }
+}
+
+/// A synthesized mask as an image whose top-left corner is the cell's.
+fn mask_image(canvas: synth::Canvas, metrics: &CellMetrics) -> Option<GlyphImage> {
+    Some(GlyphImage {
+        left: 0,
+        top: i32::try_from(metrics.baseline).ok()?,
+        width: canvas.width,
+        height: canvas.height,
+        stride: canvas.width,
+        advance: Some(f32_from(metrics.width)),
+        pixels: cache::Pixels::Mask(canvas.pixels),
+    })
 }
 
 fn placement(run: &TextRun<'_>) -> Placement {
@@ -216,6 +261,7 @@ fn placement(run: &TextRun<'_>) -> Placement {
         color: run.color,
         clip: run.clip,
         subpixel: 0,
+        cells: 1,
     }
 }
 

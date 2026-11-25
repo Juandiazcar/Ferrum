@@ -6,7 +6,7 @@
 //! last rows of the stream become the new screen; the cursor row stays where it was on screen
 //! whenever the content allows.
 
-use ferrum_scrollback::{LineCursor, LineFlags, LineRef, Scrollback, StyledRun};
+use ferrum_scrollback::{LineCursor, LineFlags, LineRef, Run, Scrollback, StyleTable, StyledRun};
 
 use crate::codec::{Tail, encode_cells, pad_trailing_blanks};
 use crate::core::Core;
@@ -17,6 +17,20 @@ use crate::grid::Grid;
 use crate::history_extras::HistoryExtras;
 use crate::rewrap::{Feed, OutRow, Rewrapper, Rows};
 use crate::size::Size;
+
+/// Rows of history rewrapped between two checks of the stop request: one scrollback chunk.
+const STOP_CHECK_LINES: usize = ferrum_scrollback::HOT_CHUNK_LINES;
+
+/// How a resize ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Reflowed {
+    /// The screen and the whole history have the new width.
+    Complete,
+    /// Stopped on request: the screen has the new width; the history rows not reached yet keep
+    /// the old one until the next resize.
+    Interrupted,
+}
 
 /// The state of one reflow.
 struct Reflow {
@@ -69,6 +83,25 @@ impl Reflow {
         self.flush(out);
     }
 
+    /// Moves every pending row to the scrollback (an interrupted reflow). When the logical line
+    /// continues in the old rows that follow, its last row is marked wrapped, unpadded, so the
+    /// next reflow joins the two parts exactly.
+    fn flush_all(&mut self, out: &mut History<'_>, last: LastRow) {
+        while let Some(mut row) = self.rows.pending.pop_front() {
+            self.front += 1;
+            if last == LastRow::Continues && self.rows.pending.is_empty() {
+                row.flags = row.flags.union(LineFlags::WRAPPED);
+                let line = LineRef { flags: row.flags, text: &row.text, runs: &row.runs };
+                if let Err(error) = out.extras.push(out.scrollback, &line) {
+                    tracing::warn!(%error, "scrollback stored a reflowed row clipped");
+                }
+            } else {
+                push_row(out, &mut row);
+            }
+            self.rows.recycle(row);
+        }
+    }
+
     /// Moves rows that can no longer be on the screen to the scrollback.
     fn flush(&mut self, out: &mut History<'_>) {
         loop {
@@ -83,6 +116,38 @@ impl Reflow {
             push_row(out, &mut row);
             self.rows.recycle(row);
         }
+    }
+}
+
+/// The styles of a stored line's runs, into `out`.
+fn styled_runs(styles: &StyleTable, runs: &[Run], out: &mut Vec<StyledRun>) {
+    out.clear();
+    out.extend(runs.iter().map(|run| StyledRun {
+        style: styles.get(run.style).unwrap_or_default(),
+        len: usize::try_from(run.len).unwrap_or(usize::MAX),
+    }));
+}
+
+/// Whether the logical line of the last rewrapped row goes on in the rows not reached.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LastRow {
+    Ends,
+    Continues,
+}
+
+/// The reading side of one pass over the history.
+struct Pass {
+    /// `pushed_lines` when the pass started: rows from there on are the pass's own output.
+    boundary: u64,
+    cursor: LineCursor,
+    runs: Vec<StyledRun>,
+    /// The first row that could not be read (it is dropped, the pass goes on).
+    first_error: Option<ferrum_scrollback::ScrollbackError>,
+}
+
+impl Pass {
+    fn result(&mut self) -> Result<(), VtError> {
+        self.first_error.take().map_or(Ok(()), |error| Err(error.into()))
     }
 }
 
@@ -108,52 +173,105 @@ impl<S: EventSink> Core<S> {
     /// A history row that cannot be read is dropped from the history and the first such error is
     /// returned at the end: the rows around it keep their order, and the logical line it belonged
     /// to ends at the lost row, so the text before it is never joined to the text after it.
-    pub(crate) fn reflow_primary(&mut self, size: Size) -> Result<(), VtError> {
+    pub(crate) fn reflow_primary(
+        &mut self,
+        size: Size,
+        stop: &mut dyn FnMut() -> bool,
+    ) -> Result<Reflowed, VtError> {
         let mut state = Reflow::new(size, self.primary.cursor.y);
-        let history = self.reflow_history(&mut state);
+        let (history, reflowed) = self.reflow_history(&mut state, stop);
         self.reflow_screen(&mut state);
         if state.open {
             state.finish_line(&mut self.history_out());
         }
         self.install_reflowed(&state, size);
-        history
+        history.map(|()| reflowed)
     }
 
     fn history_out(&mut self) -> History<'_> {
         History { scrollback: &mut self.scrollback, extras: &mut self.extras.history }
     }
 
-    /// Pops the old lines oldest first into `state`.
-    fn reflow_history(&mut self, state: &mut Reflow) -> Result<(), VtError> {
-        let boundary = self.scrollback.pushed_lines();
-        let mut cursor = LineCursor::new();
-        let mut runs: Vec<StyledRun> = Vec::new();
-        let mut first_error = None;
-        while self.scrollback.dropped_lines() < boundary {
-            let line = match self.scrollback.pop_front(&mut cursor) {
+    /// Pops the old lines oldest first into `state`, asking `stop` every chunk of rows.
+    fn reflow_history(
+        &mut self,
+        state: &mut Reflow,
+        stop: &mut dyn FnMut() -> bool,
+    ) -> (Result<(), VtError>, Reflowed) {
+        let mut pass = Pass {
+            boundary: self.scrollback.pushed_lines(),
+            cursor: LineCursor::new(),
+            runs: Vec::new(),
+            first_error: None,
+        };
+        let mut since_check = 0;
+        while self.scrollback.dropped_lines() < pass.boundary {
+            since_check += 1;
+            if since_check == STOP_CHECK_LINES {
+                since_check = 0;
+                if stop() {
+                    self.interrupt(state, &mut pass);
+                    return (pass.result(), Reflowed::Interrupted);
+                }
+            }
+            if !self.rewrap_front(state, &mut pass) {
+                break;
+            }
+        }
+        (pass.result(), Reflowed::Complete)
+    }
+
+    /// Rewraps the oldest row of the history into `state`; false when the history is empty.
+    fn rewrap_front(&mut self, state: &mut Reflow, pass: &mut Pass) -> bool {
+        let line = match self.scrollback.pop_front(&mut pass.cursor) {
+            Ok(Some(line)) => line,
+            Ok(None) => return false,
+            Err(error) => {
+                // The row stays at the front: drop it, or the rewritten rows would end up behind
+                // the ones not yet read. Its loss is reported once, at the end, and the logical
+                // line it continued ends here.
+                pass.first_error.get_or_insert(error);
+                self.scrollback.skip_front();
+                if state.open {
+                    state.finish_line(&mut self.history_out());
+                }
+                return true;
+            }
+        };
+        styled_runs(self.scrollback.styles(), &line.runs, &mut pass.runs);
+        let row = Feed { flags: line.flags, text: &line.text, runs: &pass.runs, cursor_x: None };
+        state.feed(&mut self.history_out(), &row);
+        true
+    }
+
+    /// Stops rewrapping (`docs/05` §5: a long job checks its cancel token at chunk boundaries):
+    /// the rows rewrapped so far go to the history, and the old rows not read yet follow them
+    /// unchanged, so the order is kept and nothing is lost. Those rows keep their old width until
+    /// the next reflow, which joins and cuts every logical line again. A row that cannot be read
+    /// is dropped and reported, as the rewrapping loop does.
+    fn interrupt(&mut self, state: &mut Reflow, pass: &mut Pass) {
+        let last = if state.open { LastRow::Continues } else { LastRow::Ends };
+        if state.open {
+            state.finish_line(&mut self.history_out());
+        }
+        state.flush_all(&mut self.history_out(), last);
+        while self.scrollback.dropped_lines() < pass.boundary {
+            let line = match self.scrollback.pop_front(&mut pass.cursor) {
                 Ok(Some(line)) => line,
                 Ok(None) => break,
                 Err(error) => {
-                    // The row stays at the front: drop it, or the rewritten rows would end up
-                    // behind the ones not yet read. Its loss is reported once, at the end, and
-                    // the logical line it continued ends here.
-                    first_error.get_or_insert(error);
+                    pass.first_error.get_or_insert(error);
                     self.scrollback.skip_front();
-                    if state.open {
-                        state.finish_line(&mut self.history_out());
-                    }
                     continue;
                 }
             };
-            runs.clear();
-            runs.extend(line.runs.iter().map(|run| StyledRun {
-                style: self.scrollback.styles().get(run.style).unwrap_or_default(),
-                len: usize::try_from(run.len).unwrap_or(usize::MAX),
-            }));
-            let row = Feed { flags: line.flags, text: &line.text, runs: &runs, cursor_x: None };
-            state.feed(&mut self.history_out(), &row);
+            styled_runs(self.scrollback.styles(), &line.runs, &mut pass.runs);
+            let copy = LineRef { flags: line.flags, text: &line.text, runs: &pass.runs };
+            let out = self.history_out();
+            if let Err(error) = out.extras.push(out.scrollback, &copy) {
+                tracing::warn!(%error, "scrollback stored a moved row clipped");
+            }
         }
-        first_error.map_or(Ok(()), |error| Err(error.into()))
     }
 
     /// Feeds the rows of the old screen up to the last one with content or the cursor.

@@ -85,6 +85,7 @@ pub use keyboard::{KeyboardFlags, KeyboardStack};
 pub use limits::*;
 pub use modes::{Mode, MouseTracking};
 pub use palette::{ANSI_COLORS, PALETTE_SIZE, Palette, Rgb, Role};
+pub use reflow::Reflowed;
 pub use row::Row;
 pub use screen::{Region, Screen};
 pub use selection::{Point, Selection, SelectionKind};

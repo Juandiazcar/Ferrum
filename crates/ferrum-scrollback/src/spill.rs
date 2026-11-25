@@ -67,6 +67,24 @@ pub trait SpillStore: Send + std::fmt::Debug {
 
     /// Most live bytes the store accepts.
     fn capacity_bytes(&self) -> u64;
+
+    /// A read-only handle on the records live now, for a reader on another thread; `None` when
+    /// the store has nothing to read or cannot share it.
+    fn reader(&self) -> Option<Box<dyn SpillReader>> {
+        None
+    }
+}
+
+/// A read-only handle on a spill store's records, usable from another thread while the store
+/// goes on (a history snapshot reads its spilled chunks through it).
+pub trait SpillReader: Send + Sync + std::fmt::Debug {
+    /// Reads the record into `out`, as [`SpillStore::read`] does. A record that the store has
+    /// discarded since the handle was taken may read as other bytes; the chunk decoder rejects
+    /// them.
+    ///
+    /// # Errors
+    /// [`SpillError::UnknownHandle`] or [`SpillError::Io`].
+    fn read(&self, handle: SpillHandle, out: &mut Vec<u8>) -> Result<(), SpillError>;
 }
 
 /// Shared capacity check for implementations.

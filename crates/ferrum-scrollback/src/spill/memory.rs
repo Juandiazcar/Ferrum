@@ -2,15 +2,16 @@
 
 use std::collections::VecDeque;
 use std::io;
+use std::sync::Arc;
 
-use super::{SpillHandle, SpillStore, check_room};
+use super::{SpillHandle, SpillReader, SpillStore, check_room};
 use crate::error::SpillError;
 
 /// Keeps records in RAM. Not for production: it exists so the scrollback spill logic is tested
 /// without touching the disk, including disk-full behavior ([`fail_appends_after`](Self::fail_appends_after)).
 #[derive(Debug)]
 pub struct MemorySpill {
-    records: VecDeque<(u64, Box<[u8]>)>,
+    records: VecDeque<(u64, Arc<[u8]>)>,
     next_seq: u64,
     live: u64,
     capacity: u64,
@@ -52,7 +53,7 @@ impl SpillStore for MemorySpill {
         let seq = self.next_seq;
         self.next_seq += 1;
         self.live += len;
-        self.records.push_back((seq, Box::from(record)));
+        self.records.push_back((seq, Arc::from(record)));
         Ok(SpillHandle { seq, offset: 0, len })
     }
 
@@ -79,5 +80,28 @@ impl SpillStore for MemorySpill {
 
     fn capacity_bytes(&self) -> u64 {
         self.capacity
+    }
+
+    fn reader(&self) -> Option<Box<dyn SpillReader>> {
+        Some(Box::new(MemoryReader { records: self.records.iter().cloned().collect() }))
+    }
+}
+
+/// The records of a [`MemorySpill`] at one moment, shared.
+#[derive(Debug)]
+struct MemoryReader {
+    records: Vec<(u64, Arc<[u8]>)>,
+}
+
+impl SpillReader for MemoryReader {
+    fn read(&self, handle: SpillHandle, out: &mut Vec<u8>) -> Result<(), SpillError> {
+        let (_, bytes) = self
+            .records
+            .iter()
+            .find(|(seq, _)| *seq == handle.seq)
+            .ok_or(SpillError::UnknownHandle)?;
+        out.clear();
+        out.extend_from_slice(bytes);
+        Ok(())
     }
 }

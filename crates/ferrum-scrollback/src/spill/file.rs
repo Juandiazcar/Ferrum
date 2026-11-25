@@ -10,7 +10,7 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 
 use super::positional::{read_exact_at, write_all_at};
-use super::{SpillHandle, SpillStore, check_room};
+use super::{SpillHandle, SpillReader, SpillStore, check_room};
 use crate::error::SpillError;
 
 #[derive(Debug, Clone, Copy)]
@@ -109,6 +109,35 @@ impl SpillStore for FileSpill {
 
     fn capacity_bytes(&self) -> u64 {
         self.capacity
+    }
+
+    fn reader(&self) -> Option<Box<dyn SpillReader>> {
+        let file = self.file.as_ref()?.try_clone().ok()?;
+        let records = self.records.iter().copied().collect();
+        Some(Box::new(FileReader { file, capacity: self.capacity, records }))
+    }
+}
+
+/// A read-only handle on the records of a [`FileSpill`] at one moment.
+#[derive(Debug)]
+struct FileReader {
+    file: File,
+    capacity: u64,
+    records: Vec<Record>,
+}
+
+impl SpillReader for FileReader {
+    fn read(&self, handle: SpillHandle, out: &mut Vec<u8>) -> Result<(), SpillError> {
+        let record = self
+            .records
+            .iter()
+            .find(|record| record.seq == handle.seq && record.offset == handle.offset)
+            .ok_or(SpillError::UnknownHandle)?;
+        let len = usize::try_from(record.len).map_err(|_| SpillError::UnknownHandle)?;
+        out.clear();
+        out.resize(len, 0);
+        read_ring(&self.file, self.capacity, record.offset, out)?;
+        Ok(())
     }
 }
 

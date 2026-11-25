@@ -36,7 +36,7 @@ impl StyleId {
 }
 
 /// Interned styles of one session.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StyleTable {
     styles: Vec<Style>,
     // perf: Fx hashing; a style is hashed once per run of every pushed line (bench

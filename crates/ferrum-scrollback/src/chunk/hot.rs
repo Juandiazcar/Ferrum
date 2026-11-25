@@ -13,7 +13,7 @@ pub(crate) fn free_if_above_keep(buffer: &mut Vec<u8>) {
 }
 
 /// Up to [`HOT_CHUNK_LINES`] encoded lines back to back plus the start offset of each.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct HotChunk {
     data: Vec<u8>,
     starts: Vec<u32>,

@@ -63,6 +63,7 @@ oldest                                                              newest
 | `read_line(index, &mut LineCursor)` | random access, 0 = oldest retained line |
 | `pop_front(&mut LineCursor)` | removes and returns the oldest line; lets `ferrum-vt` rewrite history for reflow by popping the front and pushing at the back, freeing chunks as it goes |
 | `search(matcher, Direction, start)` | iterator of `LineMatch` over decoded lines; `LineMatcher` is the regex hook, `LiteralMatcher` does substring with a case toggle (matching is per row) |
+| `snapshot()` | `HistorySnapshot`: the retained lines at one moment, readable from another thread (sealed and pending chunks shared, hot chunk and styles copied, spilled chunks through `SpillStore::reader`) while the store goes on |
 | `memory_report()` | capacity-based bytes by category: hot chunk, sealed, pending, misc, shared scratch, spill disk; inline seals |
 | `take_event()`, `spill_state()`, `dropped_lines()` | spill and eviction status |
 | `SpillStore`, `FileSpill`, `MemorySpill` | the seam, the file ring, the in-memory fake with failure injection |

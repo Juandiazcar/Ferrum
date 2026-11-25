@@ -41,6 +41,8 @@ selection model, damage tracking and the event sink (`docs/02` §3).
 | `Terminal::new(Size, Scrollback, sink)` | create a terminal |
 | `parse(&[u8])` | feed program output (never panics, never fails) |
 | `resize(Size)` | resize with reflow |
+| `resize_until(Size, stop)` | the same, asking `stop` every 1 024 history rows; on a stop the rest of the history keeps its width until the next resize (`Reflowed::Interrupted`) |
+| `reflow_until(stop)` | rewraps again at the current size (continues an interrupted reflow), margins and modes kept |
 | `grid()`, `screen()`, `cursor()`, `modes()`, `scrollback()`, `palette()`, `extras()`, `title()`, `cwd()`, `keyboard_flags()`, `cursor_style()` | read the state |
 | `take_pending_chunk()` / `install_sealed_chunk(SealedBlob)` | hand full history chunks to the worker between reads and put the sealed blobs back (`docs/02` §5, ADR 0028 decision 8) |
 | `damage()` / `take_damage()` | dirty rows since the last take |

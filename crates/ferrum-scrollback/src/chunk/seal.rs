@@ -1,5 +1,7 @@
 //! Sealing: LZ4-compress a full chunk into a blob with a delta-encoded line index.
 
+use std::sync::Arc;
+
 use lz4_flex::block::{CompressTable, compress_into_with_table, get_maximum_output_size};
 
 use super::hot::free_if_above_keep;
@@ -69,7 +71,7 @@ impl ChunkSealer {
     }
 
     /// Builds the sealed blob of `hot` (which must hold at least one line).
-    pub(crate) fn seal_hot(&mut self, hot: &HotChunk) -> Result<Box<[u8]>, ScrollbackError> {
+    pub(crate) fn seal_hot(&mut self, hot: &HotChunk) -> Result<Arc<[u8]>, ScrollbackError> {
         #[cfg(test)]
         if let Some(left) = self.failing_after.as_mut() {
             *left = left.checked_sub(1).ok_or(ScrollbackError::Compress)?;
@@ -96,7 +98,8 @@ impl ChunkSealer {
         let written = compress_into_with_table(raw, target, &mut self.table)
             .map_err(|_| ScrollbackError::Compress)?;
         self.out.truncate(header + written);
-        let blob = Box::from(self.out.as_slice());
+        // Shared, so a history snapshot can hold it while the session goes on (one allocation).
+        let blob = Arc::from(self.out.as_slice());
         free_if_above_keep(&mut self.out);
         free_if_above_keep(&mut self.index);
         Ok(blob)
@@ -121,7 +124,7 @@ mod tests {
     use crate::line::{DecodedLine, LineFlags, LineRef};
     use crate::style::StyleTable;
 
-    fn sealed_blob(texts: &[&str]) -> Box<[u8]> {
+    fn sealed_blob(texts: &[&str]) -> Arc<[u8]> {
         let (mut styles, mut encoder, mut hot) =
             (StyleTable::new(), Encoder::default(), HotChunk::new());
         for text in texts {

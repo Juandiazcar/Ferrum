@@ -2,26 +2,25 @@
 //!
 //! The pseudoconsole is created with `PSEUDOCONSOLE_INHERIT_CURSOR`, the configuration measured by
 //! spike S4 (`docs/11` §4): its first output is the cursor query `ESC[6n`, which withholds
-//! everything else until the session layer answers it (W1). Its input is an anonymous pipe
-//! (`std::io::pipe`, synchronous); its output is a named pipe whose end in this process is
-//! overlapped and served, with every other session's, by the backend's single I/O thread
-//! ([`driver`], maintainer decision Q-31): readers report [`Readiness::Notify`](crate::Readiness)
-//! and no thread runs per session. The child is started with
+//! everything else until the session layer answers it (W1). Its input and output are named
+//! pipes whose ends in this process are overlapped and served, with every other session's, by the
+//! backend's single I/O thread ([`driver`], maintainer decision Q-31; [`input`]): readers and
+//! writers report [`Readiness::Notify`](crate::Readiness) and no thread runs per session. The child is started with
 //! `CreateProcessW`, attached to the pseudoconsole, inheriting no handle, with an explicit
 //! environment block and working directory (W8), and found by the one lookup rule of every
 //! backend ([`program`](crate::program)); a batch file runs through the system `cmd.exe` with
 //! its arguments escaped to reach it literally. Exit is read from the process handle, never from
 //! the reader, so code 259 is an exit like any other (W2); `kill` is `TerminateProcess`; `close`
 //! terminates the child and closes the pseudoconsole, which ends every attached process and lets
-//! the reader reach the end of the output (W3). Writes may block (W4).
+//! the reader reach the end of the output (W3). A write never blocks the I/O thread (W4).
 //!
 //! Every `unsafe` call lives in [`sys`].
 
 mod driver;
+mod input;
 mod sys;
 
 use std::ffi::{OsStr, OsString};
-use std::io::{PipeWriter, Write};
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -31,9 +30,10 @@ use crate::program::{self, Search};
 use crate::windows_command::{self, Variable};
 use crate::{
     EnvOp, ExitSource, ExitStatus, PtyBackend, PtyChild, PtyError, PtyKiller, PtyResize,
-    PtySession, PtySize, PtyWriter, SpawnSpec,
+    PtySession, PtySize, SpawnSpec,
 };
 use driver::Driver;
+use input::ConptyWriter;
 use sys::{Launch, Process, PseudoConsole, Terminated};
 
 type SharedConsole = Arc<Mutex<Option<PseudoConsole>>>;
@@ -63,13 +63,13 @@ impl PtyBackend for ConptyBackend {
         let variables = environment(spec);
         let (application, mut command_line) = command(spec, &variables)?;
         let environment = windows_command::environment_block(variables);
-        let (child_input, input) = std::io::pipe().map_err(|error| PtyError::io("pipe", error))?;
+        let (input, child_input) =
+            sys::input_pipe().map_err(|error| PtyError::io("pipe", error))?;
         let (output, child_output) =
             sys::output_pipe().map_err(|error| PtyError::io("pipe", error))?;
-        let reader = self
-            .driver()?
-            .reader(output)
-            .map_err(|error| PtyError::io("register the output", error))?;
+        let driver = self.driver()?;
+        let reader =
+            driver.reader(output).map_err(|error| PtyError::io("register the output", error))?;
         let console = PseudoConsole::new(spec.size, &child_input, &child_output)
             .map_err(|error| PtyError::io("create the pseudoconsole", error))?;
         // The console holds its own duplicates; with ours closed, its exit ends the output.
@@ -83,11 +83,13 @@ impl PtyBackend for ConptyBackend {
         let process = sys::spawn(&console, &mut launch)
             .map_err(|error| PtyError::io("create the process", error))?;
         let closed = Arc::new(AtomicBool::new(false));
+        let writer = ConptyWriter::new(&driver, input, Arc::clone(&closed))
+            .map_err(|error| PtyError::io("register the input", error))?;
         let process = Arc::new(Child { process, killed: AtomicBool::new(false) });
         let console: SharedConsole = Arc::new(Mutex::new(Some(console)));
         Ok(PtySession {
             reader: Box::new(reader),
-            writer: Box::new(ConptyWriter { pipe: input, closed: Arc::clone(&closed) }),
+            writer: Box::new(writer),
             resize: Box::new(ConptyResize {
                 console: Arc::clone(&console),
                 size: Mutex::new(spec.size),
@@ -138,27 +140,6 @@ fn environment(spec: &SpawnSpec) -> Vec<Variable> {
 /// and the guarded handle stays valid.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
-}
-
-struct ConptyWriter {
-    pipe: PipeWriter,
-    closed: Arc<AtomicBool>,
-}
-
-impl PtyWriter for ConptyWriter {
-    fn write_all(&mut self, bytes: &[u8]) -> Result<(), PtyError> {
-        if self.closed.load(Ordering::Acquire) {
-            return Err(PtyError::Closed);
-        }
-        self.pipe.write_all(bytes).map_err(|error| {
-            // A write blocked when `close` happened fails once the console is gone.
-            if self.closed.load(Ordering::Acquire) {
-                PtyError::Closed
-            } else {
-                PtyError::io("write the pseudoconsole", error)
-            }
-        })
-    }
 }
 
 struct ConptyResize {

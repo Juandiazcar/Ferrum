@@ -28,6 +28,11 @@ every process attached to the terminal, a killed child reports `ExitStatus::Kill
 | Linux, macOS | `UnixBackend` (`portable-pty` 0.9.0 opens the pseudo terminal, `rustix` for the rest) | the child is spawned by `std::process::Command` as a session leader with the terminal as controlling TTY; `close` finds the processes attached to the terminal in the kernel's process table (`/proc` on Linux, `proc_pidinfo` on macOS), without starting any program |
 | Windows | `ConptyBackend` (`windows-sys` 0.61.2, `mio` 1.2.5) | pseudoconsole with `PSEUDOCONSOLE_INHERIT_CURSOR` (`docs/11` §4): the first output is `ESC[6n`, which the session layer answers (W1); the output of every session is an overlapped named pipe served by one I/O thread, `pty-io` (Q-31); exit read from the process handle (259 is an exit) |
 
+`PtyWriter::try_write` (WP-06) never blocks: Unix writes the non-blocking master once and reports
+`Readiness::Fd` (the reader's descriptor, watched for writability); `ConPTY` writes an overlapped
+named pipe served by `pty-io` and reports `Readiness::Notify` (ADR 0026 W4: no thread per session
+for writes either).
+
 `ExitWatch` (`native_exit_watch`, WP-06) tells which children exited without a thread per child
 or a timer (NFR-PERF-06): Linux watches `pidfd`s in one `epoll` set and macOS uses one `kqueue`
 with `EVFILT_PROC`, both a single descriptor for the daemon's poller (`Readiness::Fd`); on Windows a

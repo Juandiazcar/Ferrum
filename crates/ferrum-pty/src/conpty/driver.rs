@@ -17,7 +17,8 @@ use mio::{Events, Interest, Poll, Registry, Token, Waker};
 
 use crate::{Notify, PtyError, PtyReader, Readiness};
 
-/// The token of the waker that stops the thread; session tokens start after it.
+/// The token of the waker (mio allows one per poller): it stops the thread, and delivers the
+/// notifications [`Driver::renotify`] asked for; session tokens start after it.
 const STOP: Token = Token(0);
 /// Name of the I/O thread.
 const THREAD_NAME: &str = "pty-io";
@@ -26,17 +27,25 @@ const THREAD_STACK_BYTES: usize = 64 * 1024;
 /// Events taken from the completion port per wait; more simply wait for the next turn.
 const EVENTS_PER_WAIT: usize = 64;
 
-type Sessions = Arc<Mutex<HashMap<Token, Weak<Output>>>>;
+/// What the I/O thread wakes: a session's output (readable) or input (writable) pipe.
+pub(super) trait Endpoint: Send + Sync {
+    /// The pipe is ready for the next non-blocking attempt.
+    fn mark_ready(&self);
+}
 
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+type Sessions = Arc<Mutex<HashMap<Token, Weak<dyn Endpoint>>>>;
+
+pub(super) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// The I/O thread and what sessions need to register with it.
 pub(super) struct Driver {
-    registry: Registry,
+    pub(super) registry: Registry,
     stop: Waker,
-    sessions: Sessions,
+    pub(super) sessions: Sessions,
+    /// Pipes whose notification must be called again on the I/O thread.
+    kicked: Arc<Mutex<Vec<Token>>>,
     next_token: AtomicUsize,
     stopping: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
@@ -51,16 +60,22 @@ impl Driver {
         let stop = Waker::new(poll.registry(), STOP)?;
         let sessions: Sessions = Arc::default();
         let stopping = Arc::new(AtomicBool::new(false));
-        let (thread_sessions, thread_stopping) = (Arc::clone(&sessions), Arc::clone(&stopping));
+        let kicked: Arc<Mutex<Vec<Token>>> = Arc::default();
+        let shared = Shared {
+            sessions: Arc::clone(&sessions),
+            stopping: Arc::clone(&stopping),
+            kicked: Arc::clone(&kicked),
+        };
         let thread = std::thread::Builder::new()
             .name(THREAD_NAME.into())
             .stack_size(THREAD_STACK_BYTES)
-            .spawn(move || serve(poll, &thread_sessions, &thread_stopping))?;
+            .spawn(move || serve(poll, &shared))?;
         let thread_id = thread.thread().id();
         Ok(Arc::new(Self {
             registry,
             stop,
             sessions,
+            kicked,
             next_token: AtomicUsize::new(STOP.0 + 1),
             stopping,
             thread: Mutex::new(Some(thread)),
@@ -70,7 +85,7 @@ impl Driver {
 
     /// Registers the output pipe of a new session and returns its reader.
     pub(super) fn reader(self: &Arc<Self>, mut pipe: NamedPipe) -> std::io::Result<ConptyReader> {
-        let token = Token(self.next_token.fetch_add(1, Ordering::Relaxed));
+        let token = self.token();
         self.registry.register(&mut pipe, token, Interest::READABLE)?;
         let output = Arc::new(Output {
             pipe,
@@ -79,8 +94,22 @@ impl Driver {
             ready: Condvar::new(),
             driver: Arc::clone(self),
         });
-        lock(&self.sessions).insert(token, Arc::downgrade(&output));
+        let endpoint: Arc<dyn Endpoint> = output.clone();
+        lock(&self.sessions).insert(token, Arc::downgrade(&endpoint));
         Ok(ConptyReader(output))
+    }
+
+    /// Calls the notification of pipe `token` again, from the I/O thread (notifications always
+    /// come from `pty-io`, never from the caller's thread).
+    pub(super) fn renotify(&self, token: Token) {
+        lock(&self.kicked).push(token);
+        // If waking fails the thread is gone and nothing waits for the notification any more.
+        let _woken = self.stop.wake();
+    }
+
+    /// A fresh token for a pipe.
+    pub(super) fn token(&self) -> Token {
+        Token(self.next_token.fetch_add(1, Ordering::Relaxed))
     }
 }
 
@@ -98,10 +127,18 @@ impl Drop for Driver {
     }
 }
 
+/// What the I/O thread shares with the driver.
+struct Shared {
+    sessions: Sessions,
+    stopping: Arc<AtomicBool>,
+    kicked: Arc<Mutex<Vec<Token>>>,
+}
+
 /// The loop of the I/O thread: wait, then mark each ready session and notify it.
-fn serve(mut poll: Poll, sessions: &Sessions, stopping: &AtomicBool) {
+fn serve(mut poll: Poll, shared: &Shared) {
     let mut events = Events::with_capacity(EVENTS_PER_WAIT);
-    while !stopping.load(Ordering::Acquire) {
+    let mut kicked = Vec::new();
+    while !shared.stopping.load(Ordering::Acquire) {
         match poll.poll(&mut events, None) {
             Ok(()) => {}
             Err(error) if error.kind() == ErrorKind::Interrupted => continue,
@@ -109,9 +146,16 @@ fn serve(mut poll: Poll, sessions: &Sessions, stopping: &AtomicBool) {
             Err(_) => return,
         }
         for event in &events {
-            let output = lock(sessions).get(&event.token()).and_then(Weak::upgrade);
-            if let Some(output) = output {
-                output.mark_ready();
+            if event.token() == STOP {
+                std::mem::swap(&mut kicked, &mut *lock(&shared.kicked));
+            } else {
+                kicked.push(event.token());
+            }
+            for token in kicked.drain(..) {
+                let endpoint = lock(&shared.sessions).get(&token).and_then(Weak::upgrade);
+                if let Some(endpoint) = endpoint {
+                    endpoint.mark_ready();
+                }
             }
         }
     }
@@ -133,7 +177,7 @@ struct Output {
     driver: Arc<Driver>,
 }
 
-impl Output {
+impl Endpoint for Output {
     fn mark_ready(&self) {
         let mut state = lock(&self.state);
         state.ready = true;
@@ -145,7 +189,9 @@ impl Output {
             notify();
         }
     }
+}
 
+impl Output {
     /// One non-blocking attempt; `None` when no output is ready.
     fn try_read(&self, buf: &mut [u8]) -> Result<Option<usize>, PtyError> {
         let mut state = lock(&self.state);
@@ -205,14 +251,14 @@ impl PtyReader for ConptyReader {
     }
 
     fn set_notify(&mut self, notify: Notify) {
-        let notify: Arc<dyn Fn() + Send + Sync> = Arc::from(notify);
         let mut state = lock(&self.0.state);
-        state.notify = Some(Arc::clone(&notify));
+        state.notify = Some(Arc::from(notify));
         let ready = state.ready;
         drop(state);
-        // Output that became ready before the notification was set is not lost.
+        // Output that became ready before the notification was set is not lost; it is reported
+        // from the I/O thread like every notification.
         if ready {
-            notify();
+            self.0.driver.renotify(self.0.token);
         }
     }
 }

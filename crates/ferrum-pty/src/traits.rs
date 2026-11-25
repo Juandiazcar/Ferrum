@@ -74,6 +74,31 @@ pub trait PtyWriter: Send {
     /// [`PtyError::Closed`] after `close` (also for a write blocked when `close` happens), or
     /// [`PtyError::Io`] when the OS write fails.
     fn write_all(&mut self, bytes: &[u8]) -> Result<(), PtyError>;
+
+    /// Writes as much of `bytes` as the terminal takes now, never blocking: `Ok(Some(n))` with
+    /// `n` bytes written (at least one for a non-empty `bytes`), `Ok(None)` when nothing fits;
+    /// [`readiness`](Self::readiness) says how to learn that it would make progress again. The
+    /// default writes everything with [`write_all`](Self::write_all) (writers that never block).
+    ///
+    /// # Errors
+    /// As [`write_all`](Self::write_all).
+    fn try_write(&mut self, bytes: &[u8]) -> Result<Option<usize>, PtyError> {
+        self.write_all(bytes).map(|()| Some(bytes.len()))
+    }
+
+    /// How the caller learns that [`try_write`](Self::try_write) would take bytes again:
+    /// [`Readiness::Fd`] (the descriptor becomes writable; on Unix it is the reader's
+    /// descriptor), [`Readiness::Notify`] (the function of [`set_notify`](Self::set_notify) is
+    /// called), or [`Readiness::Blocking`] for a writer whose `try_write` always takes everything.
+    fn readiness(&self) -> Readiness {
+        Readiness::Blocking
+    }
+
+    /// For [`Readiness::Notify`] writers: `notify` is called, from a thread of the backend, when
+    /// room frees up after a `try_write` returned `Ok(None)`. Other writers ignore it.
+    fn set_notify(&mut self, notify: Notify) {
+        drop(notify);
+    }
 }
 
 /// Terminal size of a session.

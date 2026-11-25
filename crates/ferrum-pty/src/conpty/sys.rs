@@ -282,7 +282,7 @@ pub(super) fn system_directory() -> io::Result<std::path::PathBuf> {
     }
 }
 
-/// Kernel buffer of the output pipe: one chunk of the daemon's read (`docs/02` §5: at most 64 KiB).
+/// Kernel buffer of a console pipe: one chunk of the daemon's read (`docs/02` §5: at most 64 KiB).
 const PIPE_BUFFER_BYTES: u32 = 64 * 1024;
 
 /// Number of output pipes created by this process, which makes each pipe name unique.
@@ -295,18 +295,50 @@ static PIPE_SERIAL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64:
 /// (no second client can connect), refuses remote clients, and must be the first instance of
 /// its name (nobody can have created it in advance).
 pub(super) fn output_pipe() -> io::Result<(mio::windows::NamedPipe, std::fs::File)> {
+    console_pipe(Direction::FromConsole)
+}
+
+/// Creates the input pipe of a pseudoconsole, the mirror of [`output_pipe`]: this process writes
+/// through an overlapped server end served by the single I/O thread (`docs/11` §4: "overlapped
+/// I/O" for writes), so a child that does not read never blocks a thread.
+pub(super) fn input_pipe() -> io::Result<(mio::windows::NamedPipe, std::fs::File)> {
+    console_pipe(Direction::ToConsole)
+}
+
+/// Which way the bytes of a console pipe flow.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Direction {
+    FromConsole,
+    ToConsole,
+}
+
+fn console_pipe(direction: Direction) -> io::Result<(mio::windows::NamedPipe, std::fs::File)> {
+    use windows_sys::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};
+    let serial = PIPE_SERIAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let name = format!(r"\\.\pipe\ferrum-pty-{}-{serial}", std::process::id());
+    let name: Vec<u16> = name.encode_utf16().chain(Some(0)).collect();
+    let server = create_server(&name, direction)?;
+    let access = match direction {
+        Direction::FromConsole => GENERIC_WRITE,
+        Direction::ToConsole => GENERIC_READ,
+    };
+    Ok((server, open_client(&name, access)?))
+}
+
+/// The overlapped, owner-only server end of pipe `name` (NUL-terminated).
+fn create_server(name: &[u16], direction: Direction) -> io::Result<mio::windows::NamedPipe> {
     use std::os::windows::io::FromRawHandle as _;
-    use windows_sys::Win32::Foundation::GENERIC_WRITE;
     use windows_sys::Win32::Storage::FileSystem::{
-        CreateFileW, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, OPEN_EXISTING,
-        PIPE_ACCESS_INBOUND,
+        FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_INBOUND,
+        PIPE_ACCESS_OUTBOUND,
     };
     use windows_sys::Win32::System::Pipes::{
         CreateNamedPipeW, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_WAIT,
     };
-    let serial = PIPE_SERIAL.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let name = format!(r"\\.\pipe\ferrum-pty-{}-{serial}", std::process::id());
-    let name: Vec<u16> = name.encode_utf16().chain(Some(0)).collect();
+    let (access, out_buffer, in_buffer) = match direction {
+        Direction::FromConsole => (PIPE_ACCESS_INBOUND, 0, PIPE_BUFFER_BYTES),
+        Direction::ToConsole => (PIPE_ACCESS_OUTBOUND, PIPE_BUFFER_BYTES, 0),
+    };
     let owner_only = security::OwnerOnly::new()?;
     let attributes = owner_only.attributes();
     // SAFETY: `name` is NUL-terminated and outlives the call; `attributes` points to the
@@ -314,11 +346,11 @@ pub(super) fn output_pipe() -> io::Result<(mio::windows::NamedPipe, std::fs::Fil
     let server = unsafe {
         CreateNamedPipeW(
             name.as_ptr(),
-            PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
+            access | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
             PIPE_TYPE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
             1,
-            0,
-            PIPE_BUFFER_BYTES,
+            out_buffer,
+            in_buffer,
             0,
             &raw const attributes,
         )
@@ -328,13 +360,19 @@ pub(super) fn output_pipe() -> io::Result<(mio::windows::NamedPipe, std::fs::Fil
     }
     // SAFETY: `server` is a valid named-pipe handle that nothing else owns; mio takes ownership
     // and closes it on drop.
-    let server = unsafe { mio::windows::NamedPipe::from_raw_handle(server) };
+    Ok(unsafe { mio::windows::NamedPipe::from_raw_handle(server) })
+}
+
+/// The synchronous client end of pipe `name` (NUL-terminated), opened with `access`.
+fn open_client(name: &[u16], access: u32) -> io::Result<std::fs::File> {
+    use std::os::windows::io::FromRawHandle as _;
+    use windows_sys::Win32::Storage::FileSystem::{CreateFileW, OPEN_EXISTING};
     // SAFETY: `name` is NUL-terminated; no template, no security attributes (not inheritable);
     // the returned handle is checked below.
     let client = unsafe {
         CreateFileW(
             name.as_ptr(),
-            GENERIC_WRITE,
+            access,
             0,
             std::ptr::null(),
             OPEN_EXISTING,
@@ -346,5 +384,5 @@ pub(super) fn output_pipe() -> io::Result<(mio::windows::NamedPipe, std::fs::Fil
         return Err(io::Error::last_os_error());
     }
     // SAFETY: `client` is a valid file handle that nothing else owns; `File` closes it on drop.
-    Ok((server, unsafe { std::fs::File::from_raw_handle(client) }))
+    Ok(unsafe { std::fs::File::from_raw_handle(client) })
 }

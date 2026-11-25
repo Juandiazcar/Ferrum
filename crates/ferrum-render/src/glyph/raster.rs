@@ -7,6 +7,7 @@ use swash::scale::{Render, ScaleContext, Source, StrikeWith};
 use swash::zeno::{Angle, Format, Transform};
 
 use super::cache::{GlyphImage, Pixels};
+use crate::blit::ROW_ALIGN;
 use crate::font::{Face, Fonts, Glyph};
 
 /// Synthetic italic slant: the default angle of CSS `font-style: oblique` (CSS Fonts 4, §2.3).
@@ -46,8 +47,8 @@ impl Rasterizer {
     }
 
     /// Rasterizes `glyph` at `size` physical pixels per em. A color glyph larger than `fit` is
-    /// drawn again at the size that fits. `None` when the face cannot be read or the glyph has
-    /// no image (a space: the caller draws nothing).
+    /// drawn again at the size that fits. A glyph without ink gives an empty image; `None` when
+    /// the face cannot be read.
     pub(crate) fn render(
         &mut self,
         fonts: &Fonts,
@@ -113,21 +114,27 @@ struct Request<'a> {
     size: f32,
 }
 
-/// The cacheable form of `image`; `None` for an empty one.
+/// The cacheable form of `image`, rows padded to the blit step.
 fn convert(image: &Image, advance: f32) -> Option<GlyphImage> {
     let placement = image.placement;
-    let area = usize::try_from(u64::from(placement.width) * u64::from(placement.height)).ok()?;
-    if area == 0 {
-        return None;
+    let width = usize::try_from(placement.width).ok()?;
+    let height = usize::try_from(placement.height).ok()?;
+    if width == 0 || height == 0 {
+        return Some(GlyphImage::empty(advance));
     }
+    let stride = aligned(placement.width)?;
+    let padded = usize::try_from(stride).ok()?;
+    let area = width.checked_mul(height)?;
     let pixels = match image.content {
-        Content::Mask => Pixels::Mask(image.data.get(..area)?.to_vec()),
+        Content::Mask => {
+            let rows = image.data.get(..area)?.chunks_exact(width);
+            Pixels::Mask(pad_rows(rows, padded, |&coverage| coverage))
+        }
         Content::Color | Content::SubpixelMask => {
             let straight = matches!(image.source, Source::ColorBitmap(_) | Source::Bitmap(_));
             let rgba = image.data.get(..area.checked_mul(4)?)?;
-            Pixels::Color(
-                rgba.as_chunks::<4>().0.iter().map(|&px| premultiply(px, straight)).collect(),
-            )
+            let rows = rgba.as_chunks::<4>().0.chunks_exact(width);
+            Pixels::Color(pad_rows(rows, padded, |&pixel| premultiply(pixel, straight)))
         }
     };
     Some(GlyphImage {
@@ -135,9 +142,30 @@ fn convert(image: &Image, advance: f32) -> Option<GlyphImage> {
         top: placement.top,
         width: placement.width,
         height: placement.height,
+        stride,
         advance,
         pixels,
     })
+}
+
+/// `width` rounded up to `crate::blit::ROW_ALIGN`.
+pub(crate) fn aligned(width: u32) -> Option<u32> {
+    Some(width.checked_add(ROW_ALIGN - 1)? / ROW_ALIGN * ROW_ALIGN)
+}
+
+/// The rows converted by `pixel`, each padded with the default (transparent) value to `stride`.
+pub(crate) fn pad_rows<'a, S: 'a, T: Default + Clone>(
+    rows: impl Iterator<Item = &'a [S]>,
+    stride: usize,
+    pixel: impl Fn(&S) -> T,
+) -> Vec<T> {
+    let mut out = Vec::new();
+    for row in rows {
+        let start = out.len();
+        out.extend(row.iter().map(&pixel));
+        out.resize(start + stride, T::default());
+    }
+    out
 }
 
 /// One RGBA pixel as premultiplied `0xAARRGGBB`. `swash` composites color outlines already

@@ -1,0 +1,137 @@
+//! Grapheme clusters of several characters: emoji sequences (ZWJ families, flags, keycaps, skin
+//! tones) and combining marks are shaped by `swash` with the face of their first character, so a
+//! sequence becomes the font's single glyph and marks get their positions. Results are memoized;
+//! a memo hit allocates nothing.
+
+use std::hash::{Hash, Hasher};
+
+use rustc_hash::{FxHashMap, FxHasher};
+use swash::shape::ShapeContext;
+
+use super::{is_ignorable, presentation};
+use crate::font::metrics::{SIZE_Q_ONE, f32_from};
+use crate::font::{Fonts, Glyph, TextStyle};
+
+/// Most glyphs kept for one cluster: a sequence shapes to one glyph, a base with combining marks
+/// to one glyph per mark; eight holds a base and seven stacked marks, beyond anything a terminal
+/// cell shows legibly (longer clusters are drawn with their first eight glyphs).
+pub(crate) const MAX_CLUSTER_GLYPHS: usize = 8;
+/// Most remembered clusters. Clusters are rare next to single characters; 4 096 is a third of a
+/// 200×60 screen made only of distinct clusters. The memo is emptied when full.
+pub(crate) const MAX_SHAPED_CLUSTERS: usize = 4096;
+
+/// A glyph of a cluster and its offset from the cell's pen position, in whole pixels.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Positioned {
+    pub(crate) glyph: Glyph,
+    pub(crate) x: i32,
+    pub(crate) y: i32,
+}
+
+#[derive(Debug)]
+struct Shaped {
+    text: Box<str>,
+    style: TextStyle,
+    size_q: u32,
+    glyphs: Vec<Positioned>,
+}
+
+/// The shaping context and the memo.
+pub(crate) struct Shaper {
+    context: ShapeContext,
+    memo: FxHashMap<u64, Shaped>,
+}
+
+impl std::fmt::Debug for Shaper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Shaper").field("memo", &self.memo.len()).finish_non_exhaustive()
+    }
+}
+
+impl Shaper {
+    pub(crate) fn new() -> Self {
+        Self { context: ShapeContext::new(), memo: FxHashMap::default() }
+    }
+
+    /// The glyphs of `text` in `style` at `size_q` (1/64 px).
+    pub(crate) fn shape(
+        &mut self,
+        fonts: &mut Fonts,
+        text: &str,
+        style: TextStyle,
+        size_q: u32,
+    ) -> &[Positioned] {
+        let mut hasher = FxHasher::default();
+        (text, style, size_q).hash(&mut hasher);
+        let key = hasher.finish();
+        let hit = self.memo.get(&key).is_some_and(|shaped| {
+            *shaped.text == *text && shaped.style == style && shaped.size_q == size_q
+        });
+        if !hit {
+            let glyphs = self.shape_uncached(fonts, text, style, size_q);
+            if self.memo.len() >= MAX_SHAPED_CLUSTERS {
+                self.memo.clear();
+            }
+            let shaped = Shaped { text: text.into(), style, size_q, glyphs };
+            let _previous = self.memo.insert(key, shaped);
+        }
+        self.memo.get(&key).map_or(&[], |shaped| shaped.glyphs.as_slice())
+    }
+
+    fn shape_uncached(
+        &mut self,
+        fonts: &mut Fonts,
+        text: &str,
+        style: TextStyle,
+        size_q: u32,
+    ) -> Vec<Positioned> {
+        let mut chars = text.chars().filter(|&ch| !is_ignorable(ch));
+        let Some(first) = chars.next() else { return Vec::new() };
+        let emoji_selector = text.contains('\u{FE0F}').then_some('\u{FE0F}');
+        let base = fonts.glyph(first, style, presentation(first, emoji_selector));
+        let shaped = self.run(fonts, base, text, size_q);
+        if !shaped.is_empty() && shaped.iter().all(|positioned| positioned.glyph.id != 0) {
+            return shaped;
+        }
+        // The base face lacks part of the cluster: each character from its own face, stacked.
+        std::iter::once(base)
+            .chain(chars.map(|ch| fonts.glyph(ch, style, presentation(ch, None))))
+            .take(MAX_CLUSTER_GLYPHS)
+            .map(|glyph| Positioned { glyph, x: 0, y: 0 })
+            .collect()
+    }
+
+    /// Shapes `text` with the face of `base`.
+    fn run(&mut self, fonts: &Fonts, base: Glyph, text: &str, size_q: u32) -> Vec<Positioned> {
+        let Some(face) = fonts.face(base.face) else { return Vec::new() };
+        let size = f32_from(size_q) / SIZE_Q_ONE;
+        let context = &mut self.context;
+        let shaped = face.with_font(fonts.system(), |font| {
+            let mut glyphs = Vec::new();
+            let mut shaper = context
+                .builder(font)
+                .size(size)
+                .variations(face.weight_setting(base.weight))
+                .build();
+            shaper.add_str(text);
+            let mut pen = 0.0;
+            shaper.shape_with(|cluster| {
+                for glyph in cluster.glyphs {
+                    if glyphs.len() < MAX_CLUSTER_GLYPHS {
+                        glyphs.push(positioned(base, glyph.id, pen + glyph.x, glyph.y));
+                    }
+                    pen += glyph.advance;
+                }
+            });
+            glyphs
+        });
+        shaped.unwrap_or_default()
+    }
+}
+
+/// `id` of `base`'s face at an offset, rounded to whole pixels (`y` up, as fonts measure).
+#[allow(clippy::cast_possible_truncation, reason = "offsets of a glyph inside one cell")]
+fn positioned(base: Glyph, id: u16, x: f32, y: f32) -> Positioned {
+    let glyph = Glyph { face: base.face, id, ..base };
+    Positioned { glyph, x: x.round() as i32, y: -(y.round() as i32) }
+}

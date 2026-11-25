@@ -18,6 +18,42 @@ mod x86;
 /// Mask of the three color channels of a target pixel (`0x00RRGGBB`).
 const RGB_MASK: u32 = 0x00FF_FFFF;
 
+/// Glyph rows are stored padded to a multiple of this many pixels (zero coverage), the step of
+/// the widest kernels (AVX2, NEON), so narrow glyphs are blended in whole SIMD steps.
+pub(crate) const ROW_ALIGN: u32 = 8;
+
+/// A rectangle to blend: `rows` rows of `width` pixels; consecutive rows are `dst_stride`
+/// pixels apart in the target and `src_stride` apart in the source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Shape {
+    pub(crate) width: usize,
+    pub(crate) rows: usize,
+    pub(crate) dst_stride: usize,
+    pub(crate) src_stride: usize,
+}
+
+/// Calls `blend` on every row of `shape` (rows that do not fit either buffer are skipped).
+// perf: `render_repaint/*` — inlined into each kernel so the row loop runs with its CPU features
+// and the row function is inlined into it.
+#[allow(clippy::inline_always, reason = "see the perf comment: inlining is what this is for")]
+#[inline(always)]
+fn for_each_row<T>(
+    dst: &mut [u32],
+    src: &[T],
+    shape: Shape,
+    mut blend: impl FnMut(&mut [u32], &[T]),
+) {
+    if shape.dst_stride == 0 || shape.src_stride == 0 {
+        return;
+    }
+    let rows = dst.chunks_mut(shape.dst_stride).zip(src.chunks(shape.src_stride)).take(shape.rows);
+    for (dst, src) in rows {
+        if let (Some(dst), Some(src)) = (dst.get_mut(..shape.width), src.get(..shape.width)) {
+            blend(dst, src);
+        }
+    }
+}
+
 /// A set of blit kernels for this CPU.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Kernel {
@@ -69,6 +105,7 @@ impl Kernel {
 
     /// Blends `color` into `dst` with the coverage of `mask` (as many pixels as the shorter of
     /// the two).
+    #[cfg(test)]
     pub(crate) fn blend_mask(self, dst: &mut [u32], mask: &[u8], color: u32) {
         let color = color & RGB_MASK;
         match self {
@@ -86,8 +123,44 @@ impl Kernel {
         }
     }
 
+    /// [`Kernel::blend_mask`] over the rows of `shape`; `dst` starts at the rectangle's
+    /// top-left pixel.
+    pub(crate) fn blend_mask_rect(self, dst: &mut [u32], mask: &[u8], color: u32, shape: Shape) {
+        let color = color & RGB_MASK;
+        match self {
+            Self::Scalar => for_each_row(dst, mask, shape, |d, m| blend_mask_scalar(d, m, color)),
+            #[cfg(target_arch = "x86_64")]
+            // SAFETY: SSE2 is part of the `x86_64` baseline.
+            Self::Sse2 => unsafe { x86::blend_mask_rect_sse2(dst, mask, color, shape) },
+            #[cfg(target_arch = "x86_64")]
+            // SAFETY: `Avx2` exists only when the CPU has AVX2 (see `blend_mask`).
+            Self::Avx2 => unsafe { x86::blend_mask_rect_avx2(dst, mask, color, shape) },
+            #[cfg(target_arch = "aarch64")]
+            // SAFETY: NEON is part of the `aarch64` baseline.
+            Self::Neon => unsafe { neon::blend_mask_rect(dst, mask, color, shape) },
+        }
+    }
+
+    /// [`Kernel::blend_color`] over the rows of `shape`; `dst` starts at the rectangle's
+    /// top-left pixel.
+    pub(crate) fn blend_color_rect(self, dst: &mut [u32], src: &[u32], shape: Shape) {
+        match self {
+            Self::Scalar => for_each_row(dst, src, shape, blend_color_scalar),
+            #[cfg(target_arch = "x86_64")]
+            // SAFETY: SSE2 is part of the `x86_64` baseline.
+            Self::Sse2 => unsafe { x86::blend_color_rect_sse2(dst, src, shape) },
+            #[cfg(target_arch = "x86_64")]
+            // SAFETY: `Avx2` exists only when the CPU has AVX2 (see `blend_mask`).
+            Self::Avx2 => unsafe { x86::blend_color_rect_avx2(dst, src, shape) },
+            #[cfg(target_arch = "aarch64")]
+            // SAFETY: NEON is part of the `aarch64` baseline.
+            Self::Neon => unsafe { neon::blend_color_rect(dst, src, shape) },
+        }
+    }
+
     /// Composites premultiplied `0xAARRGGBB` pixels of `src` over `dst` (as many as the shorter
     /// of the two).
+    #[cfg(test)]
     pub(crate) fn blend_color(self, dst: &mut [u32], src: &[u32]) {
         match self {
             Self::Scalar => blend_color_scalar(dst, src),
@@ -226,6 +299,40 @@ mod tests {
                 let mut out = dst.clone();
                 kernel.blend_color(&mut out, &src);
                 assert_eq!(out, expected_color, "{kernel:?} color, {len} pixels");
+            }
+        }
+    }
+
+    #[test]
+    fn rectangles_blend_every_row_with_its_strides() {
+        let shape = Shape { width: 9, rows: 3, dst_stride: 20, src_stride: 16 };
+        let mask: Vec<u8> = (0..48).map(|i| if i % 16 < 9 { 200 } else { 7 }).collect();
+        let src: Vec<u32> =
+            (0..48).map(|i| if i % 16 < 9 { 0xC080_4020 } else { 0xFF00_0000 }).collect();
+        for kernel in Kernel::available() {
+            let mut dst = vec![0x0010_2030; 60];
+            kernel.blend_mask_rect(&mut dst, &mask, 0x00FF_FFFF, shape);
+            for (i, &pixel) in dst.iter().enumerate() {
+                let inside = i % 20 < 9;
+                assert_eq!(
+                    pixel,
+                    if inside {
+                        blend_mask_pixel(0x0010_2030, 0x00FF_FFFF, 200)
+                    } else {
+                        0x0010_2030
+                    },
+                    "{kernel:?} {i}"
+                );
+            }
+            let mut dst = vec![0x0010_2030; 60];
+            kernel.blend_color_rect(&mut dst, &src, shape);
+            for (i, &pixel) in dst.iter().enumerate() {
+                let inside = i % 20 < 9;
+                assert_eq!(
+                    pixel,
+                    if inside { blend_color_pixel(0x0010_2030, 0xC080_4020) } else { 0x0010_2030 },
+                    "{kernel:?} {i}"
+                );
             }
         }
     }

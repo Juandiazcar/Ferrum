@@ -9,6 +9,7 @@
 use rustc_hash::FxHashMap;
 
 use crate::font::{FaceId, Synthesis};
+use crate::synth::{Decoration, Lines};
 
 /// End of the LRU list.
 const NIL: u32 = u32::MAX;
@@ -29,6 +30,8 @@ pub(crate) enum GlyphKey {
     },
     /// A glyph drawn by `crate::synth` for a cell of this size and line thickness.
     Synthetic { ch: char, width: u32, height: u32, light: u32 },
+    /// A decoration mask for a cell of these lines.
+    Decoration { decoration: Decoration, lines: Lines },
 }
 
 /// Pixels of a rasterized glyph.
@@ -49,12 +52,22 @@ pub(crate) struct GlyphImage {
     pub(crate) top: i32,
     pub(crate) width: u32,
     pub(crate) height: u32,
+    /// Pixels per stored row: `width` rounded up to `crate::blit::ROW_ALIGN`, the padding
+    /// transparent.
+    pub(crate) stride: u32,
     /// Horizontal advance in physical pixels.
     pub(crate) advance: f32,
     pub(crate) pixels: Pixels,
 }
 
 impl GlyphImage {
+    /// An image with no pixels: a glyph without ink, or one that could not be rasterized
+    /// (cached too, so it is not tried again every frame).
+    pub(crate) fn empty(advance: f32) -> Self {
+        let pixels = Pixels::Mask(Vec::new());
+        Self { left: 0, top: 0, width: 0, height: 0, stride: 0, advance, pixels }
+    }
+
     fn bytes(&self) -> usize {
         match &self.pixels {
             Pixels::Mask(mask) => mask.capacity(),
@@ -87,6 +100,9 @@ pub(crate) struct GlyphCache {
     tail: u32,
     used_bytes: usize,
     capacity_bytes: usize,
+    /// Incremented by every eviction: a slot remembered at another generation may hold another
+    /// glyph.
+    generation: u32,
 }
 
 impl GlyphCache {
@@ -99,7 +115,18 @@ impl GlyphCache {
             tail: NIL,
             used_bytes: 0,
             capacity_bytes,
+            generation: 0,
         }
+    }
+
+    pub(crate) fn generation(&self) -> u32 {
+        self.generation
+    }
+
+    /// Marks `slot` as the most recently used.
+    pub(crate) fn touch(&mut self, slot: u32) {
+        self.unlink(slot);
+        self.push_front(slot);
     }
 
     pub(crate) fn used_bytes(&self) -> usize {
@@ -113,8 +140,7 @@ impl GlyphCache {
     /// The slot of `key`, marked as the most recently used.
     pub(crate) fn lookup(&mut self, key: &GlyphKey) -> Option<u32> {
         let slot = *self.map.get(key)?;
-        self.unlink(slot);
-        self.push_front(slot);
+        self.touch(slot);
         Some(slot)
     }
 
@@ -160,6 +186,7 @@ impl GlyphCache {
         let _removed = self.map.remove(&key);
         self.used_bytes = self.used_bytes.saturating_sub(bytes + ENTRY_OVERHEAD);
         self.free.push(index);
+        self.generation = self.generation.wrapping_add(1);
     }
 
     fn slot_mut(&mut self, index: u32) -> Option<&mut Slot> {
@@ -219,6 +246,7 @@ mod tests {
             top: 0,
             width: 1,
             height: 1,
+            stride: 8,
             advance: 7.0,
             pixels: Pixels::Mask(vec![0; bytes]),
         }

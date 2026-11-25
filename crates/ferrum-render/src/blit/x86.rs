@@ -14,7 +14,7 @@ use std::arch::x86_64::{
     _mm256_unpacklo_epi8,
 };
 
-use super::{RGB_MASK, blend_color_scalar, blend_mask_scalar};
+use super::{RGB_MASK, Shape, blend_color_scalar, blend_mask_scalar, for_each_row};
 
 /// Shuffle control that copies 16-bit lane 3 of every group of four (a pixel's alpha).
 const ALPHA_LANES: i32 = 0b11_11_11_11;
@@ -54,6 +54,7 @@ fn spread_4(coverage: [u8; 4]) -> __m128i {
 }
 
 /// Callable only where SSE2 is enabled (`unsafe` at the call site; SSE2 is part of `x86_64`).
+#[inline]
 #[target_feature(enable = "sse2")]
 pub(super) fn blend_mask_sse2(dst: &mut [u32], mask: &[u8], color: u32) {
     let len = dst.len().min(mask.len());
@@ -86,6 +87,7 @@ pub(super) fn blend_mask_sse2(dst: &mut [u32], mask: &[u8], color: u32) {
 }
 
 /// As [`blend_mask_sse2`]: SSE2 only.
+#[inline]
 #[target_feature(enable = "sse2")]
 pub(super) fn blend_color_sse2(dst: &mut [u32], src: &[u32]) {
     let len = dst.len().min(src.len());
@@ -134,6 +136,7 @@ fn scale_256(d: __m256i, inverse: __m256i) -> __m256i {
 }
 
 /// Only callable where the CPU supports AVX2 (`unsafe` at the call site).
+#[inline]
 #[target_feature(enable = "avx2")]
 pub(super) fn blend_mask_avx2(dst: &mut [u32], mask: &[u8], color: u32) {
     let len = dst.len().min(mask.len());
@@ -168,6 +171,7 @@ pub(super) fn blend_mask_avx2(dst: &mut [u32], mask: &[u8], color: u32) {
 }
 
 /// Only callable where the CPU supports AVX2 (`unsafe` at the call site).
+#[inline]
 #[target_feature(enable = "avx2")]
 pub(super) fn blend_color_avx2(dst: &mut [u32], src: &[u32]) {
     let len = dst.len().min(src.len());
@@ -199,4 +203,28 @@ pub(super) fn blend_color_avx2(dst: &mut [u32], src: &[u32]) {
         }
     }
     blend_color_scalar(pixels_rest, sources_rest);
+}
+
+/// The rows of `shape`, SSE2 only (`unsafe` at the call site).
+#[target_feature(enable = "sse2")]
+pub(super) fn blend_mask_rect_sse2(dst: &mut [u32], mask: &[u8], color: u32, shape: Shape) {
+    for_each_row(dst, mask, shape, |dst, mask| blend_mask_sse2(dst, mask, color));
+}
+
+/// The rows of `shape`, SSE2 only (`unsafe` at the call site).
+#[target_feature(enable = "sse2")]
+pub(super) fn blend_color_rect_sse2(dst: &mut [u32], src: &[u32], shape: Shape) {
+    for_each_row(dst, src, shape, |dst, src| blend_color_sse2(dst, src));
+}
+
+/// The rows of `shape`, AVX2 only (`unsafe` at the call site).
+#[target_feature(enable = "avx2")]
+pub(super) fn blend_mask_rect_avx2(dst: &mut [u32], mask: &[u8], color: u32, shape: Shape) {
+    for_each_row(dst, mask, shape, |dst, mask| blend_mask_avx2(dst, mask, color));
+}
+
+/// The rows of `shape`, AVX2 only (`unsafe` at the call site).
+#[target_feature(enable = "avx2")]
+pub(super) fn blend_color_rect_avx2(dst: &mut [u32], src: &[u32], shape: Shape) {
+    for_each_row(dst, src, shape, |dst, src| blend_color_avx2(dst, src));
 }

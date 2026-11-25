@@ -8,6 +8,8 @@
 //! - [`Glyphs`]: fonts, glyph cache (bounded LRU) and blit kernels of a window; draws glyphs and
 //!   lines of text into a [`Target`]. Box drawing, block elements and the powerline separators
 //!   are drawn pixel-perfect by the renderer itself, bypassing the font.
+//! - [`Painter`]: paints a pane's grid of [`Cell`]s with cursor and selection, repaints only the
+//!   rows whose content hash changed since the frame the buffer holds, and returns the damage.
 
 #![deny(unsafe_code)] // docs/05 §4: unsafe only in the blit kernels, each block with `// SAFETY:`
 
@@ -17,10 +19,16 @@ mod color;
 mod error;
 pub mod font;
 mod glyph;
+mod paint;
 mod synth;
 mod target;
 
 pub use color::Rgb;
 pub use error::RenderError;
 pub use glyph::{Glyphs, TextRun};
+pub use paint::{
+    Cell, CellText, CellWidth, Cursor, CursorShape, Frame, Grid, Overlay, Painter, Row, Rows,
+    Selection, SelectionKind, Strokes,
+};
+pub use synth::Underline;
 pub use target::{Rect, Target};

@@ -23,6 +23,8 @@
   `connect` is the blocking client of the tests and tools (the UI uses `interprocess`, Q-32); it
   checks that the pipe server runs as the user and is overlapped on Windows, so one thread can
   read while another writes.
+- `memory` (WP-06): `MemoryRelease`, freed heap memory back to the OS (`docs/03` §3 rule 7):
+  `malloc_trim(0)` on glibc, `mi_collect(true)` for `mimalloc` on macOS, `HeapCompact` on Windows.
 - `default_shell` (WP-06): the shell used without a profile (`docs/11` §1, §4): `$SHELL`, the user
   database entry (`getpwuid_r`), the first installed shell of `/etc/shells`; on Windows `pwsh`,
   then Windows PowerShell, then `%COMSPEC%`.
@@ -31,7 +33,7 @@
 |---|---|
 | Allowed internal dependencies | none (leaf service) |
 | Must never depend on | any other ferrum crate; pure crates never import it |
-| `unsafe` | allowed only in audited modules (`#![deny(unsafe_code)]` + local `#[allow]`): `src/win32.rs`, `src/ipc/windows/sys.rs`, `src/ipc/windows/client.rs`, `getpeereid` in `src/ipc/unix.rs` and `src/shells/passwd.rs`, each block with `// SAFETY:` |
+| `unsafe` | allowed only in audited modules (`#![deny(unsafe_code)]` + local `#[allow]`): `src/win32.rs`, `src/ipc/windows/sys.rs`, `src/ipc/windows/client.rs`, `getpeereid` in `src/ipc/unix.rs`, `src/shells/passwd.rs` and `src/memory.rs`, each block with `// SAFETY:` |
 
 The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2, enforced by
 `cargo xtask check-deps` from `xtask/deps-rules.toml`.

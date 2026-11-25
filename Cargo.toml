@@ -81,6 +81,7 @@ thiserror         = { version = "2.0.21", default-features = false, features = [
 anyhow            = "1.0.104"
 tracing           = { version = "0.1.44", default-features = false, features = ["std", "release_max_level_warn"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std"] }
+libmimalloc-sys   = { version = "0.1.49", default-features = false, features = ["extended"] }                # ferrum-platform on macOS: mi_collect (ADR 0016)
 
 # dev
 criterion         = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }

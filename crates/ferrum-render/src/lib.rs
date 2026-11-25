@@ -5,10 +5,20 @@
 //! depends on no other Ferrum crate (`docs/04` §2).
 //!
 //! - [`font`]: the embedded and system fonts, the fallback chain and the cell metrics.
+//! - [`Glyphs`]: fonts, glyph cache (bounded LRU) and blit kernels of a window; draws glyphs and
+//!   lines of text into a [`Target`].
 
 #![deny(unsafe_code)] // docs/05 §4: unsafe only in the blit kernels, each block with `// SAFETY:`
 
+#[allow(unsafe_code, reason = "docs/05 §4: the SIMD blit kernels, every block with `// SAFETY:`")]
+mod blit;
+mod color;
 mod error;
 pub mod font;
+mod glyph;
+mod target;
 
+pub use color::Rgb;
 pub use error::RenderError;
+pub use glyph::{Glyphs, TextRun};
+pub use target::{Rect, Target};

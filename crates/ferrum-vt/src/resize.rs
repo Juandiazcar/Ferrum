@@ -9,6 +9,7 @@ use crate::core::Core;
 use crate::cursor::Cursor;
 use crate::error::VtError;
 use crate::events::EventSink;
+use crate::reflow::Reflowed;
 use crate::screen::{Region, Screen};
 use crate::size::Size;
 
@@ -17,16 +18,20 @@ impl<S: EventSink> Core<S> {
     ///
     /// The terminal is consistent afterwards even when the scrollback fails while it is rewritten;
     /// the error is then returned and the history may be shorter.
-    pub(crate) fn resize(&mut self, size: Size) -> Result<(), VtError> {
+    pub(crate) fn resize(
+        &mut self,
+        size: Size,
+        stop: &mut dyn FnMut() -> bool,
+    ) -> Result<Reflowed, VtError> {
         let old = self.primary.grid.size();
         if old == size {
-            return Ok(());
+            return Ok(Reflowed::Complete);
         }
         let result = if size.cols() == old.cols() {
             self.resize_lines(size);
-            Ok(())
+            Ok(Reflowed::Complete)
         } else {
-            self.reflow_primary(size)
+            self.reflow_primary(size, stop)
         };
         self.resize_alt(size);
         self.settle_after_resize(size);

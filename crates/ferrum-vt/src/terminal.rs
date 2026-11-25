@@ -13,6 +13,7 @@ use crate::input::Input;
 use crate::keyboard::KeyboardFlags;
 use crate::modes::Mode;
 use crate::palette::Palette;
+use crate::reflow::Reflowed;
 use crate::screen::Screen;
 use crate::size::Size;
 
@@ -48,8 +49,34 @@ impl<S: EventSink> Terminal<S> {
     /// [`VtError::Scrollback`] when the history cannot be read back; the terminal is consistent
     /// afterwards but the history may be shorter.
     pub fn resize(&mut self, size: Size) -> Result<Size, VtError> {
-        self.core.resize(size)?;
-        Ok(self.size())
+        self.resize_until(size, &mut || false).map(|(applied, _)| applied)
+    }
+
+    /// Like [`resize`](Self::resize), but `stop` is asked between chunks of history while the
+    /// history is rewritten (`docs/02` §3.2: a large reflow is interruptible); when it returns
+    /// `true` the reflow ends early with [`Reflowed::Interrupted`]: the screen has the new size and
+    /// the history rows not reached keep their old width until the next resize.
+    ///
+    /// # Errors
+    /// As [`resize`](Self::resize).
+    pub fn resize_until(
+        &mut self,
+        size: Size,
+        stop: &mut dyn FnMut() -> bool,
+    ) -> Result<(Size, Reflowed), VtError> {
+        let reflowed = self.core.resize(size, stop)?;
+        Ok((self.size(), reflowed))
+    }
+
+    /// Rewraps the primary screen and its history again at the current size, asking `stop` as
+    /// [`resize_until`](Self::resize_until) does: it continues an interrupted reflow (the rows a
+    /// stop left at their old width get the current one). Margins, tab stops and modes are kept.
+    ///
+    /// # Errors
+    /// As [`resize`](Self::resize).
+    pub fn reflow_until(&mut self, stop: &mut dyn FnMut() -> bool) -> Result<Reflowed, VtError> {
+        let size = self.size();
+        self.core.reflow_primary(size, stop)
     }
 
     /// The size of the terminal.

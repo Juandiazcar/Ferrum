@@ -27,8 +27,8 @@ pub use appearance::{
 };
 pub use import_export::{ArchiveMaxEntries, ArchiveMaxTotalMib, ImportExport};
 pub use performance::{
-    Channel, GlyphCacheMib, ImageCacheMib, MaxFps, Performance, SpillDiskCapMib,
-    SpillThresholdLines, Updates,
+    Channel, DaemonExitGraceSecs, GlyphCacheMib, ImageCacheMib, MaxFps, Performance,
+    SpillDiskCapMib, SpillThresholdLines, Updates,
 };
 pub use project_limits::{MaxNameChars, MaxRecipeSessions, MaxRoots, MaxSessions, ProjectLimits};
 pub use shells::{Profile, Shells};

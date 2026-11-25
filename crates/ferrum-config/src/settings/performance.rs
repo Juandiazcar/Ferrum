@@ -42,6 +42,16 @@ bounded!(
     default = 3
 );
 
+bounded!(
+    /// Seconds the daemon waits with no session and no client before it exits (`FR-SESS-003`:
+    /// default 10 s). Bounds: 1 s still lets a UI that started the daemon connect to it; 3 600 s
+    /// (an hour) is the longest an unused daemon may stay resident.
+    DaemonExitGraceSecs(u16),
+    min = 1,
+    max = 3_600,
+    default = 10
+);
+
 /// Frame rate cap (`docs/02` §6: default 60 Hz).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -76,6 +86,8 @@ pub struct Performance {
     pub glyph_cache_mib: GlyphCacheMib,
     /// Image cache cap.
     pub image_cache_mib: ImageCacheMib,
+    /// Idle exit grace period of the daemon.
+    pub daemon_exit_grace_secs: DaemonExitGraceSecs,
 }
 
 /// Update channel (`FR-DIST-002`). Default stable: pre-releases are opt-in.

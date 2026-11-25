@@ -136,3 +136,22 @@ fn presentation_follows_the_emoji_selector_and_blocks() {
     assert_eq!(presentation('❤', None), Presentation::Text);
     assert_eq!(presentation('a', None), Presentation::Text);
 }
+
+#[test]
+fn box_drawing_bypasses_the_font_and_fills_the_cell_grid() {
+    let (mut glyphs, metrics) = glyphs(None);
+    let (pixels, cells) = draw(&mut glyphs, metrics, "█▀╋", TextStyle::REGULAR);
+    assert_eq!(cells, 3);
+    let width = usize::try_from(metrics.width).unwrap();
+    let rows: Vec<&[u32]> = pixels.chunks(width * 4).collect();
+    assert!(
+        rows.iter().all(|row| row[..width].iter().all(|&pixel| pixel == WHITE.pixel())),
+        "█ fills its cell"
+    );
+    let expected = synth::draw('╋', metrics.width, metrics.height, metrics.stroke).unwrap();
+    let drawn: Vec<u8> = rows
+        .iter()
+        .flat_map(|row| row[2 * width..3 * width].iter().map(|&pixel| (pixel & 0xFF) as u8))
+        .collect();
+    assert_eq!(drawn, expected.pixels, "the synthesized mask, not the font's glyph");
+}

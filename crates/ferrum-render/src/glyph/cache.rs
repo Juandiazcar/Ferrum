@@ -13,17 +13,22 @@ use crate::font::{FaceId, Synthesis};
 /// End of the LRU list.
 const NIL: u32 = u32::MAX;
 
-/// What identifies a rasterized glyph.
+/// What identifies a cached glyph image.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct GlyphKey {
-    pub(crate) face: FaceId,
-    pub(crate) id: u16,
-    /// Font size in 1/64 physical pixel.
-    pub(crate) size_q: u32,
-    pub(crate) weight: u16,
-    pub(crate) synth: Synthesis,
-    /// Largest image of a color glyph (two cells), which depends on the cell size.
-    pub(crate) fit: (u32, u32),
+pub(crate) enum GlyphKey {
+    /// A glyph of a font.
+    Font {
+        face: FaceId,
+        id: u16,
+        /// Font size in 1/64 physical pixel.
+        size_q: u32,
+        weight: u16,
+        synth: Synthesis,
+        /// Largest image of a color glyph (two cells), which depends on the cell size.
+        fit: (u32, u32),
+    },
+    /// A glyph drawn by `crate::synth` for a cell of this size and line thickness.
+    Synthetic { ch: char, width: u32, height: u32, light: u32 },
 }
 
 /// Pixels of a rasterized glyph.
@@ -198,7 +203,14 @@ mod tests {
 
     fn key(id: u16) -> GlyphKey {
         let synth = Synthesis::default();
-        GlyphKey { face: FaceId::EMBEDDED, id, size_q: 64 * 12, weight: 400, synth, fit: (14, 16) }
+        GlyphKey::Font {
+            face: FaceId::EMBEDDED,
+            id,
+            size_q: 64 * 12,
+            weight: 400,
+            synth,
+            fit: (14, 16),
+        }
     }
 
     fn image(bytes: usize) -> GlyphImage {

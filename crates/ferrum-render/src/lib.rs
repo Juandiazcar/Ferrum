@@ -6,7 +6,8 @@
 //!
 //! - [`font`]: the embedded and system fonts, the fallback chain and the cell metrics.
 //! - [`Glyphs`]: fonts, glyph cache (bounded LRU) and blit kernels of a window; draws glyphs and
-//!   lines of text into a [`Target`].
+//!   lines of text into a [`Target`]. Box drawing, block elements and the powerline separators
+//!   are drawn pixel-perfect by the renderer itself, bypassing the font.
 
 #![deny(unsafe_code)] // docs/05 §4: unsafe only in the blit kernels, each block with `// SAFETY:`
 
@@ -16,6 +17,7 @@ mod color;
 mod error;
 pub mod font;
 mod glyph;
+mod synth;
 mod target;
 
 pub use color::Rgb;

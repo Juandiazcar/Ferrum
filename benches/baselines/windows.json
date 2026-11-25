@@ -4,6 +4,9 @@
   "median_ns": {
     "daemon_search/literal_insensitive_10k_lines": 3916119.230769231,
     "daemon_search/regex_insensitive_10k_lines": 6878506.25,
+    "render_repaint/damage_4_rows": 55335.24492234169,
+    "render_repaint/dense_200x60": 658824.4894598154,
+    "render_repaint/typical_200x60": 323841.73114119924,
     "scrollback_push/fixture_rows_retain_10k": 3498500.0,
     "scrollback_read/random_1k": 138859050.0,
     "scrollback_read/sequential_10k": 2621755.0,

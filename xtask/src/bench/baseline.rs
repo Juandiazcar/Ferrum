@@ -35,6 +35,10 @@ pub(crate) const CEILINGS_NS: &[(&str, f64)] = &[
     ("scrollback_seal/fixture_chunks", 4_287_330.0),
     // "Reflow of 10 000 lines on resize <= 40 ms", so the ceiling is 80 ms.
     ("vt_reflow/10k_lines_200_to_100_columns", 80_000_000.0),
+    // NFR-PERF-03: full repaint of 200x60 cells <= 2.5 ms CPU, on dense text (every cell a glyph,
+    // maintainer decision Q-19) and on the typical mix, so the ceiling is 5 ms.
+    ("render_repaint/dense_200x60", 5_000_000.0),
+    ("render_repaint/typical_200x60", 5_000_000.0),
 ];
 
 /// `benches/baselines/{os}.json`: median time per bench id, measured on one runner class.

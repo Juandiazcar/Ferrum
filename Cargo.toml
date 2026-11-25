@@ -72,6 +72,7 @@ csscolorparser    = "0.9.2"
 directories       = { version = "6.0.0", default-features = false }
 arboard           = { version = "3.7.0", default-features = false }
 image             = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+png               = { version = "0.18.1", default-features = false }                                                      # ferrum-render golden images (dev)
 
 # app glue
 lexopt            = "0.3.2"

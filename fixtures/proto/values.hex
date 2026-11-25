@@ -16,6 +16,7 @@ session_status_running 00
 session_status_exited 010101
 session_status_exited_unknown 0100
 session_status_killed 02
+session_status_failed 030e7465726d696e616c207374617465
 row_region_screen 00
 row_region_history 01
 session_kind_terminal 00

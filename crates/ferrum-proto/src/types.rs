@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::error::ProtoError;
 use crate::list::List;
+use crate::redact::Text;
 
 /// A session, unique for the daemon's lifetime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -277,7 +278,7 @@ pub enum ProgressState {
 }
 
 /// Where a session is in its lifecycle (`FR-SESS-006`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum SessionStatus {
     /// The process runs.
@@ -289,6 +290,12 @@ pub enum SessionStatus {
     },
     /// The process was killed (closed by the user, or by a signal).
     Killed,
+    /// The daemon stopped the session after an internal error (protocol 1.1, `docs/02` §10:
+    /// "marked failed with the error").
+    Failed {
+        /// What failed, in words fixed by the daemon (never terminal content).
+        error: Text,
+    },
 }
 
 /// Which rows a `Rows` message carries.

@@ -188,6 +188,7 @@ fn session_event() -> impl Strategy<Value = SessionEvent> {
         Just(SessionStatus::Running),
         prop::option::of(any::<i32>()).prop_map(|code| SessionStatus::Exited { code }),
         Just(SessionStatus::Killed),
+        "[a-z ]{0,16}".prop_map(|error| SessionStatus::Failed { error: Text::new(error) }),
     ];
     let info = (project(), prop::option::of(text()), text(), status).prop_map(
         |(project_id, name, title, status)| SessionInfo {
@@ -219,6 +220,8 @@ fn session_event() -> impl Strategy<Value = SessionEvent> {
             state,
             value: Percent::try_from(value).unwrap()
         }),
+        text().prop_map(|error| SessionEvent::Failed { error }),
+        Just(SessionEvent::SpillDisabled),
     ]
 }
 

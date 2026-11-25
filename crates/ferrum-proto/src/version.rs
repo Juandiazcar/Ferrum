@@ -16,8 +16,10 @@ pub struct ProtocolVersion {
     pub minor: u16,
 }
 
-/// The version this build speaks: the first protocol.
-pub const PROTOCOL_VERSION: ProtocolVersion = ProtocolVersion { major: 1, minor: 0 };
+/// The version this build speaks: 1.0 was the first protocol; 1.1 adds `SearchResults`,
+/// `FileSetAside`, the failed session state (`SessionEvent::Failed`, `SessionStatus::Failed`) and
+/// `SessionEvent::SpillDisabled`.
+pub const PROTOCOL_VERSION: ProtocolVersion = ProtocolVersion { major: 1, minor: 1 };
 
 impl ProtocolVersion {
     /// The version both sides use: same major, the lower minor. A peer never sends a message

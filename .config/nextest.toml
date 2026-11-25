@@ -5,11 +5,24 @@
 filter = 'test(=large_output_integrity) | test(=ten_sessions_memory) | test(=startup_output_follows_docs_11)'
 success-output = "immediate"
 
+# The daemon scenarios start ferrumd, PTYs and UI processes; each waits at most 30 s for any
+# event. A run that still has not finished after 5 minutes is hung: end it instead of holding
+# the job until the CI time limit.
+[[profile.default.overrides]]
+filter = 'package(ferrum-daemon) & kind(test)'
+slow-timeout = { period = "60s", terminate-after = 5 }
+
 # One daemon per user: on Windows the IPC pipe is named after the user's SID only (`docs/10` §2),
 # so the tests that start an endpoint run one at a time on every OS.
 [test-groups]
 ipc-endpoint = { max-threads = 1 }
 
 [[profile.default.overrides]]
-filter = 'package(ferrum-platform) & binary(ipc)'
+filter = '(package(ferrum-daemon) & kind(test)) | (package(ferrum-platform) & binary(ipc))'
 test-group = 'ipc-endpoint'
+
+# NFR-PERF-04 is a latency gate: the flood scenario runs alone, so the other tests of the run do
+# not compete with its 21 processes for the runner's cores.
+[[profile.default.overrides]]
+filter = 'package(ferrum-daemon) & test(=a_flooding_session_does_not_delay_the_other_nineteen)'
+threads-required = "num-test-threads"

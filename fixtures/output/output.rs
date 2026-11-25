@@ -11,6 +11,7 @@
 #![allow(dead_code, reason = "each includer uses a different subset of the fixture API")]
 
 mod rng;
+pub(crate) mod stream;
 mod text;
 
 use ferrum_scrollback::{LineFlags, LineRef, Style, StyledRun};

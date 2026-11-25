@@ -62,3 +62,6 @@ The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2,
   compares them with the `insta` binary snapshots in `fixtures/render/`, per channel within a
   tolerance of 2.
 - `tests/alloc_paint.rs` (`dhat`, `harness = false`): 0 allocations over 100 steady-state frames.
+- `benches/repaint.rs`: `render_repaint/dense_200x60` and `typical_200x60` (NFR-PERF-03, full
+  repaint, gated by `cargo xtask bench` at 5 ms), `render_repaint/damage_4_rows` (a frame with
+  four changed rows).

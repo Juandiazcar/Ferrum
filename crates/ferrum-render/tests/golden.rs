@@ -110,6 +110,14 @@ fn fixtures() -> PathBuf {
 fn check(name: &str, image: &Image) {
     let png = encode(image);
     let stored = std::fs::read(fixtures().join(format!("{name}.snap.png"))).ok();
+    #[allow(clippy::print_stderr)]
+    if std::env::var_os("WP07_GOLDEN_DIFF").is_some() {
+        let ours = decode(&png).expect("our own image decodes").2;
+        let theirs = stored.as_deref().and_then(decode).map(|d| d.2).unwrap_or_default();
+        let max = theirs.iter().zip(&ours).map(|(&a, &b)| a.abs_diff(b)).max().unwrap_or(255);
+        let differing = theirs.iter().zip(&ours).filter(|(a, b)| a != b).count();
+        eprintln!("GOLDEN {name} max={max} differing_channels={differing}");
+    }
     let close = stored.as_deref().and_then(decode).is_some_and(|(width, height, rgb)| {
         let ours = decode(&png).expect("our own image decodes").2;
         (width, height) == (image.width, image.height)

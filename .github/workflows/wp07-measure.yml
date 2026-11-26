@@ -1,0 +1,85 @@
+# Temporary (WP-07 audit fixes): measures on GitHub-hosted runners (Q-35) the repaint benches
+# before and after the perf commit, the golden images' real difference between the three OS
+# (TOLERANCE), and the golden scenes under Miri on the nightly job's runner. Never merged.
+name: wp07-measure
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-rust
+      - name: CPU
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Linux) lscpu | grep -E 'Model name|^CPU\(s\)' ;;
+            macOS) sysctl -n machdep.cpu.brand_string; sysctl -n hw.ncpu ;;
+            Windows) powershell -Command "(Get-CimInstance Win32_Processor).Name" ;;
+          esac
+          rustc --version
+      - name: Repaint benches before and after the perf commit, alternating, three runs each
+        shell: bash
+        run: |
+          after=$(git log --format=%H -1 --grep='^perf(render)')
+          before=$(git rev-parse "$after^")
+          git worktree add -f "$RUNNER_TEMP/before" "$before"
+          git worktree add -f "$RUNNER_TEMP/after" "$after"
+          for run in 1 2 3; do
+            for side in before after; do
+              export CARGO_TARGET_DIR="$RUNNER_TEMP/target-$side"
+              cargo bench --locked --manifest-path "$RUNNER_TEMP/$side/Cargo.toml" -p ferrum-render --bench repaint -- --noplot >/dev/null 2>&1
+              for bench in dense_200x60 typical_200x60 dense_200x60_2x damage_4_rows; do
+                file=$CARGO_TARGET_DIR/criterion/render_repaint/$bench/new/estimates.json
+                echo "RESULT side=$side run=$run bench=$bench median_ns=$(jq '.median.point_estimate' "$file")"
+              done
+            done
+          done
+
+  golden-diff:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rust
+      - name: Largest channel difference of each scene against the stored image
+        shell: bash
+        run: WP07_GOLDEN_DIFF=1 cargo test --locked -p ferrum-render --test golden -- --nocapture --test-threads=1 2>&1 | grep -E 'GOLDEN|test result'
+
+  miri-golden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      MIRIFLAGS: -Zmiri-disable-isolation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master, 2026-11-15
+        with:
+          toolchain: nightly
+          components: miri, rust-src
+      - name: The nightly job's steps and each golden scene, timed
+        run: |
+          t() { s=$(date +%s); "$@" 2>&1 | grep -E 'test result|panicked|FAILED|ignored' | tail -40; echo "TIME $(( $(date +%s) - s )) s: $*"; }
+          t cargo +nightly miri test --locked -p ferrum-scrollback --lib --test roundtrip -- single_line zero_max sealing_happens
+          t cargo +nightly miri test --locked -p ferrum-vt --lib
+          t cargo +nightly miri test --locked -p ferrum-proto -p ferrum-config -p ferrum-project -p ferrum-ui -p ferrum-render --lib
+          for scene in a_box_drawn_frame_is_seamless cursor_shapes box_drawing_blocks_and_powerline box_drawing_at_2x text_styles_decorations_cursor_and_selection lcd_text_on_an_opaque_background text_styles_at_2x; do
+            t cargo +nightly miri test --locked -p ferrum-render --test golden -- --exact $scene
+          done
+          t cargo +nightly miri test --locked -p ferrum-render --test alloc_paint --test glyph_cache_memory

@@ -76,7 +76,20 @@ cannot be created on a CI runner, so the refusal paths are checked by hand.
 |---|---|---|---|---|
 | MV-06-1 | Start `ferrumd` as user A; as user B (and as root on Unix), connect to A's endpoint: Unix `socat - UNIX-CONNECT:<run dir>/ferrumd.sock` (the run directory itself must refuse B: mode 0700), Windows `[System.IO.Pipes.NamedPipeClientStream]` on `ferrum-<hash>`; the connection is refused and the daemon logs `refused a connection` without the peer's details, and A's sessions are unaffected | pending | pending | pending |
 
+## Renderer (WP-07)
+
+CI runs the render tests on all three OS (golden images with the embedded font, color emoji with
+the system emoji font of each runner) and the hosted runners measured the repaint benches (PR #103).
+What needs a person, a display or the reference machine:
+
+| ID | Check | Linux | macOS | Windows |
+|---|---|---|---|---|
+| MV-07-1 | `cargo bench -p ferrum-render --bench repaint` on the maintainer's i5-9400 (Q-19): `render_repaint/dense_200x60` at most 2.5 ms | n/a | n/a | pending |
+| MV-07-2 | HiDPI: with WP-08, a window at scale 1.25, 1.5 and 2.0 (per-monitor on Windows, Retina on macOS): text crisp, box-drawing lines continuous across cells, cursor and underline on whole pixels | pending | pending | pending |
+| MV-07-3 | Color emoji by eye (Noto Color Emoji `CBDT`, Apple Color Emoji `sbix`, Segoe UI Emoji `COLR`): single emoji, ZWJ family, flag, keycap, skin tone, each in two cells | pending | pending | pending |
+| MV-07-4 | A system family picked by name (DejaVu Sans Mono / Menlo / Consolas): regular, bold, italic and bold italic come from the family's own faces when installed | pending | pending | pending |
+
 ## Later work packages
 
-Rows for IME, HiDPI, compositor behavior, OS drag and drop, installers and signing are added with
-WP-07, WP-11, WP-16 and WP-18 (`docs/spec/docs/12-build-order.md`).
+Rows for IME, compositor behavior, OS drag and drop, installers and signing are added with WP-11,
+WP-16 and WP-18 (`docs/spec/docs/12-build-order.md`); HiDPI rows are in the renderer section.

@@ -14,3 +14,4 @@ extend-exclude = [
 [default.extend-words]
 # Terminal vocabulary that looks like a typo (add entries only with a reason).
 ba = "ba"   # a byte in the hex annotations of fixtures/vt/**/*.md (0xBA)
+flate = "flate"   # the crate `flate2` (docs/07, a dependency of `png`)

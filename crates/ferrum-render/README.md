@@ -25,7 +25,19 @@
 - `Glyphs`: the `Fonts`, the glyph cache and the blit kernels. **One per process**: `docs/03`
   §2 budgets one glyph cache, so every window and pane shares the same `Glyphs` (WP-08 wires it).
   `Glyphs::draw_text(&mut Target, &TextRun)` draws a line on the cell grid (one cell per
-  character, two for a wide glyph, none for a combining mark).
+  character, two for a wide glyph, none for a combining mark). `Glyphs::set_fonts` and
+  `Glyphs::set_antialias` change what glyphs look like; `Glyphs::generation` changes with them,
+  so painters repaint.
+- `Painter::paint(&mut Glyphs, &mut Target, &Frame) -> &[Rect]`: paints one pane's `Grid` of
+  `Row`s of `Cell`s (text or grapheme cluster, resolved colors, weight and slant, underline
+  style and color, strikeout, overline, wide cells) with the `Overlay` (cursor: block,
+  underline, bar, hollow, spanning both columns of a wide cell; linear or block selection).
+  Each row has a content hash (cells, cluster text, the cursor and the selection with its
+  colors); only rows whose hash differs from the frame the buffer holds (`Frame::buffer_age`,
+  `softbuffer`'s `Buffer::age`) are repainted, and the dirty rectangles are returned for
+  `present_with_damage`. Age 0, an age past the remembered frames, a new layout or a new
+  `Glyphs::generation` repaint everything, padding included. Steady-state painting allocates
+  nothing (`tests/alloc_paint.rs`).
 - `Target`: the caller's `&mut [u32]` (`0x00RRGGBB`, the `softbuffer` buffer) with its size;
   `Rect`, `Rgb`.
 
@@ -35,6 +47,8 @@ families of `docs/11` §2, the emoji fonts, then any system face whose coverage 
 coverage of the system faces is read the first time a fallback is needed) and memoized. Emoji
 presentation follows Unicode `Emoji_Presentation` and VS15/VS16. At most 64 fallback faces stay
 loaded; the least recently used is dropped, with its memo entries and cached glyphs.
+Grapheme clusters of several characters (emoji sequences, combining marks) are shaped with
+`swash` by the face of their first character and memoized (clusters up to 64 bytes).
 
 Box drawing (U+2500–U+257F), block elements (U+2580–U+259F) and the powerline separators
 (U+E0B0–U+E0B3) bypass the font: they are drawn on the cell's own pixel grid (light lines of the
@@ -48,6 +62,16 @@ bytes by the caller (the glyph cache setting, default 3 MB); the cap counts pixe
 cache's containers, and a glyph larger than the whole cache is drawn without being kept.
 Blending uses SSE2 or AVX2 (detected at run time) on `x86_64` and NEON on `aarch64`; tests
 check every kernel against the scalar one bit for bit.
+
+## Tests and benches
+
+- Golden images: `tests/golden.rs` paints small scenes with the embedded font at 13 px (text
+  styles, decorations, cursor shapes, selection, box drawing, blocks, powerline, at 1× and 2×,
+  and LCD text) and compares them with the `insta` binary snapshots in `fixtures/render/`, per
+  channel within a tolerance of 2. They also run under Miri (nightly).
+- `tests/alloc_paint.rs` (`dhat`, `harness = false`): 0 allocations over 100 steady-state frames.
+- `tests/glyph_cache_memory.rs` (`dhat`, `harness = false`): the heap stays within the glyph
+  cache cap.
 
 The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2, enforced by
 `cargo xtask check-deps` from `xtask/deps-rules.toml`.

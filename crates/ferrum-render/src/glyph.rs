@@ -6,13 +6,18 @@
 //! it to every painter. Steady-state drawing (every glyph already cached) allocates nothing.
 
 mod cache;
+mod cell;
 mod draw;
 mod raster;
+mod shape;
 mod text;
 
 use cache::{GlyphCache, GlyphImage, GlyphKey};
 use raster::{At, Fit, Rasterizer};
+use shape::Shaper;
 pub(crate) use text::{cells_for, is_ignorable, presentation};
+
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::blit::Kernel;
 use crate::color::Rgb;
@@ -62,10 +67,19 @@ pub(crate) struct Placement {
     pub(crate) metrics: CellMetrics,
     pub(crate) color: Rgb,
     pub(crate) clip: Rect,
-    /// Pen position within its pixel, in steps of 1/`SUBPIXEL_STEPS` px.
+    /// Offset of the glyph from the pen, in pixels right and down (shaped clusters).
+    pub(crate) shift: (i32, i32),
+    /// The rest of the horizontal offset, in steps of 1/`SUBPIXEL_STEPS` px.
     pub(crate) subpixel: u8,
     /// Cells the glyph spans (2 for a wide cell): a synthesized glyph covers all of them.
     pub(crate) cells: u32,
+}
+
+/// Source of [`Glyphs::generation`] values, unique in the process.
+static GENERATIONS: AtomicU64 = AtomicU64::new(0);
+
+fn next_generation() -> u64 {
+    GENERATIONS.fetch_add(1, Ordering::Relaxed)
 }
 
 /// Where a looked-up glyph image is.
@@ -83,10 +97,13 @@ pub struct Glyphs {
     fonts: Fonts,
     cache: GlyphCache,
     raster: Rasterizer,
+    shaper: Shaper,
     kernel: Kernel,
     antialias: Antialias,
     /// The last image too large for the cache, drawn without being kept.
     uncached: Option<GlyphImage>,
+    /// Changes whenever the same glyph would be drawn with other pixels (fonts, antialiasing).
+    generation: u64,
 }
 
 impl Glyphs {
@@ -97,10 +114,27 @@ impl Glyphs {
             fonts,
             cache: GlyphCache::new(cache_bytes),
             raster: Rasterizer::new(),
+            shaper: Shaper::new(),
             kernel: Kernel::detect(),
             antialias: Antialias::Grayscale,
             uncached: None,
+            generation: next_generation(),
         }
+    }
+
+    /// Replaces the fonts (a new font family or fallback list): every cached glyph and shaped
+    /// cluster is forgotten and painters repaint everything.
+    pub fn set_fonts(&mut self, fonts: Fonts) {
+        self.fonts = fonts;
+        self.cache.evict_where(|_| true);
+        self.shaper = Shaper::new();
+        self.generation = next_generation();
+    }
+
+    /// Identifies what the glyphs look like: it changes with the fonts and the antialiasing, so
+    /// a painter knows to repaint cells whose content did not change. Unique in the process.
+    pub fn generation(&self) -> u64 {
+        self.generation
     }
 
     /// The fonts.
@@ -110,7 +144,10 @@ impl Glyphs {
 
     /// Sets how text is antialiased from now on (glyphs are cached per mode).
     pub fn set_antialias(&mut self, antialias: Antialias) {
-        self.antialias = antialias;
+        if self.antialias != antialias {
+            self.antialias = antialias;
+            self.generation = next_generation();
+        }
     }
 
     /// Bytes the glyph cache holds now (pixels and containers), never above its cap.
@@ -233,10 +270,13 @@ impl Glyphs {
         }
     }
 
-    /// Removes the cached glyphs of fallback faces the fonts dropped.
+    /// Removes the cached glyphs and shaped clusters of fallback faces the fonts dropped.
     fn forget_dropped_faces(&mut self) {
-        let cache = &mut self.cache;
-        self.fonts.drain_dropped(|face| cache.evict_where(|key| key.is_of(face)));
+        let (cache, shaper) = (&mut self.cache, &mut self.shaper);
+        self.fonts.drain_dropped(|face| {
+            cache.evict_where(|key| key.is_of(face));
+            shaper.forget(face);
+        });
     }
 }
 
@@ -260,6 +300,7 @@ fn placement(run: &TextRun<'_>) -> Placement {
         metrics: run.metrics,
         color: run.color,
         clip: run.clip,
+        shift: (0, 0),
         subpixel: 0,
         cells: 1,
     }

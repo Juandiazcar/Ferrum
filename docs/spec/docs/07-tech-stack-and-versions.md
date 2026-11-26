@@ -48,7 +48,7 @@ Versions below were **verified on 2026-11-20** against crates.io (`max_stable_ve
 | Bit flags | `bitflags` | 2.13.2 (2026-11-22, latest stable) | vt | cell attrs, modes; `default-features = false` |
 | Clipboard | `arboard` | 3.7.0 | platform | text + image; Wayland/X11 handled; features trimmed |
 | Image decode | `image` | 0.25.10 | render | `default-features = false`, features: `png`, `jpeg`, `gif`, `webp` only |
-| PNG (direct) | `png` | 0.18.1 | render | for kitty graphics PNG path if `image` is too heavy |
+| PNG (direct) | `png` | 0.18.1 (2026-11-25, latest stable; `default-features = false`) | render | for kitty graphics PNG path if `image` is too heavy; a dev-dependency of `ferrum-render` today, encoding and decoding its golden images (`fixtures/render/`). Brings `flate2` 1.1.11, `fdeflate` 0.3.7, `crc32fast` 1.5.6 (its `build.rs`, reviewed 2026-11-26, only runs `rustc --version` to enable stabilized CRC intrinsics), `simd-adler32` 0.3.10 and `miniz_oxide` 0.8.9 (a second version next to 0.9.1: `png` pins 0.8) |
 | Base64 | `base64` | 0.23.1 (2026-11-22, latest stable) | vt | OSC 52, kitty graphics; `default-features = false`, `std` (no `simd-unsafe`) |
 | Directories | `directories` | 6.0.0 (re-verified 2026-11-24, latest stable; `default-features = false`, it has no features) | platform | XDG / Library / AppData paths; brings `dirs-sys` 0.5 (the OS lookups), `option-ext` (MPL-2.0, unmodified, allowed by `docs/10` §6) and on Redox only `redox_users`/`libredox`; no `unsafe` of its own (`dirs-sys` calls the OS); no `rust-version` declared; MIT OR Apache-2.0; last release 2025-01-12 |
 | Native menus (macOS) | `muda` | 0.21.2 | app (macOS only) | standard app menu so Cmd+Q/H/M and Edit actions work |
@@ -133,7 +133,7 @@ Used only by throwaway packages under `spikes/` (own workspace and lockfile, exc
 | `cargo-bloat` | 0.12.1 | binary size attribution (last release 2024-05; still works) |
 | `criterion` | 0.8.2 | benchmarks |
 | `proptest` | 1.12.0 (2026-11-23, latest stable) | property tests (`ferrum-scrollback`, `ferrum-vt`; `default-features = false`, `std`) |
-| `insta` | 1.49.0 (2026-11-23, latest stable) | snapshot/golden tests (`default-features = false`; `ferrum-vt` fixtures) |
+| `insta` | 1.49.0 (2026-11-23, latest stable) | snapshot/golden tests (`default-features = false`; `ferrum-vt` fixtures, `ferrum-render` golden images as binary snapshots) |
 | `dhat` | 0.3.3 (2026-11-23, latest stable) | allocation counting in tests (`default-features = false`) |
 | `terminal_size` | 0.4.4 (2026-11-24, latest stable; released 2026-03-23) | `ferrum-testkit` only: the `ferrum-pty-helper` child of the `PtyBackend` contract suite reports the terminal size it sees (PT-15) without `unsafe`; depends only on `rustix` (Unix) and `windows-sys` 0.61 (Windows), both already in this table (`default-features = false`) |
 | `git-cliff` | 2.14.2 | changelog |

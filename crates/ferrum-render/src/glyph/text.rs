@@ -110,6 +110,15 @@ pub(crate) fn presentation(ch: char, next: Option<char>) -> Presentation {
     }
 }
 
+/// How a grapheme cluster is presented: its first character's [`presentation`], decided by the
+/// first VS15 or VS16 in the cluster when there is one (`❤️` is emoji, `☕︎` text).
+pub(crate) fn cluster_presentation(text: &str) -> Presentation {
+    let mut chars = text.chars();
+    let Some(first) = chars.next() else { return Presentation::Text };
+    let selector = chars.find(|&ch| ch == TEXT_SELECTOR || ch == EMOJI_SELECTOR);
+    presentation(first, selector)
+}
+
 fn is_emoji_presentation(ch: char) -> bool {
     EMOJI_PRESENTATION
         .binary_search_by(|&(first, last)| {
@@ -187,6 +196,10 @@ mod tests {
             assert_eq!(presentation(text, None), Presentation::Text, "{text}");
         }
         assert_eq!(presentation('❤', Some(EMOJI_SELECTOR)), Presentation::Emoji);
+        assert_eq!(cluster_presentation("❤\u{FE0F}"), Presentation::Emoji);
+        assert_eq!(cluster_presentation("☕\u{FE0E}"), Presentation::Text);
+        assert_eq!(cluster_presentation("👍🏽"), Presentation::Emoji);
+        assert_eq!(cluster_presentation("e\u{301}"), Presentation::Text);
         assert_eq!(presentation('☕', Some(TEXT_SELECTOR)), Presentation::Text);
     }
 

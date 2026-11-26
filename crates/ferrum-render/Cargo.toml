@@ -44,8 +44,14 @@ thiserror = { workspace = true }
 [dev-dependencies]
 dhat = { workspace = true }
 ferrum-testkit = { workspace = true }
+insta = { workspace = true }
+png = { workspace = true }
 
 # `dhat` counts every thread: run on the main thread (ferrum-testkit `single_test`).
 [[test]]
 name = "glyph_cache_memory"
+harness = false
+
+[[test]]
+name = "alloc_paint"
 harness = false

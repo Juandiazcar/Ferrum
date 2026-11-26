@@ -11,6 +11,7 @@ use rustc_hash::FxHashMap;
 
 use super::Antialias;
 use crate::font::{FaceId, Synthesis};
+use crate::synth::{Decoration, Lines};
 
 /// End of the LRU list.
 const NIL: u32 = u32::MAX;
@@ -34,6 +35,8 @@ pub(crate) enum GlyphKey {
     },
     /// A glyph drawn by `crate::synth` over this many pixels and line thickness.
     Synthetic { ch: char, width: u32, height: u32, light: u32 },
+    /// A decoration mask for a cell of these lines.
+    Decoration { decoration: Decoration, lines: Lines },
 }
 
 impl GlyphKey {

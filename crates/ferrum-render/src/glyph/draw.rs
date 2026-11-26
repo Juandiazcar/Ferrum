@@ -10,8 +10,9 @@ use crate::target::{Rect, Target};
 pub(super) fn blit(target: &mut Target<'_>, kernel: Kernel, image: &GlyphImage, place: &Placement) {
     let band = Rect::new(0, place.y, target.width(), place.metrics.height);
     let clip = place.clip.intersect(&band).intersect(&target.bounds());
-    let left = i64::from(place.x) + i64::from(image.left);
-    let top = i64::from(place.y) + i64::from(place.metrics.baseline) - i64::from(image.top);
+    let left = i64::from(place.x) + i64::from(image.left) + i64::from(place.shift.0);
+    let top = i64::from(place.y) + i64::from(place.metrics.baseline) - i64::from(image.top)
+        + i64::from(place.shift.1);
     let columns = clip_span(left, image.width, (clip.x, clip.right()));
     let lines = clip_span(top, image.height, (clip.y, clip.bottom()));
     let (Some((x, skip, len)), Some((y, first, rows))) = (columns, lines) else { return };

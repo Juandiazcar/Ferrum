@@ -1,0 +1,39 @@
+# Temporary (WP-07): measures the ferrum-render repaint benches on GitHub-hosted runners for
+# NFR-PERF-03 / Q-19 (Q-27 as amended: the agents measure on hosted runners). Never merged.
+name: wp07-bench
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rust
+      - name: CPU
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Linux) lscpu | grep -E 'Model name|^CPU\(s\)' ;;
+            macOS) sysctl -n machdep.cpu.brand_string; sysctl -n hw.ncpu ;;
+            Windows) powershell -Command "(Get-CimInstance Win32_Processor).Name" ;;
+          esac
+          rustc --version
+      - name: Repaint benches, three runs
+        shell: bash
+        run: |
+          for run in 1 2 3; do
+            cargo bench --locked -p ferrum-render --bench repaint -- --noplot 2>&1 | grep -E '^render_repaint|time:'
+            for bench in dense_200x60 typical_200x60 damage_4_rows; do
+              file=target/criterion/render_repaint/$bench/new/estimates.json
+              echo "RESULT run=$run bench=$bench median_ns=$(jq '.median.point_estimate' "$file")"
+            done
+          done

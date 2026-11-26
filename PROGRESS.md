@@ -2,6 +2,62 @@
 
 Honest state of the build (`docs/spec/docs/12-build-order.md`). Numbers appear here only when measured.
 
+## WP-07 `ferrum-render` (stacked PRs #99 → #100 → #101 → #102 → #103 → #104 → #105)
+
+Done: the embedded JetBrains Mono 2.304 variable font, subset to Latin, Latin-ext, box drawing,
+block elements and powerline (162 964 bytes, OFL, `assets/fonts/`) and system families through
+`fontdb` (no fontconfig, scanned off the UI thread; files mapped by `fontdb` only while read, so no
+`unsafe` outside the blit kernels), the system color emoji fonts, `CellMetrics` from logical size
+and scale factor (HiDPI, fractional factors) (#99); the fallback chain with per-face coverage
+pages, the bounded LRU glyph cache (key face, glyph, size, weight, synthesis; byte cap from the
+caller), grayscale AA, color emoji (`COLR`, `CBDT`, `sbix`) fitted to two cells, synthetic bold and
+italic, SSE2/AVX2 (run-time detected)/NEON blit kernels equal to the scalar one bit for bit,
+`Glyphs::draw_text` (#100); pixel-perfect box drawing, block elements and powerline separators
+bypassing the font (#101); `Painter` with row hashes, buffer-age history, damage rectangles,
+underline styles (single, double, curly, dotted, dashed) and colors, strikeout, overline, cursor
+block/underline/bar/hollow, linear and block selection, wide cells, shaped grapheme clusters, the
+`dhat` gate and the golden images (#102); the repaint benches and their 5 ms ceilings (#103);
+rounded-rect and shadow chrome tiles drawn by nine-slicing (#104). New constants are in the Q-30
+row of `docs/14`.
+
+Measured on GitHub-hosted runners (the agents measure there under Q-27 as amended; each run gets
+other CPUs, Q-28), criterion medians of three runs each, rustc 1.100.0, release. Run 45824708305
+(temporary PR #106) is the final code of this stack; run 45820450614 (temporary PR #98) the same
+hot path before the last fixes (emoji advance, the subpixel key field, test attributes):
+
+| Runner (run) | dense 200×60, NFR-PERF-03 (≤ 2.5 ms, Q-19) | typical 200×60 | four changed rows |
+|---|---|---|---|
+| Windows, AMD EPYC 7763, AVX2 (45824708305) | 1.147–1.158 ms | 0.561–0.571 ms | 86.4–87.0 µs |
+| Linux, AMD EPYC 9V74, AVX2 (45824708305) | 0.841–0.857 ms | 0.400–0.405 ms | 66.1–67.4 µs |
+| macOS, Apple M1 virtual, NEON (45824708305) | 0.98–1.62 ms | 0.626–0.830 ms | 74.3–99.1 µs |
+| Windows, AMD EPYC 9V45, AVX2 (45820450614) | 0.658–0.660 ms | 0.320–0.324 ms | 54.6–55.4 µs |
+| Linux, AMD EPYC 7763, AVX2 (45820450614) | 1.072–1.080 ms | 0.528–0.533 ms | 83.4–83.9 µs |
+| macOS, Apple M1 virtual, NEON (45820450614) | 1.21–1.45 ms | 0.567–0.645 ms | 84.2–96.2 µs |
+
+Apple M2 (development machine, not a baseline): dense 0.83 ms (2.0 ms before the padded rows, the
+row-rectangle kernels, the ASCII table and the three-word row hash), typical 0.39 ms, four rows
+63 µs. Windows baselines from run 45824708305 are in `benches/baselines/windows.json`.
+
+| Criterion | Result |
+|---|---|
+| NFR-PERF-03 | met on every hosted runner above: dense at most 1.62 ms (2.5 ms target) |
+| Zero steady-state allocations | `tests/alloc_paint.rs` (`dhat`, `harness = false`): 0 blocks over 100 frames (full and incremental, moving cursor and selection, a cluster, box drawing, every decoration, a wide cell); 100 blocks when one `Vec` is added per frame |
+| Golden images | 10 `insta` binary snapshots in `fixtures/render/` (text styles, decorations, cursors, selection at 1× and 2×, box drawing 1× and 2×, a box frame, chrome tiles), equal within 2 per channel on the three OS (CI) |
+| Glyph cache working set (13 px, M2) | printable ASCII in four styles 94 160 B (376 glyphs); plus 3 000 CJK glyphs 1.09 MB; plus 80 emoji 1.17 MB, all under the 3 MB allowance (`docs/03` §2) |
+| System font scan | 786 faces in 42 ms (M2) |
+| MSRV 1.97 | `cargo +1.97.0 test --locked -p ferrum-render` green |
+| Miri (nightly, aarch64, local) | the library tests pass (106 s), NEON kernels included; skipped there: the system-font tests (Miri cannot map memory), the golden scenes (far too slow interpreted; compared natively on the three OS) and the chrome tile tests: under Miri only, `tiny-skia`'s anti-aliased fill indexes past a 13-px pixmap (`lowp` pipeline, also with `-Zmiri-deterministic-floats`); natively they pass on the three OS |
+
+Open items / not verified:
+- The i5-9400 run named in Q-19 is no longer a merge condition (Q-27 as amended): MV-07-1.
+- HiDPI on real displays, color emoji and system families by eye: MV-07-2 to MV-07-4 (the window
+  that shows them arrives with WP-08).
+- The `tiny-skia` Miri finding above is worth reporting upstream.
+
+Next: WP-08 `ferrum-ui` + `ferrum-app` (the UI converts its rows into `Cell`s, calls
+`SystemFonts::scan` off the UI thread, maps the font setting to `Family` and pt to logical px, and
+presents `Painter::paint`'s damage with `present_with_damage`).
+
 ## WP-06 `ferrum-daemon` (stacked PRs #90 → #91 → #92 → #93 → #94 → #95 → #96)
 
 Done: protocol 1.1 (`SearchResults`, `SessionEvent::Failed`/`SessionStatus::Failed` with the

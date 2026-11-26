@@ -1,6 +1,8 @@
 //! Painting one row: backgrounds, text, decorations, then the cursor. Glyphs are drawn after
 //! every background of the row, so a glyph may overhang into the next cell (a wide glyph into
 //! its spacer, an italic into its neighbor).
+// perf: `render_repaint/*` (benches/repaint.rs) — backgrounds are filled on the row's first pixel
+// line and copied down.
 
 use super::Grid;
 use super::cell::{Cell, CellText, CellWidth, Row, Strokes};
@@ -70,7 +72,7 @@ fn resolve_colors(
     }
 }
 
-/// Fills the backgrounds run by run.
+/// Fills the backgrounds run by run on the row's first pixel line, then copies that line down.
 fn fill_backgrounds(cx: &mut Context<'_, '_>, y: u16) {
     let rect = cx.grid.row_rect(y).intersect(&cx.clip);
     if rect.is_empty() {
@@ -83,10 +85,11 @@ fn fill_backgrounds(cx: &mut Context<'_, '_>, y: u16) {
             cx.colors.iter().skip(usize::from(col)).take_while(|(_, other)| *other == bg).count();
         let run = u16::try_from(run).unwrap_or(u16::MAX).max(1);
         let x = cx.grid.cell_rect(col, y).x;
-        let span = Rect::new(x, rect.y, u32::from(run).saturating_mul(width), rect.height);
-        cx.target.fill(span.intersect(&rect), bg);
+        let line = Rect::new(x, rect.y, u32::from(run).saturating_mul(width), 1).intersect(&rect);
+        cx.target.fill(line, bg);
         col = col.saturating_add(run);
     }
+    cx.target.copy_line(rect.y, rect.y.saturating_add(1)..rect.bottom(), (rect.x, rect.width));
 }
 
 /// Cells a cell's glyph, block cursor or synthesized mask covers.

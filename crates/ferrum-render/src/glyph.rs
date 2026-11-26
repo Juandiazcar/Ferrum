@@ -5,6 +5,7 @@
 //! glyph cache (3 MB by default, the glyph cache setting), so the caller creates one and passes
 //! it to every painter. Steady-state drawing (every glyph already cached) allocates nothing.
 
+mod ascii;
 mod cache;
 mod cell;
 mod draw;
@@ -12,6 +13,7 @@ mod raster;
 mod shape;
 mod text;
 
+use ascii::AsciiSlots;
 use cache::{GlyphCache, GlyphImage, GlyphKey};
 use raster::{At, Fit, Rasterizer};
 use shape::Shaper;
@@ -98,6 +100,7 @@ pub struct Glyphs {
     cache: GlyphCache,
     raster: Rasterizer,
     shaper: Shaper,
+    ascii: AsciiSlots,
     kernel: Kernel,
     antialias: Antialias,
     /// The last image too large for the cache, drawn without being kept.
@@ -115,6 +118,7 @@ impl Glyphs {
             cache: GlyphCache::new(cache_bytes),
             raster: Rasterizer::new(),
             shaper: Shaper::new(),
+            ascii: AsciiSlots::new(),
             kernel: Kernel::detect(),
             antialias: Antialias::Grayscale,
             uncached: None,
@@ -208,7 +212,7 @@ impl Glyphs {
         let key = GlyphKey::Synthetic { ch, width, height: metrics.height, light: metrics.stroke };
         let make = |_: &Fonts, _: &mut Rasterizer| {
             let canvas = synth::draw(ch, width, metrics.height, metrics.stroke)?;
-            mask_image(canvas, &metrics)
+            mask_image(&canvas, &metrics)
         };
         let stored = self.image(key, make);
         self.blit(target, stored, place);
@@ -280,16 +284,21 @@ impl Glyphs {
     }
 }
 
-/// A synthesized mask as an image whose top-left corner is the cell's.
-fn mask_image(canvas: synth::Canvas, metrics: &CellMetrics) -> Option<GlyphImage> {
+/// A synthesized mask as an image whose top-left corner is the cell's, rows padded to the blit
+/// step.
+fn mask_image(canvas: &synth::Canvas, metrics: &CellMetrics) -> Option<GlyphImage> {
+    let stride = raster::aligned(canvas.width)?;
+    let width = usize::try_from(canvas.width).ok()?.max(1);
+    let rows = canvas.pixels.chunks_exact(width);
+    let pixels = raster::pad_rows(rows, usize::try_from(stride).ok()?, |&coverage| coverage);
     Some(GlyphImage {
         left: 0,
         top: i32::try_from(metrics.baseline).ok()?,
         width: canvas.width,
         height: canvas.height,
-        stride: canvas.width,
+        stride,
         advance: Some(f32_from(metrics.width)),
-        pixels: cache::Pixels::Mask(canvas.pixels),
+        pixels: cache::Pixels::Mask(pixels),
     })
 }
 

@@ -112,6 +112,9 @@ pub(crate) struct GlyphCache {
     /// Bytes of pixels of the cached images.
     pixel_bytes: usize,
     capacity_bytes: usize,
+    /// Incremented by every eviction: a slot remembered at another generation may hold another
+    /// glyph.
+    generation: u32,
 }
 
 impl GlyphCache {
@@ -124,7 +127,12 @@ impl GlyphCache {
             tail: NIL,
             pixel_bytes: 0,
             capacity_bytes,
+            generation: 0,
         }
+    }
+
+    pub(crate) fn generation(&self) -> u32 {
+        self.generation
     }
 
     /// Bytes the cache holds: pixels plus the capacity of its containers. Never above the cap.
@@ -260,6 +268,7 @@ impl GlyphCache {
         let _removed = self.map.remove(&key);
         self.pixel_bytes = self.pixel_bytes.saturating_sub(bytes);
         self.free.push(index);
+        self.generation = self.generation.wrapping_add(1);
     }
 
     fn slot_mut(&mut self, index: u32) -> Option<&mut Slot> {

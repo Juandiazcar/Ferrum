@@ -13,4 +13,7 @@ pub enum RenderError {
     /// A font file could not be read as a font.
     #[error("the font file could not be read")]
     UnreadableFont,
+    /// The pixel buffer is not `width × height` pixels long.
+    #[error("the pixel buffer does not match its width and height")]
+    BufferSize,
 }

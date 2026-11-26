@@ -509,8 +509,10 @@ dependencies = [
 name = "ferrum-render"
 version = "0.1.0"
 dependencies = [
+ "dhat",
  "ferrum-testkit",
  "fontdb",
+ "rustc-hash 2.1.3",
  "swash",
  "thiserror 2.0.21",
 ]

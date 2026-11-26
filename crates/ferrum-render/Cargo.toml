@@ -38,7 +38,14 @@ missing_panics_doc = "warn"
 [dependencies]
 swash = { workspace = true }
 fontdb = { workspace = true }
+rustc-hash = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+dhat = { workspace = true }
 ferrum-testkit = { workspace = true }
+
+# `dhat` counts every thread: run on the main thread (ferrum-testkit `single_test`).
+[[test]]
+name = "glyph_cache_memory"
+harness = false

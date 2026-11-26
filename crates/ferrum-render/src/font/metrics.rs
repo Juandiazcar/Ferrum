@@ -50,8 +50,11 @@ impl FontSpec {
 /// Geometry of one cell, in physical pixels, measured from the cell's top-left corner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CellMetrics {
-    /// Cell width.
+    /// Cell width: the font's advance plus the letter spacing.
     pub width: u32,
+    /// The font's own advance of `0`, rounded, without the letter spacing: what a glyph's
+    /// advance is compared with to count its cells.
+    pub advance: u32,
     /// Cell height.
     pub height: u32,
     /// Baseline, from the top of the cell.
@@ -77,6 +80,7 @@ impl CellMetrics {
         let zero = font.charmap().map('0');
         let advance = font.glyph_metrics(&[]).scale(size).advance_width(zero);
         let width = to_px(advance + spec.letter_spacing_px * spec.scale_factor).max(1);
+        let own_advance = to_px(advance).max(1);
         let natural = metrics.ascent + metrics.descent + metrics.leading;
         let height = to_px(natural * spec.line_height).max(1);
         let half_leading = (f32_from(height) - (metrics.ascent + metrics.descent)) / 2.0;
@@ -86,6 +90,7 @@ impl CellMetrics {
         let below = |offset: f32| to_px(f32_from(baseline) - offset).min(last_line);
         Ok(Self {
             width,
+            advance: own_advance,
             height,
             baseline,
             underline_top: below(metrics.underline_offset),

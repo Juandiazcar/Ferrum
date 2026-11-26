@@ -111,6 +111,40 @@ impl<'a> Target<'a> {
         }
     }
 
+    /// Copies the pixels `x..x + len` of row `from` into rows `to` (clipped to the buffer).
+    pub(crate) fn copy_line(&mut self, from: u32, to: std::ops::Range<u32>, (x, len): (u32, u32)) {
+        if from >= self.height || x >= self.width {
+            return;
+        }
+        let width = u64::from(self.width);
+        let len = u64::from(len.min(self.width - x));
+        let source = u64::from(from) * width + u64::from(x);
+        for y in to.start..to.end.min(self.height) {
+            let destination = u64::from(y) * width + u64::from(x);
+            let (Ok(source), Ok(end), Ok(destination)) = (
+                usize::try_from(source),
+                usize::try_from(source + len),
+                usize::try_from(destination),
+            ) else {
+                return;
+            };
+            if end <= self.pixels.len()
+                && destination.saturating_add(end - source) <= self.pixels.len()
+            {
+                self.pixels.copy_within(source..end, destination);
+            }
+        }
+    }
+
+    /// Every pixel from (`x`, `y`) to the end of the buffer, rows `width` pixels apart.
+    pub(crate) fn tail_mut(&mut self, x: u32, y: u32) -> Option<&mut [u32]> {
+        if x >= self.width || y >= self.height {
+            return None;
+        }
+        let start = usize::try_from(u64::from(y) * u64::from(self.width) + u64::from(x)).ok()?;
+        self.pixels.get_mut(start..)
+    }
+
     /// The pixels of row `y` from `x`, at most `len` of them, clipped to the buffer.
     pub(crate) fn span_mut(&mut self, y: u32, x: u32, len: u32) -> Option<&mut [u32]> {
         if y >= self.height || x >= self.width {

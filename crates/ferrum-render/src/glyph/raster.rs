@@ -9,6 +9,7 @@ use swash::zeno::{Angle, Format, Transform, Vector};
 
 use super::Antialias;
 use super::cache::{GlyphImage, Pixels};
+use crate::blit::ROW_ALIGN;
 use crate::font::metrics::f32_from;
 use crate::font::{Face, Fonts, Glyph};
 
@@ -146,25 +147,26 @@ fn convert(image: &Image, advance: f32) -> Option<GlyphImage> {
     if width == 0 || height == 0 {
         return Some(GlyphImage::empty(Some(advance)));
     }
+    let stride = aligned(placement.width)?;
+    let padded = usize::try_from(stride).ok()?;
     let area = width.checked_mul(height)?;
     let pixels = match image.content {
-        Content::Mask => Pixels::Mask(image.data.get(..area)?.to_vec()),
+        Content::Mask => {
+            let rows = image.data.get(..area)?.chunks_exact(width);
+            Pixels::Mask(pad_rows(rows, padded, |&coverage| coverage))
+        }
         Content::SubpixelMask => {
             let rgba = image.data.get(..area.checked_mul(4)?)?;
-            Pixels::Subpixel(
-                rgba.as_chunks::<4>()
-                    .0
-                    .iter()
-                    .map(|&[r, g, b, _]| u32::from_be_bytes([0, r, g, b]))
-                    .collect(),
-            )
+            let rows = rgba.as_chunks::<4>().0.chunks_exact(width);
+            Pixels::Subpixel(pad_rows(rows, padded, |&[r, g, b, _]| {
+                u32::from_be_bytes([0, r, g, b])
+            }))
         }
         Content::Color => {
             let straight = matches!(image.source, Source::ColorBitmap(_) | Source::Bitmap(_));
             let rgba = image.data.get(..area.checked_mul(4)?)?;
-            Pixels::Color(
-                rgba.as_chunks::<4>().0.iter().map(|&px| premultiply(px, straight)).collect(),
-            )
+            let rows = rgba.as_chunks::<4>().0.chunks_exact(width);
+            Pixels::Color(pad_rows(rows, padded, |&pixel| premultiply(pixel, straight)))
         }
     };
     Some(GlyphImage {
@@ -172,10 +174,31 @@ fn convert(image: &Image, advance: f32) -> Option<GlyphImage> {
         top: placement.top,
         width: placement.width,
         height: placement.height,
-        stride: placement.width,
+        stride,
         advance: Some(advance),
         pixels,
     })
+}
+
+/// `width` rounded up to `crate::blit::ROW_ALIGN`.
+pub(crate) fn aligned(width: u32) -> Option<u32> {
+    Some(width.checked_add(ROW_ALIGN - 1)? / ROW_ALIGN * ROW_ALIGN)
+}
+
+/// The rows converted by `pixel`, each padded with the default (transparent) value to `stride`.
+pub(crate) fn pad_rows<'a, S: 'a, T: Default + Clone>(
+    rows: impl ExactSizeIterator<Item = &'a [S]>,
+    stride: usize,
+    pixel: impl Fn(&S) -> T,
+) -> Vec<T> {
+    // Exactly the image's size: the glyph cache counts capacity.
+    let mut out = Vec::with_capacity(rows.len().saturating_mul(stride));
+    for row in rows {
+        let start = out.len();
+        out.extend(row.iter().map(&pixel));
+        out.resize(start.saturating_add(stride), T::default());
+    }
+    out
 }
 
 /// One RGBA pixel as premultiplied `0xAARRGGBB`. `swash` composites color outlines already

@@ -2,6 +2,8 @@
 //! (decoded `ferrum-proto` rows) into these, with colors already resolved (palette, inverse,
 //! dim, hidden), so the renderer needs no terminal type (`docs/04` §2).
 
+use std::hash::{Hash, Hasher};
+
 use crate::color::Rgb;
 use crate::font::TextStyle;
 use crate::synth::Underline;
@@ -61,7 +63,7 @@ impl Strokes {
 }
 
 /// One cell, colors resolved.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cell {
     /// Its text.
     pub text: CellText,
@@ -94,6 +96,31 @@ impl Cell {
             strokes: Strokes::NONE,
             width: CellWidth::Single,
         }
+    }
+}
+
+impl Hash for Cell {
+    /// Three words per cell instead of one write per field: rows are hashed every frame.
+    // perf: `render_repaint/damage_4_rows` hashes 12 000 cells per frame.
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let text = match self.text {
+            CellText::Empty => 0,
+            CellText::Char(ch) => 1 << 32 | u64::from(ch),
+            CellText::Cluster { start, len } => 2 << 62 | u64::from(len) << 32 | u64::from(start),
+        };
+        let colors = u64::from(self.fg.pixel()) << 32 | u64::from(self.bg.pixel());
+        let underline = self.underline as u64;
+        let slant = self.style.slant as u64;
+        let width = self.width as u64;
+        let style = u64::from(self.underline_color.pixel())
+            | u64::from(self.style.weight) << 24
+            | slant << 40
+            | underline << 41
+            | u64::from(self.strokes.0) << 44
+            | width << 46;
+        state.write_u64(text);
+        state.write_u64(colors);
+        state.write_u64(style);
     }
 }
 

@@ -2,42 +2,48 @@
 
 use super::Placement;
 use super::cache::{GlyphImage, Pixels};
-use crate::blit::Kernel;
+use crate::blit::{Kernel, Shape};
 use crate::target::{Rect, Target};
 
 /// Blends `image` into `target` at `place`, clipped to the clip rectangle, the target and the
-/// glyph's row of cells.
+/// glyph's row of cells. Rows are blended with their transparent padding when it is visible, so
+/// narrow glyphs take whole SIMD steps.
+// perf: `render_repaint/*` — one call per glyph, not per row.
 pub(super) fn blit(target: &mut Target<'_>, kernel: Kernel, image: &GlyphImage, place: &Placement) {
     let band = Rect::new(0, place.y, target.width(), place.metrics.height);
     let clip = place.clip.intersect(&band).intersect(&target.bounds());
     let left = i64::from(place.x) + i64::from(image.left) + i64::from(place.shift.0);
     let top = i64::from(place.y) + i64::from(place.metrics.baseline) - i64::from(image.top)
         + i64::from(place.shift.1);
-    let columns = clip_span(left, image.width, (clip.x, clip.right()));
+    let columns = clip_span(left, image.stride, (clip.x, clip.right()));
     let lines = clip_span(top, image.height, (clip.y, clip.bottom()));
-    let (Some((x, skip, len)), Some((y, first, rows))) = (columns, lines) else { return };
-    let stride = usize::try_from(image.stride).unwrap_or(0);
+    let (Some((x, skip, width)), Some((y, first, rows))) = (columns, lines) else { return };
+    let (Ok(src_stride), Ok(width), Ok(rows), Ok(dst_stride)) = (
+        usize::try_from(image.stride),
+        usize::try_from(width),
+        usize::try_from(rows),
+        usize::try_from(target.width()),
+    ) else {
+        return;
+    };
+    let shape = Shape { width, rows, dst_stride, src_stride };
+    let from = first.saturating_mul(src_stride).saturating_add(skip);
     let color = place.color.pixel();
-    for row in 0..rows {
-        let Some(dst) = target.span_mut(y.saturating_add(row), x, len) else { return };
-        let line = first.saturating_add(usize::try_from(row).unwrap_or(usize::MAX));
-        let from = line.saturating_mul(stride).saturating_add(skip);
-        let to = from.saturating_add(dst.len());
-        match &image.pixels {
-            Pixels::Mask(mask) => {
-                if let Some(mask) = mask.get(from..to) {
-                    kernel.blend_mask(dst, mask, color);
-                }
+    let Some(dst) = target.tail_mut(x, y) else { return };
+    match &image.pixels {
+        Pixels::Mask(mask) => {
+            if let Some(mask) = mask.get(from..) {
+                kernel.blend_mask_rect(dst, mask, color, shape);
             }
-            Pixels::Subpixel(coverage) => {
-                if let Some(coverage) = coverage.get(from..to) {
-                    kernel.blend_subpixel(dst, coverage, color);
-                }
+        }
+        Pixels::Subpixel(coverage) => {
+            if let Some(coverage) = coverage.get(from..) {
+                kernel.blend_subpixel_rect(dst, coverage, color, shape);
             }
-            Pixels::Color(pixels) => {
-                if let Some(pixels) = pixels.get(from..to) {
-                    kernel.blend_color(dst, pixels);
-                }
+        }
+        Pixels::Color(pixels) => {
+            if let Some(pixels) = pixels.get(from..) {
+                kernel.blend_color_rect(dst, pixels, shape);
             }
         }
     }

@@ -180,3 +180,37 @@ fn lcd_text_blends_each_channel() {
     });
     assert!(fringed, "white text on black gets colored edges with LCD antialiasing");
 }
+
+#[test]
+fn box_drawing_bypasses_the_font_and_fills_the_cell_grid() {
+    let (mut glyphs, metrics) = glyphs(None);
+    let (pixels, cells) = draw(&mut glyphs, metrics, "█▀╋", TextStyle::REGULAR);
+    assert_eq!(cells, 3);
+    let width = usize::try_from(metrics.width).unwrap();
+    let rows: Vec<&[u32]> = pixels.chunks(width * 4).collect();
+    assert!(
+        rows.iter().all(|row| row[..width].iter().all(|&pixel| pixel == WHITE.pixel())),
+        "█ fills its cell"
+    );
+    let expected = synth::draw('╋', metrics.width, metrics.height, metrics.stroke).unwrap();
+    let drawn: Vec<u8> = rows
+        .iter()
+        .flat_map(|row| row[2 * width..3 * width].iter().map(|&pixel| (pixel & 0xFF) as u8))
+        .collect();
+    assert_eq!(drawn, expected.pixels, "the synthesized mask, not the font's glyph");
+}
+
+#[test]
+fn a_synthesized_glyph_spans_every_cell_of_a_wide_cell() {
+    let (mut glyphs, metrics) = glyphs(None);
+    let (width, height) = (metrics.width * 4, metrics.height);
+    let mut pixels = vec![0; usize::try_from(width * height).unwrap()];
+    let mut target = Target::new(&mut pixels, width, height).unwrap();
+    let place = Placement { cells: 2, ..placement(&run("", metrics, target.bounds())) };
+    glyphs.draw_synthetic(&mut target, '─', &place);
+    let middle = usize::try_from((metrics.height - metrics.stroke) / 2 * width).unwrap();
+    let two = usize::try_from(metrics.width * 2).unwrap();
+    let line = &pixels[middle..middle + usize::try_from(width).unwrap()];
+    assert!(line[..two].iter().all(|&pixel| pixel == WHITE.pixel()), "both cells");
+    assert!(line[two..].iter().all(|&pixel| pixel == 0), "and no further");
+}

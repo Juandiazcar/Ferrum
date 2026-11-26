@@ -1,7 +1,7 @@
 use super::*;
 
 fn key(id: u16) -> GlyphKey {
-    GlyphKey {
+    GlyphKey::Font {
         face: FaceId::EMBEDDED,
         id,
         size_q: 64 * 12,
@@ -86,7 +86,7 @@ fn entries_can_be_evicted_by_key() {
     for id in 0..10 {
         cache.insert(key(id), image(8)).unwrap();
     }
-    cache.evict_where(|key| key.id % 2 == 0);
+    cache.evict_where(|key| matches!(key, GlyphKey::Font { id, .. } if id % 2 == 0));
     assert_eq!(cache.len(), 5);
     assert!(cache.lookup(&key(2)).is_none() && cache.lookup(&key(3)).is_some());
 }

@@ -36,6 +36,12 @@ coverage of the system faces is read the first time a fallback is needed) and me
 presentation follows Unicode `Emoji_Presentation` and VS15/VS16. At most 64 fallback faces stay
 loaded; the least recently used is dropped, with its memo entries and cached glyphs.
 
+Box drawing (U+2500–U+257F), block elements (U+2580–U+259F) and the powerline separators
+(U+E0B0–U+E0B3) bypass the font: they are drawn on the cell's own pixel grid (light lines of the
+font's underline thickness, heavy twice that), so lines meet exactly across cells; tests check
+that every arm of every box-drawing character ends on the pixels of the matching straight line,
+and complementary blocks tile at odd sizes. A wide cell's synthesized glyph covers both cells.
+
 The glyph cache is a bounded LRU of grayscale coverage masks, per-channel LCD coverage (the LCD
 text setting, `Glyphs::set_antialias`) and premultiplied color images (`docs/02` §6), capped in
 bytes by the caller (the glyph cache setting, default 3 MB); the cap counts pixels and the

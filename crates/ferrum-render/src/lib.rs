@@ -8,6 +8,7 @@
 //! - [`Glyphs`]: fonts, glyph cache (bounded LRU) and blit kernels, one per process; draws glyphs and
 //!   lines of text into a [`Target`]. Box drawing, block elements and the powerline separators
 //!   are drawn pixel-perfect by the renderer itself, bypassing the font.
+//! - [`chrome`]: rounded rectangles and shadows as cached tiles, drawn by nine-slicing.
 //! - [`Painter`]: paints a pane's grid of [`Cell`]s with cursor and selection, repaints only the
 //!   rows whose content hash changed since the frame the buffer holds, and returns the damage.
 
@@ -15,6 +16,7 @@
 
 #[allow(unsafe_code, reason = "docs/05 §4: the SIMD blit kernels, every block with `// SAFETY:`")]
 mod blit;
+pub mod chrome;
 mod color;
 mod error;
 pub mod font;

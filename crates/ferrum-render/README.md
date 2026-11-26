@@ -72,6 +72,9 @@ check every kernel against the scalar one bit for bit.
 - `tests/alloc_paint.rs` (`dhat`, `harness = false`): 0 allocations over 100 steady-state frames.
 - `tests/glyph_cache_memory.rs` (`dhat`, `harness = false`): the heap stays within the glyph
   cache cap.
+- `benches/repaint.rs`: `render_repaint/dense_200x60`, `typical_200x60` (NFR-PERF-03, 13 px at
+  scale 1, gated at 5 ms by `cargo xtask bench`), `dense_200x60_2x` (scale 2) and
+  `damage_4_rows` (four changed rows).
 
 The authoritative edge table is `docs/spec/docs/04-repository-structure.md` §2, enforced by
 `cargo xtask check-deps` from `xtask/deps-rules.toml`.

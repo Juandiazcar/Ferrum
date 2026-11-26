@@ -147,6 +147,9 @@ pub struct Appearance {
     pub animations: bool,
     /// Reduced motion (`docs/09` §11). Default off: the user opts in.
     pub reduced_motion: bool,
+    /// LCD (subpixel) antialiasing of text on opaque backgrounds (`docs/02` §6: optional, off by
+    /// default; grayscale antialiasing is the default).
+    pub lcd_text: bool,
 }
 
 impl Default for Appearance {
@@ -170,6 +173,7 @@ impl Default for Appearance {
             project_tint: false,
             animations: true,
             reduced_motion: false,
+            lcd_text: false,
         }
     }
 }

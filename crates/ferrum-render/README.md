@@ -7,7 +7,7 @@
 |---|---|
 | Allowed internal dependencies | none (no windowing; takes plain values, not config types) |
 | Must never depend on | winit, softbuffer, ferrum-config and any other ferrum crate |
-| External dependencies | `swash` (shaping, rasterization), `fontdb` (system font discovery), `rustc-hash` (cache maps), `thiserror` |
+| External dependencies | `swash` (shaping, rasterization), `fontdb` (system font discovery), `tiny-skia` (chrome tiles), `rustc-hash` (cache maps), `thiserror` |
 | `unsafe` | allowed only in the blit kernels (`#![deny(unsafe_code)]` + one local `#[allow]`) |
 
 ## Public API
@@ -38,6 +38,11 @@
   `present_with_damage`. Age 0, an age past the remembered frames, a new layout or a new
   `Glyphs::generation` repaint everything, padding included. Steady-state painting allocates
   nothing (`tests/alloc_paint.rs`).
+- `chrome::Tile`: a rounded rectangle (fill, optional border) or a blurred shadow drawn once
+  with `tiny-skia` at the smallest size that holds its corners, then composited at any size by
+  nine-slicing (`Tile::draw`, `Shadow::draw`), with no `tiny-skia` call and no allocation per
+  frame. A shadow past the top or left edge is clipped (`Shadow::bounds` is the damage). Radii,
+  colors and blur are the caller's (theme tokens, `docs/09` §9).
 - `Target`: the caller's `&mut [u32]` (`0x00RRGGBB`, the `softbuffer` buffer) with its size;
   `Rect`, `Rgb`.
 
@@ -67,8 +72,10 @@ check every kernel against the scalar one bit for bit.
 
 - Golden images: `tests/golden.rs` paints small scenes with the embedded font at 13 px (text
   styles, decorations, cursor shapes, selection, box drawing, blocks, powerline, at 1× and 2×,
-  and LCD text) and compares them with the `insta` binary snapshots in `fixtures/render/`, per
-  channel within a tolerance of 2. They also run under Miri (nightly).
+  LCD text, and the chrome tiles) and compares them with the `insta` binary snapshots in
+  `fixtures/render/`, per channel within a tolerance of 2. They also run under Miri (nightly),
+  except the chrome tiles: `tiny-skia` compares function pointers, which Miri makes unequal
+  (the nine-slicing itself is unit-tested under Miri).
 - `tests/alloc_paint.rs` (`dhat`, `harness = false`): 0 allocations over 100 steady-state frames.
 - `tests/glyph_cache_memory.rs` (`dhat`, `harness = false`): the heap stays within the glyph
   cache cap.

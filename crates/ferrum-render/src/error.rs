@@ -16,4 +16,7 @@ pub enum RenderError {
     /// The pixel buffer is not `width × height` pixels long.
     #[error("the pixel buffer does not match its width and height")]
     BufferSize,
+    /// A tile radius, border or blur is negative, not finite, or makes the tile too large.
+    #[error("the tile size is out of range")]
+    InvalidTileSize,
 }
